@@ -371,6 +371,7 @@ export default function Mantenimiento() {
   setFormData={setFormData}   
   handleSaveAll={handleSaveAll}
         estados={Object.keys(ESTADOS_AV)}
+        listaAvisos={Object.values(columns).flatMap((col) => col.items)}
       />
 
       <ModalMantenimientoView

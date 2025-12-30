@@ -13,7 +13,9 @@ import {
 } from "../components/data";
 
 export default function ModalMantenimiento({ isOpen, onClose ,
-  formData,setFormData, handleSaveAll }) {
+  formData,setFormData, handleSaveAll, listaAvisos =[] }) {
+
+  console.log("¿Cuántos avisos llegaron al modal?:", listaAvisos.length);
   const [wizardStep, setWizardStep] = useState(1);
 
 
@@ -27,6 +29,45 @@ export default function ModalMantenimiento({ isOpen, onClose ,
 
     if (files) {
       setFormData((p) => ({ ...p, [name]: files[0] }));
+      return;
+    }
+
+    //  CÓDIGO PARA CORRELATIVO DE NÚMERO DE AVISO
+    if (name === "ordenVenta") {
+      const ventaLimpia = value.trim();
+
+      console.log("Buscando correlativo para:", ventaLimpia);
+      console.log("Lista de avisos recibida:", listaAvisos);
+
+      let nuevoCodigo = "";
+
+      if (ventaLimpia) {
+
+        const numeros = listaAvisos.map((aviso) =>{
+
+          if (!aviso.numeroAviso) return 0;
+
+          const partes = aviso.numeroAviso.split("AV");
+
+          if (partes.length > 1){
+            const sufijo = partes[partes.length - 1];
+            return parseInt(sufijo, 10) || 0;
+          }
+          return 0;
+        });
+
+        const maximo = Math.max(0, ...numeros);
+        const siguiente = maximo + 1;
+
+        nuevoCodigo = `${ventaLimpia}AV${String(siguiente).padStart(3, "0")}`;
+        
+      }
+
+      setFormData((p) => ({
+        ...p,
+        ordenVenta: value,
+        numeroAviso: nuevoCodigo,
+      }));
       return;
     }
 
@@ -94,7 +135,7 @@ export default function ModalMantenimiento({ isOpen, onClose ,
           {/* ===== PASO 1 ===== */}
           {wizardStep === 1 && (
             <>
-              <Campo label="Número de Aviso" name="numeroAviso" handleInputChange={handleInputChange} formData={formData} />
+              <Campo label="Número de Aviso" name="numeroAviso" handleInputChange={handleInputChange} formData={formData} disabled />
               <Campo label="Centro de Costo" name="centroCosto" handleInputChange={handleInputChange} formData={formData} />
               <Campo label="Orden de Venta" name="ordenVenta" handleInputChange={handleInputChange} formData={formData} />
 
