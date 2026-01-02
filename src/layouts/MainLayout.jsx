@@ -13,7 +13,7 @@ export default function MainLayout({ children }) {
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
-      <aside className="w-60 bg-white shadow-xl flex flex-col">
+      <aside className="w-50 bg-white shadow-xl flex flex-col">
         <h2 className="text-xl font-bold p-4 border-b">Administracion</h2>
 
         {/* Links */}

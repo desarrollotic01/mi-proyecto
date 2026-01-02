@@ -24,6 +24,10 @@ export default function ModalMantenimiento({ isOpen, onClose ,
 
   if (!isOpen) return null;
 
+const direccionesDisponibles = Array.from(
+  new Set(formData.equipos.map((e) => e.direccion))
+);
+
   const handleInputChange = (e) => {
     const { name, value, files } = e.target;
 
@@ -139,6 +143,7 @@ export default function ModalMantenimiento({ isOpen, onClose ,
               <Campo label="Centro de Costo" name="centroCosto" handleInputChange={handleInputChange} formData={formData} />
               <Campo label="Orden de Venta" name="ordenVenta" handleInputChange={handleInputChange} formData={formData} />
 
+
               {/* 🔥 EQUIPOS TIPO SAP */}
               <div className="col-span-2">
   <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -219,6 +224,23 @@ export default function ModalMantenimiento({ isOpen, onClose ,
                 handleInputChange={handleInputChange}
                 formData={formData}
               />
+ <Campo
+  label="Producto"
+  name="producto"
+  formData={formData}
+  
+/>
+{formData.equipos.length > 0 && (
+  <Campo
+    label="Dirección del Punto de Atención"
+    name="direccionAtencion"
+    tipo="select"
+    opciones={direccionesDisponibles}
+    handleInputChange={handleInputChange}
+    formData={formData}
+  />
+)}
+
 
               <CampoFile label="Documentos Adjuntos" name="documentos" handleInputChange={handleInputChange} />
             </>
@@ -239,10 +261,13 @@ export default function ModalMantenimiento({ isOpen, onClose ,
                 handleInputChange={handleInputChange}
                 formData={formData}
               />
-
+<Campo label="Orden de cliente" name="Orden de Cliente" handleInputChange={handleInputChange} formData={formData} />
+<Campo label="Almacen" name="Almacen" handleInputChange={handleInputChange} formData={formData} />
+<Campo label="Sede" name="Sede" handleInputChange={handleInputChange} formData={formData} />
               <Campo label="Correo Contacto" name="correoContacto" disabled formData={formData} />
               <Campo label="Número de Contacto" name="numeroContacto" disabled formData={formData} />
             </>
+
           )}
 
           {/* ===== PASO 3 ===== */}
@@ -298,12 +323,18 @@ export default function ModalMantenimiento({ isOpen, onClose ,
     const exists = p.equipos.some((e) => e.codigo === item.codigo);
     if (exists) return p;
 
+    const nuevosEquipos = [...p.equipos, item];
+
     return {
       ...p,
-      equipos: [...p.equipos, item],
+      equipos: nuevosEquipos,
+      producto: nuevosEquipos[0]?.producto || "",
+      direccionAtencion: "", // se reinicia porque cambian equipos
     };
   })
 }
+
+
 
       />
 

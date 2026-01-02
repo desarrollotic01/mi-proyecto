@@ -8,7 +8,7 @@ import esLocale from "@fullcalendar/core/locales/es";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import ModalMantenimiento from "../components/ModalMantenimiento";
 import ModalMantenimientoView from "../components/inputs/ModalMantenimientoView";
-
+import ModalTratamiento from "../components/inputs/ModalTratamiento";
 import "../styles/fullcalendar.css";
 
 /* ================= ESTADOS AV ================= */
@@ -78,6 +78,10 @@ export default function Mantenimiento() {
   const [estadoFilter, setEstadoFilter] = useState("all");
   const [searchCodigo, setSearchCodigo] = useState("");
 
+
+ const [tratamientoOpen, setTratamientoOpen] = useState(false);
+const [avisoTratamiento, setAvisoTratamiento] = useState(null);
+
   /* ================= FORM ================= */
   const initialFormData = {
   numeroAviso: "",
@@ -88,12 +92,14 @@ export default function Mantenimiento() {
   fechaAtencion: "",
   estado: "creado",
 
+
   // 🔥 CAMPOS QUE USA EL MODAL
   equipos: [],
   ubicacionTecnica: "",
   prioridad: "",
   solicitante: "",
   tipoMantenimiento: "",
+  direccionAtencion: "",
 };
 
 
@@ -107,6 +113,58 @@ export default function Mantenimiento() {
       setFormData((p) => ({ ...p, [name]: value }));
     }
   };
+
+const abrirTratamiento = (item) => {
+  setAvisoTratamiento(item);
+  setTratamientoOpen(true);
+};
+const guardarTratamiento = (tratamiento) => {
+  if (!avisoTratamiento) return;
+
+  const actualizado = {
+    ...avisoTratamiento,
+    tratamiento,
+    estado: "tratado",
+  };
+
+  setColumns((prev) => {
+    const nuevo = {};
+
+    Object.keys(prev).forEach((k) => {
+      nuevo[k] = {
+        ...prev[k],
+        items: prev[k].items.filter(
+          (i) => i.id !== avisoTratamiento.id
+        ),
+      };
+    });
+
+    nuevo.tratado = {
+      ...nuevo.tratado,
+      items: [...nuevo.tratado.items, actualizado],
+    };
+
+    return nuevo;
+  });
+
+  // calendario
+  setCalendarEvents((prev) =>
+    prev.map((ev) =>
+      ev.id === avisoTratamiento.id
+        ? {
+            ...ev,
+            backgroundColor: ESTADOS_AV.tratado.color,
+            textColor: ESTADOS_AV.tratado.text,
+          }
+        : ev
+    )
+  );
+
+  setTratamientoOpen(false);
+  setAvisoTratamiento(null);
+};
+
+
 
   /* ================= DATA ================= */
   const [columns, setColumns] = useState(
@@ -151,15 +209,16 @@ export default function Mantenimiento() {
       new Date().toISOString().slice(0, 10);
 
     setCalendarEvents((prev) => [
-      ...prev,
-      {
-        id: aviso.id,
-        date: fecha,
-        ov: aviso.ov,
-        backgroundColor: getEventColor("creado"),
-        textColor: getEventTextColor("creado"),
-      },
-    ]);
+  ...prev,
+  {
+    id: aviso.id,
+    title: aviso.numeroAviso, // 👈 AQUÍ
+    date: fecha,
+    backgroundColor: getEventColor("creado"),
+    textColor: getEventTextColor("creado"),
+  },
+]);
+
 
     setModalOpen(false);
     setWizardStep(1);
@@ -169,37 +228,71 @@ export default function Mantenimiento() {
 
   /* ================= DRAG ================= */
   const onDragEnd = ({ source, destination }) => {
-    if (!destination) return;
+  // ❌ Si no hay destino
+  if (!destination) return;
 
-    const sourceCol = columns[source.droppableId];
-    const destCol = columns[destination.droppableId];
+  // ✅ MISMA COLUMNA + MISMA POSICIÓN → NO HACER NADA
+  if (
+    source.droppableId === destination.droppableId &&
+    source.index === destination.index
+  ) {
+    return;
+  }
 
-    const sourceItems = Array.from(sourceCol.items);
-    const destItems = Array.from(destCol.items);
+  const sourceCol = columns[source.droppableId];
+  const destCol = columns[destination.droppableId];
 
-    const [moved] = sourceItems.splice(source.index, 1);
-    moved.estado = destination.droppableId;
-
-    destItems.splice(destination.index, 0, moved);
+  // 🟦 MISMA COLUMNA (reordenar)
+  if (source.droppableId === destination.droppableId) {
+    const items = Array.from(sourceCol.items);
+    const [moved] = items.splice(source.index, 1);
+    items.splice(destination.index, 0, moved);
 
     setColumns((prev) => ({
       ...prev,
-      [source.droppableId]: { ...sourceCol, items: sourceItems },
-      [destination.droppableId]: { ...destCol, items: destItems },
+      [source.droppableId]: {
+        ...sourceCol,
+        items,
+      },
     }));
+    return;
+  }
 
-    setCalendarEvents((prev) =>
-      prev.map((ev) =>
-        ev.id === moved.id
-          ? {
-              ...ev,
-              backgroundColor: getEventColor(moved.estado),
-              textColor: getEventTextColor(moved.estado),
-            }
-          : ev
-      )
-    );
-  };
+  // 🟨 DIFERENTE COLUMNA
+  const sourceItems = Array.from(sourceCol.items);
+  const destItems = Array.from(destCol.items);
+
+  const [moved] = sourceItems.splice(source.index, 1);
+  moved.estado = destination.droppableId;
+
+  destItems.splice(destination.index, 0, moved);
+
+  setColumns((prev) => ({
+    ...prev,
+    [source.droppableId]: {
+      ...sourceCol,
+      items: sourceItems,
+    },
+    [destination.droppableId]: {
+      ...destCol,
+      items: destItems,
+    },
+  }));
+
+  // 🔄 Actualizar calendario
+  setCalendarEvents((prev) =>
+    prev.map((ev) =>
+      ev.id === moved.id
+        ? {
+            ...ev,
+            backgroundColor: getEventColor(moved.estado),
+            textColor: getEventTextColor(moved.estado),
+          }
+        : ev
+    )
+  );
+};
+
 
   useEffect(() => {
     if (activeTab === "calendario" && calendarRef.current) {
@@ -251,38 +344,88 @@ export default function Mantenimiento() {
                     <h3 className="font-semibold mb-2">{col.name}</h3>
 
                     {col.items.map((item, i) => (
-                      <Draggable
-                        draggableId={item.id}
-                        index={i}
-                        key={item.id}
-                      >
-                        {(p) => (
-                          <div
-  ref={p.innerRef}
-  {...p.draggableProps}
-  {...p.dragHandleProps}
-  onClick={() => {
-    setViewData(item);
-    setViewStep(1);
-    setViewOpen(true);
-  }}
-  className="p-3 mb-2 rounded-lg border bg-white shadow-sm cursor-pointer hover:bg-gray-50"
->
+                     <Draggable draggableId={item.id} index={i} key={item.id}>
+  {(p) => (
+    <div
+      ref={p.innerRef}
+      {...p.draggableProps}
+      {...p.dragHandleProps}
+      onClick={() => {
+        setViewData(item);
+        setViewStep(1);
+        setViewOpen(true);
+      }}
+      className="p-2 mb-2 border rounded-sm bg-white shadow-sm cursor-pointer hover:bg-gray-50 text-xs space-y-2"
+    >
+      {/* N° AVISO */}
+      <div>
+        <div className="text-[11px] text-gray-500 font-medium uppercase">
+          N° Aviso
+        </div>
+        <div className="text-sm font-semibold text-gray-900">
+          #{item.numeroAviso || "—"}
+        </div>
+      </div>
 
-                            <div className="text-sm font-bold">
-                              #{item.numeroAviso || "—"}
-                            </div>
-                            <div className="text-xs">{item.producto}</div>
-                            <span
-                              className={`inline-block mt-2 px-2 py-1 text-xs border rounded ${getEstadoBadge(
-                                item.estado
-                              )}`}
-                            >
-                              {ESTADOS_AV[item.estado]?.label}
-                            </span>
-                          </div>
-                        )}
-                      </Draggable>
+      {/* EQUIPO */}
+      <div>
+        <div className="text-[11px] text-gray-500 font-medium uppercase">
+          Equipo / Maquinaria
+        </div>
+        <div className="text-xs text-gray-800">
+          {item.equipos?.[0]?.nombre || item.producto || "—"}
+        </div>
+      </div>
+
+      {/* CLIENTE */}
+      <div>
+        <div className="text-[11px] text-gray-500 font-medium uppercase">
+          Cliente
+        </div>
+        <div className="text-xs text-gray-800">
+          {item.cliente || "—"}
+        </div>
+      </div>
+
+      {/* FECHA */}
+      <div>
+        <div className="text-[11px] text-gray-500 font-medium uppercase">
+          Fecha
+        </div>
+        <div className="text-xs text-gray-800">
+          {item.fechaAtencion
+            ? new Date(item.fechaAtencion).toLocaleDateString("es-PE")
+            : "—"}
+        </div>
+      </div>
+
+      {/* ESTADO */}
+      <div>
+        <span
+          className={`inline-block px-2 py-[2px] text-[11px] border rounded-sm ${getEstadoBadge(
+            item.estado
+          )}`}
+        >
+          {ESTADOS_AV[item.estado]?.label}
+        </span>
+      </div>
+
+      {/* ✅ BOTÓN TRATAMIENTO (CORRECTO) */}
+      {item.estado === "creado" && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            abrirTratamiento(item);
+          }}
+          className="w-full bg-yellow-300 hover:bg-yellow-400 text-yellow-900 text-[11px] font-semibold py-1 rounded-sm"
+        >
+          Tratamiento
+        </button>
+      )}
+    </div>
+  )}
+</Draggable>
+
                     ))}
                     {p.placeholder}
                   </div>
@@ -298,48 +441,72 @@ export default function Mantenimiento() {
     <table className="min-w-full border border-gray-300 text-sm">
       <thead className="bg-gray-100">
         <tr>
-          <th className="border px-3 py-2 text-left">OV</th>
-          <th className="border px-3 py-2 text-left">Descripción</th>
-          <th className="border px-3 py-2 text-left">Cliente</th>
-          <th className="border px-3 py-2 text-left">Estado</th>
-          <th className="border px-3 py-2 text-left">Fecha</th>
+          <th className="border px-3 py-2 text-left">Código Aviso</th>
+    <th className="border px-3 py-2 text-left">Descripción</th>
+    <th className="border px-3 py-2 text-left">Cliente</th>
+    <th className="border px-3 py-2 text-left">Estado</th>
+    <th className="border px-3 py-2 text-left">Fecha</th>
+    <th className="border px-3 py-2 text-left">Tratamiento</th>
         </tr>
       </thead>
       <tbody>
         {Object.values(columns)
           .flatMap((col) => col.items)
           .map((item) => (
-            <tr
-              key={item.id}
-              className="hover:bg-gray-50 cursor-pointer"
-              onClick={() => {
-                setViewData(item);
-                setViewStep(1);
-                setViewOpen(true);
-              }}
-            >
-              <td className="border px-3 py-2">
-                {item.ov || "—"}
-              </td>
-              <td className="border px-3 py-2">
-                {item.descripcion || "—"}
-              </td>
-              <td className="border px-3 py-2">
-                {item.cliente || "—"}
-              </td>
-              <td className="border px-3 py-2">
-                <span
-                  className={`px-2 py-1 rounded text-xs border ${getEstadoBadge(
-                    item.estado
-                  )}`}
-                >
-                  {ESTADOS_AV[item.estado]?.label}
-                </span>
-              </td>
-              <td className="border px-3 py-2">
-                {item.fechaAtencion || "—"}
-              </td>
-            </tr>
+           <tr
+  key={item.id}
+  className="hover:bg-gray-50 cursor-pointer"
+  onClick={() => {
+    setViewData(item);
+    setViewStep(1);
+    setViewOpen(true);
+  }}
+>
+  {/* CÓDIGO AVISO */}
+  <td className="border px-2 py-1 font-semibold">
+    <span
+      className={`px-2 py-[2px] rounded-sm text-xs border ${getEstadoBadge(
+        item.estado
+      )}`}
+    >
+      {item.numeroAviso}
+    </span>
+  </td>
+
+  {/* DESCRIPCIÓN */}
+  <td className="border px-2 py-1">
+    {item.descripcion || "—"}
+  </td>
+
+  {/* CLIENTE */}
+  <td className="border px-2 py-1">
+    {item.cliente || "—"}
+  </td>
+
+  {/* ESTADO */}
+  <td className="border px-2 py-1">
+    {ESTADOS_AV[item.estado]?.label}
+  </td>
+
+  {/* FECHA */}
+  <td className="border px-2 py-1">
+    {item.fechaAtencion || "—"}
+  </td>
+
+  {/* TRATAMIENTO */}
+  <td className="border px-2 py-1">
+    {item.estado === "creado" ? (
+      <span className="text-red-600 font-semibold text-xs">
+        Pendiente
+      </span>
+    ) : (
+      <span className="text-green-600 font-semibold text-xs">
+        Tratado
+      </span>
+    )}
+  </td>
+</tr>
+
           ))}
       </tbody>
     </table>
@@ -384,6 +551,16 @@ export default function Mantenimiento() {
           setViewData(null);
         }}
       />
+      <ModalTratamiento
+  isOpen={tratamientoOpen}
+  aviso={avisoTratamiento}
+  onClose={() => {
+    setTratamientoOpen(false);
+    setAvisoTratamiento(null);
+  }}
+  onGuardar={guardarTratamiento}
+/>
+
     </div>
   );
 }

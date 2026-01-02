@@ -7,7 +7,16 @@ export default function Campo({
   disabled = false,
   formData,
   handleInputChange,
+  value, // 👈 NUEVO
+  multiple = false,
 }) {
+  const finalValue =
+    value !== undefined
+      ? value
+      : name && formData
+      ? formData[name] || ""
+      : "";
+
   return (
     <div className="flex flex-col">
       <label className="text-sm font-semibold mb-1">{label}</label>
@@ -15,12 +24,13 @@ export default function Campo({
       {tipo === "select" ? (
         <select
           name={name}
-          value={formData[name] || ""}
+          value={finalValue}
+          multiple={multiple}
           disabled={disabled}
           onChange={handleInputChange}
           className="border rounded px-3 py-2"
         >
-          <option value="">Seleccione...</option>
+          {!multiple && <option value="">Seleccione...</option>}
           {opciones.map((op, i) => (
             <option key={i} value={op}>
               {op}
@@ -31,7 +41,7 @@ export default function Campo({
         <input
           type={type}
           name={name}
-          value={formData[name] || ""}
+          value={finalValue}
           disabled={disabled}
           onChange={handleInputChange}
           className="border rounded px-3 py-2"
