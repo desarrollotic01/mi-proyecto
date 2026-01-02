@@ -163,6 +163,37 @@ const guardarTratamiento = (tratamiento) => {
   setTratamientoOpen(false);
   setAvisoTratamiento(null);
 };
+const cambiarEstado = (item, nuevoEstado) => {
+  setColumns((prev) => {
+    const nuevo = {};
+
+    Object.keys(prev).forEach((k) => {
+      nuevo[k] = {
+        ...prev[k],
+        items: prev[k].items.filter((i) => i.id !== item.id),
+      };
+    });
+
+    nuevo[nuevoEstado].items.push({
+      ...item,
+      estado: nuevoEstado,
+    });
+
+    return nuevo;
+  });
+
+  setCalendarEvents((prev) =>
+    prev.map((ev) =>
+      ev.id === item.id
+        ? {
+            ...ev,
+            backgroundColor: getEventColor(nuevoEstado),
+            textColor: getEventTextColor(nuevoEstado),
+          }
+        : ev
+    )
+  );
+};
 
 
 
@@ -411,17 +442,74 @@ const guardarTratamiento = (tratamiento) => {
       </div>
 
       {/* ✅ BOTÓN TRATAMIENTO (CORRECTO) */}
-      {item.estado === "creado" && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            abrirTratamiento(item);
-          }}
-          className="w-full bg-yellow-300 hover:bg-yellow-400 text-yellow-900 text-[11px] font-semibold py-1 rounded-sm"
-        >
-          Tratamiento
-        </button>
-      )}
+      {/* ===== ACCIONES POR ESTADO ===== */}
+<div className="space-y-1 pt-1">
+
+  {/* CREADO */}
+  {item.estado === "creado" && (
+    <>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          abrirTratamiento(item);
+        }}
+        className="w-full bg-yellow-300 hover:bg-yellow-400 text-yellow-900 text-[11px] font-semibold py-1 rounded-sm"
+      >
+        Tratar AV
+      </button>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          cambiarEstado(item, "rechazado");
+        }}
+        className="w-full bg-red-300 hover:bg-red-400 text-red-900 text-[11px] font-semibold py-1 rounded-sm"
+      >
+        Rechazar
+      </button>
+    </>
+  )}
+
+  {/* TRATADO */}
+  {item.estado === "tratado" && (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        cambiarEstado(item, "con OT");
+      }}
+      className="w-full bg-blue-300 hover:bg-blue-400 text-blue-900 text-[11px] font-semibold py-1 rounded-sm"
+    >
+      Generar OT
+    </button>
+  )}
+
+  {/* CON OT */}
+  {item.estado === "con OT" && (
+    <>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          cambiarEstado(item, "finalizado");
+        }}
+        className="w-full bg-green-300 hover:bg-green-400 text-green-900 text-[11px] font-semibold py-1 rounded-sm"
+      >
+        Finalizado
+      </button>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          cambiarEstado(item, "finalizado sin facturacion");
+        }}
+        className="w-full bg-gray-300 hover:bg-gray-400 text-gray-900 text-[11px] font-semibold py-1 rounded-sm"
+      >
+        Finalizado sin Fact.
+      </button>
+    </>
+  )}
+
+</div>
+
     </div>
   )}
 </Draggable>
@@ -446,14 +534,14 @@ const guardarTratamiento = (tratamiento) => {
     <th className="border px-3 py-2 text-left">Cliente</th>
     <th className="border px-3 py-2 text-left">Estado</th>
     <th className="border px-3 py-2 text-left">Fecha</th>
-    <th className="border px-3 py-2 text-left">Tratamiento</th>
+    <th className="border px-3 py-2 text-left">Siguiente Proceso</th>
         </tr>
       </thead>
       <tbody>
         {Object.values(columns)
           .flatMap((col) => col.items)
           .map((item) => (
-           <tr
+    <tr
   key={item.id}
   className="hover:bg-gray-50 cursor-pointer"
   onClick={() => {
@@ -462,7 +550,7 @@ const guardarTratamiento = (tratamiento) => {
     setViewOpen(true);
   }}
 >
-  {/* CÓDIGO AVISO */}
+  {/* N° AVISO */}
   <td className="border px-2 py-1 font-semibold">
     <span
       className={`px-2 py-[2px] rounded-sm text-xs border ${getEstadoBadge(
@@ -490,22 +578,75 @@ const guardarTratamiento = (tratamiento) => {
 
   {/* FECHA */}
   <td className="border px-2 py-1">
-    {item.fechaAtencion || "—"}
+    {item.fechaAtencion
+      ? new Date(item.fechaAtencion).toLocaleDateString("es-PE")
+      : "—"}
   </td>
 
-  {/* TRATAMIENTO */}
-  <td className="border px-2 py-1">
-    {item.estado === "creado" ? (
-      <span className="text-red-600 font-semibold text-xs">
-        Pendiente
-      </span>
-    ) : (
-      <span className="text-green-600 font-semibold text-xs">
-        Tratado
-      </span>
+  {/* 🔥 SIGUIENTE PROCESO (BOTONES) */}
+  <td
+    className="border px-2 py-1"
+    onClick={(e) => e.stopPropagation()} // 👈 evita abrir el modal
+  >
+    {/* CREADO */}
+    {item.estado === "creado" && (
+      <div className="flex gap-2">
+        <button
+          onClick={() => abrirTratamiento(item)}
+          className="bg-yellow-300 hover:bg-yellow-400 text-yellow-900 text-xs font-semibold px-2 py-1 rounded"
+        >
+          Tratar AV
+        </button>
+
+        <button
+          onClick={() => cambiarEstado(item, "rechazado")}
+          className="bg-red-300 hover:bg-red-400 text-red-900 text-xs font-semibold px-2 py-1 rounded"
+        >
+          Rechazar
+        </button>
+      </div>
+    )}
+
+    {/* TRATADO */}
+    {item.estado === "tratado" && (
+      <button
+        onClick={() => cambiarEstado(item, "con OT")}
+        className="bg-blue-300 hover:bg-blue-400 text-blue-900 text-xs font-semibold px-2 py-1 rounded"
+      >
+        Generar OT
+      </button>
+    )}
+
+    {/* CON OT */}
+    {item.estado === "con OT" && (
+      <div className="flex gap-2">
+        <button
+          onClick={() => cambiarEstado(item, "finalizado")}
+          className="bg-green-300 hover:bg-green-400 text-green-900 text-xs font-semibold px-2 py-1 rounded"
+        >
+          Finalizar
+        </button>
+
+        <button
+          onClick={() =>
+            cambiarEstado(item, "finalizado sin facturacion")
+          }
+          className="bg-gray-300 hover:bg-gray-400 text-gray-900 text-xs font-semibold px-2 py-1 rounded"
+        >
+          Sin Fact.
+        </button>
+      </div>
+    )}
+
+    {/* ESTADOS FINALES */}
+    {(item.estado === "finalizado" ||
+      item.estado === "finalizado sin facturacion" ||
+      item.estado === "rechazado") && (
+      <span className="text-gray-400 text-xs">—</span>
     )}
   </td>
 </tr>
+
 
           ))}
       </tbody>
