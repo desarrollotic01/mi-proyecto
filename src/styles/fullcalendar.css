@@ -127,3 +127,25 @@
 .fc-col-header-cell-cushion {
   text-transform: capitalize;
 }
+
+/* ---------------------------------------------------------
+   CORRECCIÓN ALINEACIÓN CABECERA DEL DÍA (CORREGIDO)
+--------------------------------------------------------- */
+
+/* 1. El contenedor superior debe ser relativo para que tus 'absolute' funcionen */
+.fc-daygrid-day-top {
+  display: block !important; 
+  position: relative !important;
+  padding: 0 !important;
+  margin-bottom: 4px !important;
+  width: 100% !important;
+}
+
+/* 2. IMPORTANTE: NO ocultar esta clase. 
+   En su lugar, forzamos a que ocupe todo el ancho y no estorbe. */
+.fc-daygrid-day-number {
+  display: block !important;
+  width: 100% !important;
+  text-decoration: none !important; /* Quita subrayado si es enlace */
+  float: none !important; /* Quita flotados antiguos */
+}
