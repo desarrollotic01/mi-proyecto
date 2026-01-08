@@ -18,6 +18,20 @@ export default function ModalMantenimiento({ isOpen, onClose ,
   console.log("¿Cuántos avisos llegaron al modal?:", listaAvisos.length);
   const [wizardStep, setWizardStep] = useState(1);
 
+const opcionesProducto = [
+  "Racks",
+  "Vehiculo",
+  "Autosat",
+  "Techo y Cerramiento",
+  "Equipos Propios",
+  "Sanitarias",
+  "HVAC",
+  "DACI",
+  "ACI",
+  "Datos y Comunicaciones",
+  "Eléctrico",
+  "Pisos y Estructuras",
+];
 
   // controla qué lookup está abierto
   const [lookupOpen, setLookupOpen] = useState(null);
@@ -139,9 +153,10 @@ const direccionesDisponibles = Array.from(
           {/* ===== PASO 1 ===== */}
           {wizardStep === 1 && (
             <>
-              <Campo label="Número de Aviso" name="numeroAviso" handleInputChange={handleInputChange} formData={formData} disabled />
+ <Campo label="Orden de Venta" name="ordenVenta" handleInputChange={handleInputChange} formData={formData} />
+
               <Campo label="Centro de Costo" name="centroCosto" handleInputChange={handleInputChange} formData={formData} />
-              <Campo label="Orden de Venta" name="ordenVenta" handleInputChange={handleInputChange} formData={formData} />
+  <Campo label="Número de Aviso" name="numeroAviso" handleInputChange={handleInputChange} formData={formData} disabled />
 
 
               {/* 🔥 EQUIPOS TIPO SAP */}
@@ -194,8 +209,23 @@ const direccionesDisponibles = Array.from(
                 value={formData.ubicacionTecnica}
                 onOpen={() => setLookupOpen("ubicacion")}
               />
-
-              <Campo label="Descripción" name="descripcion" handleInputChange={handleInputChange} formData={formData} />
+<Campo
+  label="Descripción Resumida"
+  name="descripcionResumida"
+  handleInputChange={handleInputChange}
+  formData={formData}
+tipo="textarea"
+/>
+<div className="col-span-2">
+  <Campo
+    label="Descripción"
+    name="descripcion"
+    tipo="textarea"
+    rows={8}
+    handleInputChange={handleInputChange}
+    formData={formData}
+  />
+</div>
 
               <Campo
                 label="Prioridad"
@@ -227,9 +257,12 @@ const direccionesDisponibles = Array.from(
  <Campo
   label="Producto"
   name="producto"
+  tipo="select"
+  opciones={opcionesProducto}
+  handleInputChange={handleInputChange}
   formData={formData}
-  
 />
+
 {formData.equipos.length > 0 && (
   <Campo
     label="Dirección del Punto de Atención"
@@ -261,7 +294,7 @@ const direccionesDisponibles = Array.from(
                 handleInputChange={handleInputChange}
                 formData={formData}
               />
-<Campo label="Orden de cliente" name="Orden de Cliente" handleInputChange={handleInputChange} formData={formData} />
+<Campo label="Numero OC de Cliente" name="Orden de Cliente" handleInputChange={handleInputChange} formData={formData} />
 <Campo label="Almacen" name="Almacen" handleInputChange={handleInputChange} formData={formData} />
 <Campo label="Sede" name="Sede" handleInputChange={handleInputChange} formData={formData} />
               <Campo label="Correo Contacto" name="correoContacto" disabled formData={formData} />

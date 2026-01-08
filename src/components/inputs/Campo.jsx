@@ -7,8 +7,9 @@ export default function Campo({
   disabled = false,
   formData,
   handleInputChange,
-  value, // 👈 NUEVO
+  value,
   multiple = false,
+  rows = 5, // 👈 opcional
 }) {
   const finalValue =
     value !== undefined
@@ -18,9 +19,10 @@ export default function Campo({
       : "";
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col ">
       <label className="text-sm font-semibold mb-1">{label}</label>
 
+      {/* SELECT */}
       {tipo === "select" ? (
         <select
           name={name}
@@ -37,6 +39,19 @@ export default function Campo({
             </option>
           ))}
         </select>
+
+      /* TEXTAREA */
+      ) : tipo === "textarea" ? (
+        <textarea
+          name={name}
+          value={finalValue}
+          disabled={disabled}
+          onChange={handleInputChange}
+          rows={rows}
+          className="border rounded px-5 py-2 resize-none"
+        />
+
+      /* INPUT */
       ) : (
         <input
           type={type}
