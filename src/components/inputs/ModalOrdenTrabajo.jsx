@@ -1,5 +1,5 @@
-import Campo from "../inputs/campo";
-import CampoFile from "../inputs/campoFile";
+import Campo from "./Campo";
+import CampoFile from "./CampoFile";
 
 export default function ModalOrdenTrabajo({
   isOpen,
