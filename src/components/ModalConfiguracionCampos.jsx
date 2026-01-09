@@ -13,15 +13,26 @@ export default function ModalConfiguracionCampos({
 
   // Mapeo de nombres amigables
   const fieldLabels = {
-    numeroAviso: "N° Aviso",
-    equipo: "Equipo / Maquinaria",
     cliente: "Cliente",
-    fecha: "Fecha de Atención",
-    estado: "Estado",
-    descripcion: "Descripción",
-    prioridad: "Prioridad",
-    solicitante: "Solicitante",
-    tipoMantenimiento: "Tipo de Mantenimiento",
+  descripcion: "Descripción",
+  ubicacionTecnica: "Ubicación Técnica",
+  numeroAviso: "N° Aviso",
+  ordenVenta: "Orden de Venta",
+  centroCosto: "Centro de Costo",
+  prioridad: "Prioridad",
+  fechaAtencion: "Fecha Atención",
+  tipoMantenimiento: "Tipo de Mantenimiento",
+  producto: "Producto",
+  direccionAtencion: "Dirección de Atención",
+  solicitante: "Solicitante",
+  supervisorAsignado: "Supervisor Asignado",
+  estadoAviso: "Estado del Aviso",
+  nombreContacto: "Nombre de Contacto",
+  correoContacto: "Correo de Contacto",
+  numeroContacto: "Número de Contacto",
+  descripcionResumida: "Descripción Resumida",
+  documentos: "Documentos Adjuntos",
+  documentoFinal: "Documento Final",
   };
 
   const onDragEnd = (result) => {
