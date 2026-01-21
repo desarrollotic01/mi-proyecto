@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAuth } from "../../../auth/context/AuthContext";
+import { crearAviso } from "../services/avisoServices";
 
 import Campo from "../../../components/inputs/Campo";
 import CampoFile from "../../../components/inputs/CampoFile";
@@ -35,16 +37,19 @@ export default function ModalMantenimiento({
   onClose,
   formData,
   setFormData,
-  handleSaveAll,
   listaAvisos = [],
+  onCreated, // opcional para refrescar lista/kanban
 }) {
   if (!isOpen) return null;
+
+  const { token } = useAuth();
 
   /* =========================
      ESTADOS
   ========================= */
   const [wizardStep, setWizardStep] = useState(1);
   const [lookupOpen, setLookupOpen] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   /* =========================
      DERIVADOS
@@ -120,6 +125,32 @@ export default function ModalMantenimiento({
     setFormData((p) => ({ ...p, [name]: value }));
   };
 
+  /* =========================
+     GUARDAR AVISO
+  ========================= */
+async function handleGuardarAviso() {
+  try {
+    console.log("TOKEN:", localStorage.getItem("token")); 
+
+    const payload = {
+      ...formData,
+      tipoAviso: "mantenimiento", // importante
+    };
+
+    await crearAviso(payload);
+
+    onClose();
+  } catch (error) {
+    console.error("Error al guardar aviso:", error);
+
+    if (error.response?.data?.errors) {
+      alert(error.response.data.errors.join("\n"));
+    } else {
+      alert("Error al guardar aviso");
+    }
+  }
+}
+
   return (
     <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
       <div className="bg-white rounded-xl w-[1100px] h-[650px] flex flex-col">
@@ -152,17 +183,13 @@ export default function ModalMantenimiento({
         {/* ================= BODY ================= */}
         <div className="flex-1 overflow-y-auto p-6 grid grid-cols-4 gap-4">
 
-          {/* ==================================================
-              PASO 1 – INFORMACIÓN GENERAL
-          ================================================== */}
+          {/* ================= PASO 1 ================= */}
           {wizardStep === 1 && (
             <>
-              {/* IDENTIFICACIÓN */}
               <Campo label="Orden de Venta" name="ordenVenta" handleInputChange={handleInputChange} formData={formData} />
               <Campo label="Centro de Costo" name="centroCosto" handleInputChange={handleInputChange} formData={formData} />
               <Campo label="Número de Aviso" name="numeroAviso" disabled formData={formData} />
 
-              {/* EQUIPOS */}
               <div className="col-span-2">
                 <label className="text-sm font-semibold">Equipos</label>
                 <div className="border rounded-lg p-2 flex flex-wrap gap-2 min-h-[42px]">
@@ -209,23 +236,10 @@ export default function ModalMantenimiento({
                 onOpen={() => setLookupOpen("ubicacion")}
               />
 
-              <Campo
-                label="Descripción Resumida"
-                name="descripcionResumida"
-                tipo="textarea"
-                handleInputChange={handleInputChange}
-                formData={formData}
-              />
+              <Campo label="Descripción Resumida" name="descripcionResumida" tipo="textarea" handleInputChange={handleInputChange} formData={formData} />
 
               <div className="col-span-2">
-                <Campo
-                  label="Descripción"
-                  name="descripcion"
-                  tipo="textarea"
-                  rows={8}
-                  handleInputChange={handleInputChange}
-                  formData={formData}
-                />
+                <Campo label="Descripción" name="descripcion" tipo="textarea" rows={8} handleInputChange={handleInputChange} formData={formData} />
               </div>
 
               <Campo label="Prioridad" name="prioridad" tipo="select" opciones={["Baja", "Media", "Alta"]} handleInputChange={handleInputChange} formData={formData} />
@@ -249,36 +263,20 @@ export default function ModalMantenimiento({
             </>
           )}
 
-          {/* ==================================================
-              PASO 2 – DATOS DEL CLIENTE
-          ================================================== */}
+          {/* ================= PASO 2 ================= */}
           {wizardStep === 2 && (
             <>
               <Campo label="Cliente" name="cliente" tipo="select" opciones={clientes} handleInputChange={handleInputChange} formData={formData} />
-
-              <Campo
-                label="Nombre de Contacto"
-                name="nombreContacto"
-                tipo="select"
-                opciones={
-                  contactosPorCliente[formData.cliente]?.map((c) => c.nombre) || []
-                }
-                handleInputChange={handleInputChange}
-                formData={formData}
-              />
-
+              <Campo label="Nombre de Contacto" name="nombreContacto" tipo="select" opciones={contactosPorCliente[formData.cliente]?.map((c) => c.nombre) || []} handleInputChange={handleInputChange} formData={formData} />
               <Campo label="Número OC de Cliente" name="ordenCliente" handleInputChange={handleInputChange} formData={formData} />
               <Campo label="Almacén" name="almacen" handleInputChange={handleInputChange} formData={formData} />
               <Campo label="Sede" name="sede" handleInputChange={handleInputChange} formData={formData} />
-
               <Campo label="Correo Contacto" name="correoContacto" disabled formData={formData} />
               <Campo label="Número de Contacto" name="numeroContacto" disabled formData={formData} />
             </>
           )}
 
-          {/* ==================================================
-              PASO 3 – GESTIÓN
-          ================================================== */}
+          {/* ================= PASO 3 ================= */}
           {wizardStep === 3 && (
             <>
               <Campo label="Supervisor Asignado" name="supervisorAsignado" handleInputChange={handleInputChange} formData={formData} />
@@ -300,16 +298,19 @@ export default function ModalMantenimiento({
           </button>
 
           <button
-            onClick={() => {
-              if (wizardStep < 3) setWizardStep(wizardStep + 1);
-              else {
-                handleSaveAll();
-                onClose();
-              }
-            }}
-            className="bg-blue-600 text-white px-4 py-2 rounded"
+            disabled={saving}
+            onClick={() =>
+              wizardStep < 3
+                ? setWizardStep(wizardStep + 1)
+                : handleGuardarAviso()
+            }
+            className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
           >
-            {wizardStep < 3 ? "Siguiente" : "Guardar Aviso"}
+            {wizardStep < 3
+              ? "Siguiente"
+              : saving
+              ? "Guardando..."
+              : "Guardar Aviso"}
           </button>
         </div>
       </div>

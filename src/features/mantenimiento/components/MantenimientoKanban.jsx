@@ -1,3 +1,4 @@
+// src/features/mantenimiento/components/MantenimientoKanban.jsx
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { ESTADOS_AV } from "../config/camposMantenimiento";
 
@@ -21,7 +22,9 @@ export default function MantenimientoKanban({
                 {...p.droppableProps}
                 className="p-3 rounded-lg border bg-gray-50"
               >
-                <h3 className="font-semibold mb-2">{col.name}</h3>
+                <h3 className="font-semibold mb-2">
+                  {ESTADOS_AV[colId]?.label || col.name}
+                </h3>
 
                 {col.items.map((item, i) => (
                   <Draggable
@@ -53,11 +56,11 @@ export default function MantenimientoKanban({
 
                         {cardFields.estado && (
                           <span
-                            className={`inline-block px-2 py-[2px] text-[11px] border rounded-sm ${getEstadoBadge(
-                              item.estado
-                            )}`}
+                            className={`inline-block px-2 py-[2px] text-[11px] border rounded-sm ${
+                              ESTADOS_AV[item.estadoAviso]?.badge
+                            }`}
                           >
-                            {ESTADOS_AV[item.estado]?.label}
+                            {ESTADOS_AV[item.estadoAviso]?.label}
                           </span>
                         )}
                       </div>

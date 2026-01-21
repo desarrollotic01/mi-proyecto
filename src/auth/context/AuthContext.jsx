@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { meRequest } from "../services/authService";
+import { loginRequest, meRequest } from "../services/authService";
 
 const AuthContext = createContext(null);
 
@@ -10,14 +10,16 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem("token");
 
+    // 🔥 SI NO HAY TOKEN, NO LLAMAMOS /me
     if (!token) {
       setLoading(false);
       return;
     }
 
     meRequest(token)
-      .then((res) => {
-        setUser(res.user || res);
+      .then((data) => {
+        // data puede ser { user } o el user directo
+        setUser(data.user || data);
       })
       .catch(() => {
         localStorage.removeItem("token");
@@ -26,9 +28,11 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = (userData, token) => {
-    localStorage.setItem("token", token);
-    setUser(userData);
+  const login = async (alias, password) => {
+    const data = await loginRequest(alias, password);
+
+    localStorage.setItem("token", data.token);
+    setUser(data.usuario); // 🔥 AQUÍ SE SETEA EL USUARIO
   };
 
   const logout = () => {
@@ -37,14 +41,10 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider
-      value={{ user, loading, login, logout }}
-    >
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
-  return useContext(AuthContext);
-}
+export const useAuth = () => useContext(AuthContext);

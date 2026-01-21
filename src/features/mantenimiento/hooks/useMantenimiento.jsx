@@ -1,6 +1,10 @@
-// src/features/mantenimiento/hooks/useMantenimiento.jsx
 import { useState, useRef, useEffect } from "react";
 import { ESTADOS_AV } from "../config/camposMantenimiento";
+import {
+  obtenerAvisos,
+  crearAviso,
+  actualizarEstadoAviso,
+} from "../services/avisoServices";
 
 export function useMantenimiento() {
   const calendarRef = useRef(null);
@@ -9,20 +13,19 @@ export function useMantenimiento() {
   const [activeTab, setActiveTab] = useState("kanban");
   const [calendarView, setCalendarView] = useState("dayGridMonth");
 
-  /* ================= MODAL ================= */
+  /* ================= MODALS ================= */
   const [modalOpen, setModalOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState(null);
 
-  /* ================= VIEW ================= */
   const [viewOpen, setViewOpen] = useState(false);
   const [viewData, setViewData] = useState(null);
   const [viewStep, setViewStep] = useState(1);
 
-  /* ================= FILTROS ================= */
   const [tratamientoOpen, setTratamientoOpen] = useState(false);
   const [avisoTratamiento, setAvisoTratamiento] = useState(null);
 
+  /* ================= FILTROS ================= */
   const [filters, setFilters] = useState({
     search: "",
     prioridad: "",
@@ -30,7 +33,7 @@ export function useMantenimiento() {
     solicitante: "",
   });
 
-  /* ================= CONFIG TARJETAS ================= */
+  /* ================= CONFIG ================= */
   const [configOpen, setConfigOpen] = useState(false);
   const [cardFields, setCardFields] = useState({
     numeroAviso: true,
@@ -58,19 +61,29 @@ export function useMantenimiento() {
 
   /* ================= FORM ================= */
   const initialFormData = {
+    tipoAviso: "mantenimiento",
+    ordenVenta: "",
+    centroCosto: "",
     numeroAviso: "",
+    descripcionResumida: "",
     descripcion: "",
+    prioridad: "",
+    tipoMantenimiento: "",
     producto: "",
+    fechaAtencion: "",
     cliente: "",
     ordenCliente: "",
-    fechaAtencion: "",
-    estado: "creado",
-    equipos: [],
+    almacen: "",
+    sede: "",
+    nombreContacto: "",
+    correoContacto: "",
+    numeroContacto: "",
     ubicacionTecnica: "",
-    prioridad: "",
-    solicitante: "",
-    tipoMantenimiento: "",
     direccionAtencion: "",
+    solicitante: "",
+    supervisorAsignado: "",
+    equipos: [],
+    documentos: [],
   };
 
   const [formData, setFormData] = useState(initialFormData);
@@ -83,25 +96,62 @@ export function useMantenimiento() {
     }, {})
   );
 
-  const [calendarEvents, setCalendarEvents] = useState([]);
-
   /* ================= HELPERS ================= */
-  const getEventColor = (estado) =>
-    ESTADOS_AV[estado]?.color || "#e5e7eb";
-
-  const getEventTextColor = (estado) =>
-    ESTADOS_AV[estado]?.text || "#374151";
-
   const getEstadoBadge = (estado) =>
     ESTADOS_AV[estado]?.badge ||
     "bg-gray-100 text-gray-700 border-gray-300";
 
-  /* ================= EFFECT ================= */
+  /* ================= LOAD AVISOS ================= */
+const cargarAvisos = async () => {
+  const avisos = await obtenerAvisos();
+
+  // Creamos columnas vacías por estado
+  const cols = Object.keys(ESTADOS_AV).reduce((acc, key) => {
+    acc[key] = {
+      name: ESTADOS_AV[key].label,
+      items: [],
+    };
+    return acc;
+  }, {});
+
+  // Metemos cada aviso en su columna
+  avisos.forEach((aviso) => {
+    const estado = aviso.estadoAviso; // 👈 BACKEND
+
+    if (cols[estado]) {
+      cols[estado].items.push({
+        ...aviso,
+        estado, // 👈 FRONT NORMALIZADO
+      });
+    }
+  });
+
+  setColumns(cols);
+};
+
+
+  useEffect(() => {
+    cargarAvisos();
+  }, []);
+
+  /* ================= CALENDAR ================= */
   useEffect(() => {
     if (activeTab === "calendario" && calendarRef.current) {
       calendarRef.current.getApi().changeView(calendarView);
     }
   }, [activeTab, calendarView]);
+
+  /* ================= CRUD ================= */
+  const handleSaveAll = async () => {
+    const nuevo = await crearAviso(formData);
+    await cargarAvisos();
+    setModalOpen(false);
+  };
+
+  const cambiarEstado = async (aviso, nuevoEstado) => {
+    await actualizarEstadoAviso(aviso.id, nuevoEstado);
+    await cargarAvisos();
+  };
 
   return {
     // refs
@@ -152,13 +202,12 @@ export function useMantenimiento() {
 
     // data
     columns,
-    setColumns,
-    calendarEvents,
-    setCalendarEvents,
+
+    // actions
+    handleSaveAll,
+    cambiarEstado,
 
     // helpers
-    getEventColor,
-    getEventTextColor,
     getEstadoBadge,
   };
 }

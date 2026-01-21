@@ -1,33 +1,36 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 
+import Login from "./auth/pages/Login";
+import ProtectedRoute from "./auth/Components/ProtectedRoute";
 import MainLayout from "./layouts/MainLayout";
+
 import Mantenimiento from "./features/mantenimiento/pages/Mantenimiento";
 import OrdenTrabajo from "./pages/OrdenTrabajo";
-import Login from "./auth/pages/Login";
-import ProtectedRoute from "./auth/components/ProtectedRoute";
+
+function AppLayout() {
+  return (
+    <ProtectedRoute>
+      <MainLayout>
+        <Outlet />
+      </MainLayout>
+    </ProtectedRoute>
+  );
+}
 
 export default function App() {
   return (
     <Routes>
-
-      {/* ===== RUTA PÚBLICA ===== */}
+      {/* PUBLICO */}
       <Route path="/login" element={<Login />} />
 
-      {/* ===== RUTAS PROTEGIDAS ===== */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        {/* 🔥 REDIRECCIÓN ROOT */}
-        <Route path="/" element={<Navigate to="/mantenimiento" replace />} />
-
-        <Route path="/mantenimiento" element={<Mantenimiento />} />
-        <Route path="/orden-trabajo" element={<OrdenTrabajo />} />
+      {/* PRIVADO CON LAYOUT */}
+      <Route path="/" element={<AppLayout />}>
+        <Route path="mantenimiento" element={<Mantenimiento />} />
+        <Route path="orden-trabajo" element={<OrdenTrabajo />} />
       </Route>
 
+      {/* DEFAULT */}
+      <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   );
 }

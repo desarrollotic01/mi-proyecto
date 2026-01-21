@@ -1,17 +1,15 @@
-// src/features/mantenimiento/components/MantenimientoCalendario.jsx
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import esLocale from "@fullcalendar/core/locales/es";
+import { ESTADOS_AV } from "../config/camposMantenimiento";
 
 export default function MantenimientoCalendario({
   calendarRef,
   calendarView,
   setCalendarView,
   filteredCalendarEvents,
-  renderDayCellContent,
-  renderEventContent,
 }) {
   return (
     <div className="flex flex-col h-[80vh]">
@@ -35,10 +33,14 @@ export default function MantenimientoCalendario({
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView={calendarView}
         locale={esLocale}
-        events={filteredCalendarEvents}
+        events={filteredCalendarEvents.map((ev) => ({
+          ...ev,
+          backgroundColor:
+            ESTADOS_AV[ev.extendedProps.estadoAviso]?.color,
+          textColor:
+            ESTADOS_AV[ev.extendedProps.estadoAviso]?.text,
+        }))}
         height="80vh"
-        dayCellContent={renderDayCellContent}
-        eventContent={renderEventContent}
       />
     </div>
   );

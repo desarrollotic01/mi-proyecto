@@ -1,0 +1,43 @@
+import axios from "axios";
+
+const API_URL = import.meta.env.VITE_API_URL;
+
+const api = axios.create({
+  baseURL: API_URL,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+/* =========================
+   NORMALIZADOR
+========================= */
+const normalizarAviso = (aviso) => ({
+  ...aviso,
+  estado: aviso.estadoAviso, // 👈 CLAVE
+});
+
+/* =========================
+   CRUD
+========================= */
+export const obtenerAvisos = async () => {
+  const { data } = await api.get("/avisos");
+  return data.map(normalizarAviso);
+};
+
+export const crearAviso = async (payload) => {
+  const { data } = await api.post("/avisos", payload);
+  return normalizarAviso(data);
+};
+
+export const actualizarEstadoAviso = async (id, estadoAviso) => {
+  const { data } = await api.patch(`/avisos/${id}/estado`, {
+    estadoAviso,
+  });
+  return normalizarAviso(data);
+};
