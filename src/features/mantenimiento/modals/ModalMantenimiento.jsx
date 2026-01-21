@@ -1,16 +1,16 @@
 import { useState } from "react";
 
-import Campo from "./inputs/Campo";
-import CampoFile from "./inputs/CampoFile";
-import CampoLookup from "./inputs/CampoLookup";
-import ModalLookup from "./inputs/ModalLookup";
+import Campo from "../../../components/inputs/Campo";
+import CampoFile from "../../../components/inputs/CampoFile";
+import CampoLookup from "../../../components/inputs/CampoLookup";
+import ModalLookup from "../../../components/inputs/ModalLookup";
 
 import {
   clientes,
   contactosPorCliente,
   equiposData,
   ubicacionesData,
-} from "../components/data";
+} from "../../../components/data";
 
 /* =========================
    CONSTANTES

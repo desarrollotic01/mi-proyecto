@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 
 const pages = [
-  { name: "Mantenimiento", path: "/mantenimiento" },
+  { name: "Mantenimiento", path: "../features/mantenimiento/pages/Mantenimiento.jsx" },
   { name: "Orden de Trabajo", path: "/orden-trabajo" }, 
 ];
 

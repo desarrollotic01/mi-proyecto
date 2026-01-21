@@ -3,7 +3,7 @@ import MainLayout from "./layouts/MainLayout";
 import Inicio from "./pages/Inicio";
 import Usuarios from "./pages/Usuarios";
 import Reportes from "./pages/Reportes";
-import Mantenimiento from "./pages/Mantenimiento";
+import Mantenimiento from "./features/mantenimiento/pages/Mantenimiento";
 import OrdenTrabajo from "./pages/OrdenTrabajo";
 
 export default function App() {
