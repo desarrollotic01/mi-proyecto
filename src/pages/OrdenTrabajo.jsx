@@ -1,573 +1,306 @@
-import { useState, useRef, useEffect } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import esLocale from "@fullcalendar/core/locales/es";
-
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { useState, useEffect } from "react";
+import KanbanView from "../features/OrdenTrabajo/components/OrdenTrabajoKanban";
+import ListaView from "../features/OrdenTrabajo/components/OrdenTrabajoLista";
+import CalendarioView from "../features/OrdenTrabajo/components/OrdenTrabajoCalendario";
 import ModalOrdenTrabajo from "../components/inputs/ModalOrdenTrabajo";
-import ModalOrdenTrabajoView from "../components/inputs/ModalOrdenTrabajoView";
-
-import "../styles/fullcalendar.css";
+import ModalOrdenTrabajoView from "../features/OrdenTrabajo/modals/ModalOrdenTrabajoView";
+import CrearNotificacionModal from "../features/OrdenTrabajo/modals/ModalNotificacion";
+import { 
+  getAllOrdenesTrabajo, 
+  updateEstadoOrdenTrabajo,
+  crearOrdenTrabajo,
+  liberarOrdenTrabajo 
+} from "../features/mantenimiento/services/ordenTrabajoService";
 
 /* ================= HELPERS ================= */
 
-const addOneDay = (dateTime) => {
-  if (!dateTime) return null;
-  const d = new Date(dateTime);
-  d.setDate(d.getDate() + 1);
-  return d.toISOString();
+const mapEstadoToKanban = (estado) => {
+  const mapping = {
+    "CREADO": "creado",
+    "LIBERADO": "liberado",
+    "CIERRE_TECNICO": "cierre_tecnico",
+    "CERRADO": "cerrado",
+    "CANCELADO": "cancelado"
+  };
+  return mapping[estado] || "creado";
 };
 
-const getEventColor = (estado) => {
-  switch (estado) {
-    case "created": return "#bfdbfe";
-    case "review": return "#fde68a";
-    case "done": return "#bbf7d0";
-    default: return "#e5e7eb";
-  }
+const formatDate = (isoDate) => {
+  if (!isoDate) return "—";
+  const date = new Date(isoDate);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 };
 
-const getEventTextColor = (estado) => {
-  switch (estado) {
-    case "created": return "#1e3a8a";
-    case "review": return "#78350f";
-    case "done": return "#14532d";
-    default: return "#374151";
-  }
-};
-
-const getCardColor = (estado) => {
-  switch (estado) {
-    case "created": return "bg-blue-100 border-blue-300";
-    case "review": return "bg-yellow-100 border-yellow-300";
-    case "done": return "bg-green-100 border-green-300";
-    default: return "bg-gray-100 border-gray-300";
-  }
+const formatDateForInput = (isoDate) => {
+  if (!isoDate) return "";
+  return isoDate.split('T')[0];
 };
 
 /* ================= COMPONENT ================= */
 
 export default function OrdenTrabajo() {
-
-const LISTA_COLUMNS_OT = {
-  numeroAviso: "N° Aviso",
-  descripcionOT: "Descripción OT",
-  descripcionDetalladaOT: "Descripción Detallada",
-  equipoVendido: "Equipo Vendido",
-  equipoAtendido: "Equipo Atendido",
-  equipoAlsud: "Equipo ALSUD",
-  tipoOT: "Tipo OT",
-  prioridad: "Prioridad",
-  inicioProgramado: "Inicio Programado",
-  finProgramado: "Fin Programado",
-  claveControl: "Clave Control",
-  numeroOT: "N° OT",
-  cliente: "Cliente",
-  personalAsignado: "Personal Asignado",
-  cantidadTecnicos: "Cantidad Técnicos",
-  empresaAsignada: "Empresa Asignada",
-  materialesAsignados: "Materiales Asignados",
-  supervisorResponsable: "Supervisor",
-  inicioReal: "Inicio Real",
-  finReal: "Fin Real",
-  personalDesignadoReal: "Personal Real",
-  empresasAsignadasReal: "Empresas Reales",
-  materialesUtilizados: "Materiales Utilizados",
-  estadoOT: "Estado OT",
-};
-
-const DEFAULT_VISIBLE_COLUMNS_OT = [
-  "numeroAviso",
-  "cliente",
-  "inicioProgramado",
-  "finProgramado",
-];
-
-  const calendarRef = useRef(null);
-
-  /* ================= NAV ================= */
+  /* ================= STATE ================= */
   const [activeTab, setActiveTab] = useState("kanban");
-  const [calendarView, setCalendarView] = useState("dayGridMonth");
+  const [ordenesData, setOrdenesData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  /* ================= MODAL ================= */
+  /* ================= MODALS ================= */
   const [modalOpen, setModalOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
-// ===== MODAL VISTA =====
-const [viewOpen, setViewOpen] = useState(false);
-const [viewData, setViewData] = useState(null);
-const [viewStep, setViewStep] = useState(1);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewData, setViewData] = useState(null);
+  const [viewStep, setViewStep] = useState(1);
+  const [formData, setFormData] = useState({});
 
-  /* ================= DATA ================= */
-const [estadoFilter, setEstadoFilter] = useState("all");
-const [listaSearch, setListaSearch] = useState("");
-const [showFilters, setShowFilters] = useState(false);
-
-const buildDefaultCols = () =>
-  Object.keys(LISTA_COLUMNS_OT).reduce((acc, key) => {
-    acc[key] =
-      key === "numeroAviso" ||
-      DEFAULT_VISIBLE_COLUMNS_OT.includes(key);
-    return acc;
-  }, {});
-
-const [visibleCols, setVisibleCols] = useState(buildDefaultCols);
-const [pendingCols, setPendingCols] = useState(buildDefaultCols);
-
-
-const addOneDayDate = (dateStr) => {
-  if (!dateStr) return null;
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() + 1);
-  return date.toISOString().split("T")[0];
-};
-
-
-  const initialFormData = {
-    numeroAviso: "",
-    descripcionOT: "",
-    descripcionDetalladaOT: "",
-    equipoVendido: "",
-    equipoAtendido: "",
-    equipoAlsud: "",
-    tipoOT: "",
-    prioridad: "",
-    inicioProgramado: "",
-    finProgramado: "",
-    claveControl: "",
-    numeroOT: "",
-    cliente: "",
-    personalAsignado: "",
-    cantidadTecnicos: "",
-    empresaAsignada: "",
-    materialesAsignados: "",
-    supervisorResponsable: "",
-    inicioReal: "",
-    finReal: "",
-    personalDesignadoReal: "",
-    empresasAsignadasReal: "",
-    materialesUtilizados: "",
-    estadoOT: "",
-    documentosCargados: null,
-    datosAdjuntos: null,
-  };
-
-  const [formData, setFormData] = useState(initialFormData);
-
-  const [columns, setColumns] = useState({
-    created: { name: "Creado", items: [] },
-    review: { name: "En Revisión", items: [] },
-    done: { name: "Finalizado", items: [] },
+  // Modal de Notificación (Cierre Técnico)
+  const [modalNotificacion, setModalNotificacion] = useState({
+    isOpen: false,
+    ordenTrabajo: null,
   });
+  const [listaTecnicos, setListaTecnicos] = useState([]);
+  const [listaPlanes, setListaPlanes] = useState([]);
 
-  const [calendarEvents, setCalendarEvents] = useState([]);
+  /* ================= DATA LOADING ================= */
+  useEffect(() => {
+    loadOrdenesTrabajo();
+  }, []);
 
-  /* ================= SAVE ================= */
-
-  const handleSaveAll = () => {
-    const id = Date.now().toString();
-
-    const ot = {
-      id,
-      ...formData,
-      estado: "created",
-    };
-
-    // Kanban
-    setColumns((prev) => ({
-      ...prev,
-      created: {
-        ...prev.created,
-        items: [...prev.created.items, ot],
-      },
-    }));
-
-   setCalendarEvents((prev) => [
-  ...prev,
-  {
-    id,
-    title: `#${formData.numeroAviso || "—"}`,
-    start:formData.inicioProgramado,
-end: addOneDayDate(formData.finProgramado),
-    allDay: true,
-    numeroAviso: formData.numeroAviso,
-    estado: "created",
-    backgroundColor: getEventColor("created"),
-    textColor: getEventTextColor("created"),
-  },
-]);
-
-
-    setModalOpen(false);
-    setFormData(initialFormData);
-    setWizardStep(1);
+  const loadOrdenesTrabajo = async () => {
+    try {
+      setLoading(true);
+      const data = await getAllOrdenesTrabajo();
+      setOrdenesData(data);
+    } catch (error) {
+      console.error("Error cargando órdenes:", error);
+      setOrdenesData([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  /* ================= DRAG ================= */
+  /* ================= KANBAN DATA ================= */
+  const columns = {
+    creado: { name: "Creado", color: "#3b82f6" },
+    liberado: { name: "Liberado", color: "#8b5cf6" },
+    cierre_tecnico: { name: "Cierre Técnico", color: "#f59e0b" },
+    cerrado: { name: "Cerrado", color: "#10b981" },
+    cancelado: { name: "Cancelado", color: "#ef4444" }
+  };
 
- const onDragEnd = ({ source, destination }) => {
-  if (!destination) return;
+  const getKanbanData = () => {
+    const result = Object.keys(columns).reduce((acc, key) => {
+      acc[key] = {
+        ...columns[key],
+        items: ordenesData.filter(ot => mapEstadoToKanban(ot.estado) === key)
+      };
+      return acc;
+    }, {});
+    return result;
+  };
 
-  // MISMA COLUMNA → solo reordenar
-  if (source.droppableId === destination.droppableId) {
-    const col = columns[source.droppableId];
-    const items = Array.from(col.items);
-    const [moved] = items.splice(source.index, 1);
-    items.splice(destination.index, 0, moved);
+  /* ================= HANDLERS ================= */
+  const handleSaveAll = async () => {
+    try {
+      await crearOrdenTrabajo(formData);
+      await loadOrdenesTrabajo();
+      
+      setModalOpen(false);
+      setFormData({});
+      setWizardStep(1);
+    } catch (error) {
+      console.error("Error creando orden de trabajo:", error);
+    }
+  };
 
-    setColumns((prev) => ({
-      ...prev,
-      [source.droppableId]: { ...col, items },
-    }));
-    return;
+  const handleUpdateEstado = async (ordenId, nuevoEstado) => {
+    try {
+      // Actualizar optimísticamente en el estado local
+      setOrdenesData(prev => 
+        prev.map(ot => 
+          ot.id === ordenId ? { ...ot, estado: nuevoEstado } : ot
+        )
+      );
+
+      // Actualizar en el backend
+      await updateEstadoOrdenTrabajo(ordenId, nuevoEstado);
+    } catch (error) {
+      console.error("Error actualizando estado:", error);
+      await loadOrdenesTrabajo();
+    }
+  };
+
+  const handleViewOrden = (orden) => {
+    console.log("HANDLE VIEW ORDEN:", orden);
+    setViewData(orden);
+    setViewStep(1);
+    setViewOpen(true);
+  };
+
+  // ===== NUEVA FUNCIÓN: LIBERAR ORDEN DE TRABAJO =====
+  const handleLiberar = async (ordenId) => {
+    try {
+      const confirmar = window.confirm(
+        "¿Estás seguro de liberar esta orden de trabajo? Esta acción cambiará su estado a LIBERADO."
+      );
+      
+      if (!confirmar) return;
+
+      // Actualizar optimísticamente
+      setOrdenesData(prev => 
+        prev.map(ot => 
+          ot.id === ordenId ? { ...ot, estado: "LIBERADO" } : ot
+        )
+      );
+
+      // Llamada al backend
+      await liberarOrdenTrabajo(ordenId);
+      
+      // Recargar para asegurar sincronización
+      await loadOrdenesTrabajo();
+      
+      // Opcional: mostrar toast de éxito
+      alert("✅ Orden liberada correctamente");
+    } catch (error) {
+      console.error("Error al liberar orden:", error);
+      alert("❌ Error al liberar la orden de trabajo");
+      
+      // Revertir cambio
+      await loadOrdenesTrabajo();
+    }
+  };
+
+  // ===== NUEVA FUNCIÓN: ABRIR MODAL DE CIERRE TÉCNICO =====
+  const handleAbrirCierreTecnico = async (ordenTrabajo) => {
+    try {
+      // Mostrar indicador de carga (opcional)
+      // setLoadingModal(true);
+
+      // Cargar técnicos y planes en paralelo
+      const [tecnicosData, planesData] = await Promise.all([
+        fetch('/api/tecnicos').then(r => r.json()).catch(() => []),
+        fetch(`/api/ordenes-trabajo/${ordenTrabajo.id}/planes`).then(r => r.json()).catch(() => [])
+      ]);
+      
+      setListaTecnicos(tecnicosData);
+      setListaPlanes(planesData);
+
+      // Abrir modal
+      setModalNotificacion({
+        isOpen: true,
+        ordenTrabajo: ordenTrabajo,
+      });
+    } catch (error) {
+      console.error("Error al cargar datos para cierre técnico:", error);
+      alert("❌ Error al cargar información para el cierre técnico");
+    }
+  };
+
+  // ===== CERRAR MODAL DE NOTIFICACIÓN =====
+  const handleCerrarModalNotificacion = async () => {
+    setModalNotificacion({
+      isOpen: false,
+      ordenTrabajo: null,
+    });
+    
+    // Recargar órdenes después de crear la notificación
+    await loadOrdenesTrabajo();
+  };
+
+  /* ================= RENDER ================= */
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-slate-600 font-medium">Cargando órdenes de trabajo...</p>
+        </div>
+      </div>
+    );
   }
 
-  // CAMBIO DE COLUMNA
-  const sourceCol = columns[source.droppableId];
-  const destCol = columns[destination.droppableId];
-
-  const sourceItems = Array.from(sourceCol.items);
-  const destItems = Array.from(destCol.items);
-
-  const [moved] = sourceItems.splice(source.index, 1);
-  moved.estado = destination.droppableId;
-
-  destItems.splice(destination.index, 0, moved);
-
-  setColumns((prev) => ({
-    ...prev,
-    [source.droppableId]: { ...sourceCol, items: sourceItems },
-    [destination.droppableId]: { ...destCol, items: destItems },
-  }));
-
-  // sincronizar color calendario
-  setCalendarEvents((prev) =>
-    prev.map((ev) =>
-      ev.id === moved.id
-        ? {
-            ...ev,
-            backgroundColor: getEventColor(moved.estado),
-            textColor: getEventTextColor(moved.estado),
-          }
-        : ev
-    )
-  );
-};
-
-
-  useEffect(() => {
-    if (activeTab === "calendario" && calendarRef.current) {
-      calendarRef.current.getApi().changeView(calendarView);
-    }
-  }, [activeTab, calendarView]);
-
-  /* ================= UI ================= */
-
   return (
-    <div className="p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+      <div className="container mx-auto px-4 py-6">
+        {/* HEADER */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 bg-clip-text text-transparent mb-2">
+            Órdenes de Trabajo
+          </h1>
+          <p className="text-slate-600">
+            Gestiona y visualiza todas tus órdenes de trabajo
+          </p>
+        </div>
 
-      {/* NAV */}
-      <div className="flex gap-4 mb-4 border-b pb-2">
-        {["kanban","lista", "calendario"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`pb-2 font-semibold ${
-              activeTab === tab && "border-b-2 border-gray-600 text-gray-600"
-            }`}
-          >
-            {tab === "kanban" ? "Estados" : tab === "lista" ? "Lista" : "Calendario"}
-          </button>
-
-
-        ))}
-
-        <button
-          className="ml-auto px-4 py-2 rounded-md bg-gray-200 shadow-sm"
-          onClick={() => {
-            setWizardStep(1);
-            setModalOpen(true);
-          }}
-        >
-          + Nueva OT
-        </button>
-      </div>
-
-      {/* ================= KANBAN ================= */}
-      {activeTab === "kanban" && (
-  <DragDropContext onDragEnd={onDragEnd}>
-    <div className="grid grid-cols-3 gap-4">
-      {Object.entries(columns).map(([colId, col]) => (
-        <Droppable droppableId={colId} key={colId}>
-          {(p) => (
-            <div
-              ref={p.innerRef}
-              {...p.droppableProps}
-              className="p-4 rounded-xl border shadow-sm bg-gray-50"
-            >
-              <h3 className="font-semibold mb-3">{col.name}</h3>
-
-              {col.items.map((item, i) => (
-                <Draggable key={item.id} draggableId={item.id} index={i}>
-                  {(p) => (
-                    <div
-                      ref={p.innerRef}
-                      {...p.draggableProps}
-                      {...p.dragHandleProps}
-                      className={`relative p-4 mb-3 rounded-xl border shadow-sm space-y-3 ${getCardColor(item.estado)}`}
-                    >
-                      {/* BOTÓN 3 PUNTITOS */}
-                      <button
-                        className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
-                        onClick={(e) => {
-                          e.stopPropagation(); // evita drag
-                          setViewData(item);
-                          setViewStep(1);
-                          setViewOpen(true);
-                        }}
-                      >
-                        ⋮
-                      </button>
-
-                      {/* N° AVISO */}
-                      <div>
-                        <p className="text-xs text-gray-500 font-semibold uppercase">
-                          N° Aviso
-                        </p>
-                        <p className="text-sm font-bold text-gray-900">
-                          {item.numeroAviso || "—"}
-                        </p>
-                      </div>
-
-                      {/* INICIO PROGRAMADO */}
-                      <div>
-                        <p className="text-xs text-gray-500 font-semibold uppercase">
-                          Inicio Programado
-                        </p>
-                        <p className="text-sm text-gray-800">
-                          {item.inicioProgramado
-                            ? item.inicioProgramado
-                                .split("-")
-                                .reverse()
-                                .join("/")
-                            : "—"}
-                        </p>
-                      </div>
-
-                      {/* FIN PROGRAMADO */}
-                      <div>
-                        <p className="text-xs text-gray-500 font-semibold uppercase">
-                          Fin Programado
-                        </p>
-                        <p className="text-sm text-gray-800">
-                          {item.finProgramado
-                            ? item.finProgramado
-                                .split("-")
-                                .reverse()
-                                .join("/")
-                            : "—"}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-
-              {p.placeholder}
-            </div>
-          )}
-        </Droppable>
-      ))}
-    </div>
-  </DragDropContext>
-)}
-
-    {/* ================= LISTA ================= */}
-{activeTab === "lista" && (
-  <>
-    {/* BUSCADOR */}
-    <div className="flex gap-3 mb-3">
-      <input
-        className="border p-2 rounded shadow-sm"
-        placeholder="Buscar OT o Cliente"
-        value={listaSearch}
-        onChange={(e) => setListaSearch(e.target.value)}
-      />
-    </div>
-
-    {/* FILTROS */}
-    <div className="flex items-center gap-3 mb-3">
-      <button
-  onClick={() => {
-    setPendingCols(visibleCols);
-    setShowFilters(!showFilters);
-  }}
-  className="px-3 py-1 rounded-md bg-gray-200 shadow-sm text-sm"
->
-  Filtros
-</button>
-
-<button
-  onClick={() => {
-    const defaults = buildDefaultCols();
-    setVisibleCols(defaults);
-    setPendingCols(defaults);
-    setListaSearch("");
-    setShowFilters(false);
-  }}
-  className="px-3 py-1 rounded-md bg-red-100 text-red-700 shadow-sm text-sm"
->
-  Restablecer
-</button>
-
-
-
-     {showFilters && (
-  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-3 border rounded-lg bg-gray-50 text-sm">
-
-    {Object.entries(LISTA_COLUMNS_OT).map(([key, label]) => (
-      <label key={key} className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={pendingCols[key]}
-          disabled={key === "numeroAviso"}
-          onChange={() =>
-            setPendingCols((p) => ({ ...p, [key]: !p[key] }))
-          }
-        />
-        {label}
-      </label>
-    ))}
-
-    {/* BOTÓN OK */}
-    <div className="col-span-full flex justify-end mt-2">
-      <button
-        onClick={() => {
-          setVisibleCols(pendingCols);
-          setShowFilters(false);
-        }}
-        className="px-4 py-2 bg-blue-600 text-white rounded-md"
-      >
-        OK
-      </button>
-    </div>
-
-  </div>
-)}
-
-    </div>
-
-
-    {/* TABLA */}
-    <table className="w-full text-sm border shadow-sm">
-      <thead className="bg-gray-100">
-        <tr>
-          {Object.entries(LISTA_COLUMNS_OT).map(
-            ([key, label]) =>
-              visibleCols[key] && (
-                <th key={key} className="border p-2">
-                  {label}
-                </th>
-              )
-          )}
-        </tr>
-      </thead>
-
-      <tbody>
-        {Object.values(columns)
-          .flatMap((c) => c.items)
-          .filter(
-            (ot) =>
-              !listaSearch ||
-              ot.numeroAviso?.includes(listaSearch) ||
-              ot.cliente?.toLowerCase().includes(listaSearch.toLowerCase())
-          )
-          .map((ot) => (
-            <tr key={ot.id}>
-              {Object.keys(LISTA_COLUMNS_OT).map(
-                (key) =>
-                  visibleCols[key] && (
-                    <td key={key} className="border p-2">
-                      {key.includes("inicio") || key.includes("fin")
-  ? ot[key]
-    ? ot[key].split("-").reverse().join("/")
-    : "—"
-  : ot[key] || "—"}
-
-                    </td>
-                  )
-              )}
-            </tr>
-          ))}
-      </tbody>
-    </table>
-  </>
-)}
-
-
-      {/* ================= CALENDARIO ================= */}
-      {activeTab === "calendario" && (
-        <>
-          <div className="flex gap-2 mb-3">
-            {["dayGridMonth", "dayGridWeek"].map((v) => (
+        {/* NAVIGATION */}
+        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-2 mb-6 border border-slate-200/50">
+          <div className="flex items-center gap-2">
+            {["kanban", "lista", "calendario"].map((tab) => (
               <button
-                key={v}
-                onClick={() => setCalendarView(v)}
-                className={`px-3 py-1 rounded shadow-sm ${
-                  calendarView === v
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200"
-                }`}
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`
+                  flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-300 capitalize
+                  ${activeTab === tab
+                    ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30 transform scale-[1.02]"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }
+                `}
               >
-                {v === "dayGridMonth" ? "Mes" : "Semana"}
+                {tab === "kanban" ? "📊 Estados" : tab === "lista" ? "📋 Lista" : "📅 Calendario"}
               </button>
             ))}
+            
+            <button
+              onClick={() => {
+                setWizardStep(1);
+                setModalOpen(true);
+              }}
+              className="
+                px-6 py-3 rounded-xl font-semibold
+                bg-gradient-to-r from-emerald-600 to-emerald-500 
+                text-white shadow-lg shadow-emerald-500/30
+                hover:shadow-xl hover:shadow-emerald-500/40
+                transform hover:scale-105 transition-all duration-300
+                whitespace-nowrap
+              "
+            >
+              ✨ Nueva OT
+            </button>
           </div>
+        </div>
 
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView={calendarView}
-            locale={esLocale}
-            events={calendarEvents}
-            height="80vh"
-            eventDidMount={(info) => {
-              if (info.view.type !== "dayGridWeek") return;
+        {/* VIEWS */}
+        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-6 border border-slate-200/50">
+          {activeTab === "kanban" && (
+            <KanbanView
+              data={getKanbanData()}
+              onUpdateEstado={handleUpdateEstado}
+              onViewOrden={handleViewOrden}
+              onLiberar={handleLiberar}
+              onAbrirCierreTecnico={handleAbrirCierreTecnico}
+            />
+          )}
 
-              const start = info.event.start;
-              const end = info.event.end;
-              const days = (end - start) / (1000 * 60 * 60 * 24);
+          {activeTab === "lista" && (
+            <ListaView
+              ordenes={ordenesData}
+              onViewOrden={handleViewOrden}
+            />
+          )}
 
-              if (days > 3) {
-                info.el.style.display = "none";
+          {activeTab === "calendario" && (
+            <CalendarioView
+              ordenes={ordenesData}
+              onViewOrden={handleViewOrden}
+            />
+          )}
+        </div>
+      </div>
 
-                const endDate = end.toISOString().slice(0, 10);
-
-                setTimeout(() => {
-                  const cell = document.querySelector(
-                    `[data-date="${endDate}"]`
-                  );
-                  if (!cell) return;
-
-                  const badge = document.createElement("div");
-                  badge.style.background = info.event.backgroundColor;
-                  badge.style.color = info.event.textColor;
-                  badge.style.fontSize = "11px";
-                  badge.style.padding = "2px 6px";
-                  badge.style.borderRadius = "6px";
-                  badge.style.marginTop = "2px";
-
-                  cell.appendChild(badge);
-                }, 0);
-              }
-            }}
-          />
-        </>
-      )}
-
-      {/* ================= MODAL ================= */}
+      {/* MODALS */}
       <ModalOrdenTrabajo
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -579,16 +312,24 @@ end: addOneDayDate(formData.finProgramado),
         }
         handleSaveAll={handleSaveAll}
       />
+
       <ModalOrdenTrabajoView
-  isOpen={viewOpen}
-  data={viewData}
-  wizardStep={viewStep}
-  setWizardStep={setViewStep}
-  onClose={() => {
-    setViewOpen(false);
-    setViewData(null);
-  }}
-/>
+        isOpen={viewOpen}
+        orden={viewData}
+        onClose={() => {
+          setViewOpen(false);
+          setViewData(null);
+        }}
+      />
+
+      {/* MODAL DE NOTIFICACIÓN (CIERRE TÉCNICO) */}
+      <CrearNotificacionModal
+        isOpen={modalNotificacion.isOpen}
+        onClose={handleCerrarModalNotificacion}
+        ordenTrabajoId={modalNotificacion.ordenTrabajo?.id}
+        listaTecnicos={listaTecnicos}
+        listaPlanes={listaPlanes}
+      />
     </div>
   );
 }

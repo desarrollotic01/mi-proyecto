@@ -1,3 +1,4 @@
+// Estados VISUALES (UI)
 export const ESTADOS_AV = {
   CREADO: {
     label: "Creado",
@@ -41,4 +42,15 @@ export const ESTADOS_AV = {
     text: "#312e81",
     badge: "bg-indigo-100 text-indigo-800 border-indigo-300",
   },
+};
+
+// MAPEO BACKEND → UI (ESTO ES CLAVE)
+export const ESTADO_KEY_MAP = {
+  creado: "CREADO",
+  tratado: "TRATADO",
+  "con OT": "CON_OT",
+  rechazado: "RECHAZADO",
+  finalizado: "FINALIZADO",
+  facturado: "FACTURADO",
+  "finalizado sin facturacion": "FINALIZADO_SIN_FACTURACION",
 };

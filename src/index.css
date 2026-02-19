@@ -1,7 +1,18 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Asegurar que el body y html permitan scroll completo */
+@layer base {
+  html, body {
+    @apply h-full w-full;
+    overflow-x: hidden;
+  }
+  
+  body {
+    @apply m-0 p-0;
+  }
+}
 
 @keyframes slide-up {
   from { transform: translateY(40px); opacity: 0; }

@@ -1,0 +1,22 @@
+// services/solicitudCompraService.js
+import api from "../../../services/api";
+
+export const updateSolicitudCompra = async (id, data) => {
+  try {
+    const response = await api.put(`/solicitudcompra/${id}`, data);
+    return response.data;
+  } catch (error) {
+    console.error("Error al actualizar solicitud de compra:", error);
+    throw error;
+  }
+};
+
+export const getSolicitudCompraById = async (id) => {
+  try {
+    const response = await api.get(`/solicitudcompra/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error al obtener solicitud de compra:", error);
+    throw error;
+  }
+};

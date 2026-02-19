@@ -26,9 +26,10 @@ const normalizarAviso = (aviso) => ({
    CRUD
 ========================= */
 export const obtenerAvisos = async () => {
-  const { data } = await api.get("/avisos");
-  return data.map(normalizarAviso);
+  const res = await api.get("/avisos");
+  return res.data;
 };
+
 
 export const crearAviso = async (payload) => {
   const { data } = await api.post("/avisos", payload);

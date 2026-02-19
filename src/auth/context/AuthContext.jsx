@@ -8,35 +8,46 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const initAuth = async () => {
+      const token = localStorage.getItem("token");
 
-    // 🔥 SI NO HAY TOKEN, NO LLAMAMOS /me
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
-    meRequest(token)
-      .then((data) => {
-        // data puede ser { user } o el user directo
-        setUser(data.user || data);
-      })
-      .catch(() => {
+      try {
+        // 🔐 Siempre validar token en backend
+        const data = await meRequest(token);
+        const userData = data.user || data.usuario || data;
+
+        setUser(userData);
+        localStorage.setItem("user", JSON.stringify(userData));
+      } catch (error) {
+        // ❌ Token inválido o expirado
         localStorage.removeItem("token");
+        localStorage.removeItem("user");
         setUser(null);
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
   const login = async (alias, password) => {
     const data = await loginRequest(alias, password);
 
     localStorage.setItem("token", data.token);
-    setUser(data.usuario); // 🔥 AQUÍ SE SETEA EL USUARIO
+    localStorage.setItem("user", JSON.stringify(data.usuario));
+
+    setUser(data.usuario);
   };
 
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setUser(null);
   };
 
