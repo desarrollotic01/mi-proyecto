@@ -45,13 +45,19 @@ export default function UbicacionesTecnicasPage() {
     const fetchAllData = async () => {
       setLoading(true);
       try {
-        // Traemos las ubicaciones, los clientes y los países al mismo tiempo
+
+     // Traemos las ubicaciones, los clientes y los países al mismo tiempo
         const [dataUbicaciones, dataPaises, dataClientes] = await Promise.all([
           UbicacionTecnicaService.getUbicacionTecnicas(),
           paisService.getAll?.() ?? paisService.getPaises?.(),
           clienteService.getAll?.() ?? clienteService.getClientes?.()
         ]);
         
+        // 👇 PON LOS CONSOLE.LOG AQUÍ MISMO (Línea 62 aprox) 👇
+        console.log("Catálogo de Clientes:", dataClientes);
+        console.log("Catálogo de Países:", dataPaises);
+        // 👆 ------------------------------------------------ 👆
+
         setItems(Array.isArray(dataUbicaciones) ? dataUbicaciones : []);
         setPaises(Array.isArray(dataPaises) ? dataPaises : []);
         setClientes(Array.isArray(dataClientes) ? dataClientes : []);
@@ -102,13 +108,25 @@ export default function UbicacionesTecnicasPage() {
     await loadItems();
     setModalOpen(false);
   };
-
-  const handleDelete = async (id) => {
-    if (!confirm("¿Seguro de eliminar esta Ubicación Técnica?")) return;
+const handleDelete = async (id) => {
+    if (!confirm("¿Estás seguro de eliminar esta Ubicación Técnica?")) return;
+    
     setBusyId(id);
     try {
-      await UbicacionTecnicaService.deleteUbicacion(id);
-      await loadItems();
+      // 1. Eliminamos usando el nombre correcto del servicio
+      await UbicacionTecnicaService.deleteUbicacionTecnica(id); 
+      
+      // 2. Recargamos la tabla usando la función que SÍ existe en tu código
+      await loadItems(); 
+      
+    } catch (err) {
+      console.error("Detalle del error al eliminar:", err);
+      const errorDelServidor = err?.response?.data?.message 
+                            || err?.response?.data?.error 
+                            || err?.message 
+                            || "Error interno del servidor";
+
+      alert(`No se puede eliminar el registro.\n\nMotivo del servidor: ${errorDelServidor}`);
     } finally {
       setBusyId(null);
     }
