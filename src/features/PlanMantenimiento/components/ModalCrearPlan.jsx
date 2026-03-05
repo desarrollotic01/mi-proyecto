@@ -576,7 +576,7 @@ export default function ModalCrearPlan({
             <div className="flex items-center gap-3 mb-6">
               <div className="w-1.5 h-8 bg-gradient-to-b from-blue-600 to-blue-400 rounded-full"></div>
               <h3 className="text-xl font-bold text-slate-800">
-                Información del Plan
+                Información del Plan - Pruebas
               </h3>
             </div>
 
@@ -809,7 +809,7 @@ export default function ModalCrearPlan({
               <div className="flex items-center gap-3">
                 <div className="w-1.5 h-8 bg-gradient-to-b from-indigo-600 to-purple-500 rounded-full"></div>
                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  Recursos del Plan (General)
+                  Recursos del Plan (General) - Prueba
                   <Package className="w-5 h-5 text-indigo-600" />
                 </h3>
               </div>
