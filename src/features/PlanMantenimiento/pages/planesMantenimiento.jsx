@@ -1,20 +1,37 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { planMantenimientoService } from "../services/planMantenimientoService";
-import { Plus, Wrench, Eye, Calendar, Settings2 } from "lucide-react";
-import PanelPlan from "../components/PanelPlan";
+import {
+  Plus,
+  Wrench,
+  Calendar,
+  Settings2,
+  Search,
+  Filter,
+  BadgeCheck,
+} from "lucide-react";
+
 import ModalCrearPlan from "../components/ModalCrearPlan";
+import VistaPlanesSimple from "../components/VistaPlanesSimple";
+import PlanesMantenimientoExcel from "../components/PlanesMantenimientoExcel";
+import ModalDetallePlan from "../components/Modaldetalleplan"; 
 
 export default function PlanesMantenimiento() {
   const [planes, setPlanes] = useState([]);
   const [planSeleccionado, setPlanSeleccionado] = useState(null);
   const [mostrarModalCrear, setMostrarModalCrear] = useState(false);
 
+  const [vista, setVista] = useState("SIMPLE");
+  const [q, setQ] = useState("");
+  const [fTipo, setFTipo] = useState("TODOS");
+  const [fEstado, setFEstado] = useState("TODOS");
+
   const cargarPlanes = async () => {
     try {
       const data = await planMantenimientoService.getPlanes();
-      setPlanes(data);
+      setPlanes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error cargando planes", error);
+      setPlanes([]);
     }
   };
 
@@ -32,205 +49,203 @@ export default function PlanesMantenimiento() {
     return styles[tipo] || styles.PREVENTIVO;
   };
 
+  const getEquiposLabel = (plan) => {
+    const equipos = plan?.equipos || [];
+    if (!Array.isArray(equipos) || equipos.length === 0) return "Sin asignar";
+    const top = equipos
+      .slice(0, 2)
+      .map((e) => e?.nombre || e?.codigo)
+      .filter(Boolean);
+    const extra = equipos.length - top.length;
+    return extra > 0 ? `${top.join(", ")} +${extra}` : top.join(", ");
+  };
+
+  const planesFiltrados = useMemo(() => {
+    const texto = q.trim().toLowerCase();
+    return (planes || [])
+      .filter((p) => {
+        if (fEstado === "ACTIVOS" && !p.activo) return false;
+        if (fEstado === "INACTIVOS" && p.activo) return false;
+        if (fTipo !== "TODOS" && p.tipo !== fTipo) return false;
+        if (!texto) return true;
+        const equiposTxt = (p?.equipos || [])
+          .map((e) => `${e?.codigo || ""} ${e?.nombre || ""}`.trim())
+          .join(" ")
+          .toLowerCase();
+        const fields = [
+          p?.nombre, p?.codigoPlan, p?.tipo, p?.modeloEquipo, p?.tipoEquipo, equiposTxt,
+        ].filter(Boolean).join(" ").toLowerCase();
+        return fields.includes(texto);
+      })
+      .sort((a, b) => {
+        const da = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const db = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return db - da;
+      });
+  }, [planes, q, fTipo, fEstado]);
+
+  const stats = useMemo(() => {
+    const total = planes.length;
+    const activos = planes.filter((p) => p.activo).length;
+    const preventivos = planes.filter((p) => p.tipo === "PREVENTIVO").length;
+    const correctivos = planes.filter((p) => p.tipo === "CORRECTIVO").length;
+    const especificos = planes.filter((p) => p.esEspecifico).length;
+    return { total, activos, preventivos, correctivos, especificos };
+  }, [planes]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-slate-800 flex items-center gap-3 mb-2">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl shadow-lg">
-                <Wrench className="text-white" size={32} />
+    // ← min-h-screen → h-screen overflow-hidden para que la página use toda la pantalla
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 overflow-hidden">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <div className="max-w-full mx-auto space-y-6">
+
+          {/* HEADER */}
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold text-slate-800 flex items-center gap-3 mb-1">
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl shadow-lg">
+                  <Wrench className="text-white" size={28} />
+                </div>
+                Planes de Mantenimiento
+              </h1>
+              <p className="text-slate-600 ml-16">Gestiona y organiza tus planes de mantenimiento</p>
+            </div>
+            <button
+              onClick={() => setMostrarModalCrear(true)}
+              className="self-start lg:self-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/30 transition-all duration-200 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5"
+            >
+              <Plus size={20} strokeWidth={2.5} />
+              <span className="font-semibold">Nuevo Plan</span>
+            </button>
+          </div>
+
+          {/* STATS */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {[
+              { icon: Calendar, label: "Total", value: stats.total, color: "blue-100 text-blue-600" },
+              { icon: Settings2, label: "Activos", value: stats.activos, color: "green-100 text-green-600" },
+              { icon: Wrench, label: "Preventivos", value: stats.preventivos, color: "purple-100 text-purple-600" },
+              { icon: Wrench, label: "Correctivos", value: stats.correctivos, color: "red-100 text-red-600" },
+              { icon: BadgeCheck, label: "Específicos", value: stats.especificos, color: "emerald-100 text-emerald-600" },
+            ].map(({ icon: Icon, label, value, color }) => (
+              <div key={label} className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+                <div className="flex items-center gap-3">
+                  <div className={`bg-${color.split(" ")[0]} p-2 rounded-lg`}>
+                    <Icon className={color.split(" ")[1]} size={18} />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-800">{value}</p>
+                    <p className="text-xs text-slate-600">{label}</p>
+                  </div>
+                </div>
               </div>
-              Planes de Mantenimiento
-            </h1>
-            <p className="text-slate-600 ml-16">
-              Gestiona y organiza tus planes de mantenimiento preventivo
+            ))}
+          </div>
+
+          {/* BUSCADOR + FILTROS */}
+          <div className="bg-white rounded-2xl shadow border border-slate-200 p-4">
+            <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar por nombre, código, tipo, equipo..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition text-sm"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Filter size={16} className="text-slate-500 shrink-0" />
+                  <select
+                    value={fTipo}
+                    onChange={(e) => setFTipo(e.target.value)}
+                    className="py-2.5 px-3 rounded-xl border-2 border-slate-200 focus:border-blue-500 outline-none transition bg-white text-sm"
+                  >
+                    <option value="TODOS">Todos los tipos</option>
+                    <option value="PREVENTIVO">PREVENTIVO</option>
+                    <option value="CORRECTIVO">CORRECTIVO</option>
+                    <option value="MEJORA">MEJORA</option>
+                    <option value="INSPECCION">INSPECCION</option>
+                  </select>
+                </div>
+                <select
+                  value={fEstado}
+                  onChange={(e) => setFEstado(e.target.value)}
+                  className="py-2.5 px-3 rounded-xl border-2 border-slate-200 focus:border-blue-500 outline-none transition bg-white text-sm"
+                >
+                  <option value="TODOS">Todos</option>
+                  <option value="ACTIVOS">Activos</option>
+                  <option value="INACTIVOS">Inactivos</option>
+                </select>
+                <button
+                  onClick={() => { setQ(""); setFTipo("TODOS"); setFEstado("TODOS"); }}
+                  className="py-2.5 px-4 rounded-xl border-2 border-slate-200 hover:bg-slate-50 transition font-semibold text-slate-700 text-sm"
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              Mostrando <b>{planesFiltrados.length}</b> de <b>{planes.length}</b> planes
             </p>
           </div>
 
-          <button
-            onClick={() => setMostrarModalCrear(true)}
-            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/30 transition-all duration-200 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5"
-          >
-            <Plus size={20} strokeWidth={2.5} />
-            <span className="font-semibold">Nuevo Plan</span>
-          </button>
-        </div>
-
-        {/* ESTADÍSTICAS */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-100 p-2 rounded-lg">
-                <Calendar className="text-blue-600" size={20} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{planes.length}</p>
-                <p className="text-sm text-slate-600">Total Planes</p>
-              </div>
+          {/* TABS */}
+          <div className="bg-white rounded-2xl shadow border border-slate-200 p-2">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setVista("SIMPLE")}
+                className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition text-sm ${
+                  vista === "SIMPLE"
+                    ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow"
+                    : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+                }`}
+              >
+                Vista simple
+                <span className="text-xs opacity-80 px-2 py-0.5 rounded-full bg-white/20">Tabla</span>
+              </button>
+              <button
+                onClick={() => setVista("EXCEL")}
+                className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition text-sm ${
+                  vista === "EXCEL"
+                    ? "bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow"
+                    : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+                }`}
+              >
+                Vista Excel
+                <span className="text-xs opacity-80 px-2 py-0.5 rounded-full bg-white/20">Detallada</span>
+              </button>
             </div>
+            <p className="text-xs text-slate-500 mt-2 px-2">
+              {vista === "SIMPLE"
+                ? "Vista rápida para ver planes y entrar al detalle."
+                : "Vista estilo Excel: expandible por actividades e items + exportación."}
+            </p>
           </div>
 
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
-            <div className="flex items-center gap-3">
-              <div className="bg-green-100 p-2 rounded-lg">
-                <Settings2 className="text-green-600" size={20} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">
-                  {planes.filter(p => p.activo).length}
-                </p>
-                <p className="text-sm text-slate-600">Activos</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
-            <div className="flex items-center gap-3">
-              <div className="bg-purple-100 p-2 rounded-lg">
-                <Wrench className="text-purple-600" size={20} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">
-                  {planes.filter(p => p.tipo === "PREVENTIVO").length}
-                </p>
-                <p className="text-sm text-slate-600">Preventivos</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
-            <div className="flex items-center gap-3">
-              <div className="bg-red-100 p-2 rounded-lg">
-                <Wrench className="text-red-600" size={20} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">
-                  {planes.filter(p => p.tipo === "CORRECTIVO").length}
-                </p>
-                <p className="text-sm text-slate-600">Correctivos</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* TABLA */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                  <th className="p-4 text-left text-sm font-semibold text-slate-700">
-                    Nombre del Plan
-                  </th>
-                  <th className="p-4 text-left text-sm font-semibold text-slate-700">
-                    Tipo
-                  </th>
-                  <th className="p-4 text-left text-sm font-semibold text-slate-700">
-                    Equipo
-                  </th>
-                  <th className="p-4 text-left text-sm font-semibold text-slate-700">
-                    Estado
-                  </th>
-                  <th className="p-4 text-left text-sm font-semibold text-slate-700">
-                    Actividades
-                  </th>
-                  <th className="p-4 text-right text-sm font-semibold text-slate-700">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {planes.map((plan, index) => (
-                  <tr
-                    key={plan.id}
-                    className="border-b border-slate-100 hover:bg-blue-50/50 transition-colors duration-150"
-                  >
-                    <td className="p-4">
-                      <div className="font-semibold text-slate-800">
-                        {plan.nombre}
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      <span
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getTipoBadge(
-                          plan.tipo
-                        )}`}
-                      >
-                        {plan.tipo}
-                      </span>
-                    </td>
-
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <span className="text-slate-700">
-                          {plan.equipo?.nombre || "Sin asignar"}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      {plan.activo ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
-                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                          Activo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
-                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
-                          Inactivo
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="p-4">
-                      <span className="text-slate-600 text-sm">
-                        {plan.actividades?.length || 0} actividades
-                      </span>
-                    </td>
-
-                    <td className="p-4 text-right">
-                      <button
-                        onClick={() => setPlanSeleccionado(plan)}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors duration-200 shadow-sm hover:shadow-md"
-                      >
-                        <Eye size={16} />
-                        Ver Detalles
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-
-                {planes.length === 0 && (
-                  <tr>
-                    <td colSpan="6" className="p-12 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="bg-slate-100 p-4 rounded-full">
-                          <Wrench className="text-slate-400" size={32} />
-                        </div>
-                        <p className="text-slate-600 font-medium">
-                          No hay planes de mantenimiento
-                        </p>
-                        <p className="text-slate-500 text-sm">
-                          Crea tu primer plan para comenzar
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {/* CONTENIDO */}
+          {vista === "SIMPLE" ? (
+            <VistaPlanesSimple
+              planes={planesFiltrados}
+              getTipoBadge={getTipoBadge}
+              getEquiposLabel={getEquiposLabel}
+              onVerPlan={(plan) => setPlanSeleccionado(plan)}
+              onCrearPlan={() => setMostrarModalCrear(true)}
+            />
+          ) : (
+            <PlanesMantenimientoExcel
+              planes={planesFiltrados}
+              onVer={(plan) => setPlanSeleccionado(plan)}
+            />
+          )}
         </div>
       </div>
 
-      {/* PANEL LATERAL */}
+      {/* MODAL DETALLE GRANDE */}
       {planSeleccionado && (
-        <PanelPlan
+        <ModalDetallePlan
           plan={planSeleccionado}
           onClose={() => setPlanSeleccionado(null)}
         />

@@ -1,12 +1,120 @@
-import { X, FileText, Calendar, AlertCircle, ClipboardCheck, Settings, Zap, Users, Wrench, Info, Upload, Trash2, CheckCircle2, Clock, Eye, MapPin, Building2, User, Phone, Mail, Package, AlertTriangle } from "lucide-react";
-import { useState, useEffect } from "react";
+import {
+  X,
+  FileText,
+  Calendar,
+  AlertCircle,
+  ClipboardCheck,
+  Settings,
+  Zap,
+  Users,
+  Wrench,
+  Info,
+  Upload,
+  Trash2,
+  CheckCircle2,
+  Clock,
+  Eye,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import { getTratamientoByAviso } from "../mantenimiento/services/tratamientoService";
 import { getTrabajadores } from "../mantenimiento/services/trabajadoresService";
 import { equipoService } from "../mantenimiento/services/equipoService";
 import { planMantenimientoService } from "../PlanMantenimiento/services/planMantenimientoService";
 import { adjuntosService } from "../OrdenTrabajo/services/adjuntosService";
-import ModalInfoAviso from "./modals/ModalInfoAviso";
 
+import ModalInfoAviso from "./modals/ModalInfoAviso";
+import ModalDetallesEquipo from "../OrdenTrabajo/modals/ModalDetalleEquipo";
+
+/* ─────────────────────────────────────────────
+   ENUMS / HELPERS (IGUAL QUE GRUPAL)
+───────────────────────────────────────────── */
+
+const TIPOS_TRABAJO_ENUM = [
+  "REVISION",
+  "INSPECCION",
+  "LIMPIEZA",
+  "AJUSTE",
+  "LUBRICACION",
+  "CAMBIO",
+  "APLICACION",
+  "TORQUEO_REGULACION",
+  "REPARACION",
+];
+
+const TIPOS_TRABAJO_CORRECTIVO = ["REPARACION", "CAMBIO"];
+
+const toMinutes = (valor, unidad) => {
+  const v = Number(valor);
+  if (!Number.isFinite(v) || v <= 0) return 0;
+  if (unidad === "h") return Math.round(v * 60);
+  return Math.round(v);
+};
+
+const mkActOT = (base = {}, opts = {}) => {
+  const unidad = base.unidadDuracion || "min";
+  const durVal =
+    base.duracionEstimadaValor ??
+    base.duracionValor ??
+    (typeof base.duracionMinutos === "number" ? base.duracionMinutos : 0);
+
+  const durMin =
+    base.duracionEstimadaMin ??
+    (typeof base.duracionMinutos === "number" ? base.duracionMinutos : null) ??
+    (durVal ? toMinutes(durVal, unidad) : null);
+
+  return {
+    id: base.id || crypto.randomUUID(),
+    selected: opts.forceSelected ?? true,
+
+    sistema: base.sistema || "",
+    subsistema: base.subsistema || "",
+    componente: base.componente || "",
+    tarea: base.tarea || "",
+    descripcion: base.descripcion || "",
+
+    tipoTrabajo: base.tipoTrabajo || "REVISION",
+
+    duracionEstimadaValor: Number(durVal) || 0,
+    unidadDuracion: unidad, // min | h
+    duracionEstimadaMin: durMin ?? null,
+
+    observaciones: base.observaciones || "",
+    estado: base.estado || "PENDIENTE",
+  };
+};
+
+const normalizeActOTForPayload = (a) => {
+  const unidad = a.unidadDuracion || "min";
+  const valor = Number(a.duracionEstimadaValor) || 0;
+  const durMin = toMinutes(valor, unidad);
+
+  return {
+    sistema: a.sistema?.trim() || null,
+    subsistema: a.subsistema?.trim() || null,
+    componente: a.componente?.trim() || null,
+    tarea: a.tarea?.trim() || null,
+    descripcion: a.descripcion?.trim() || null,
+
+    tipoTrabajo: a.tipoTrabajo || "REVISION",
+
+    duracionEstimadaValor: valor,
+    unidadDuracion: unidad,
+    duracionEstimadaMin: durMin || null,
+
+    observaciones: a.observaciones?.trim() || null,
+    estado: a.estado || "PENDIENTE",
+  };
+};
+
+const getEstadoBadgeColor = (estado) => {
+  const colores = {
+    PENDIENTE: "bg-amber-100 text-amber-700 border-amber-300",
+    EN_PROCESO: "bg-blue-100 text-blue-700 border-blue-300",
+    FINALIZADO: "bg-green-100 text-green-700 border-green-300",
+  };
+  return colores[estado] || "bg-gray-100 text-gray-700 border-gray-300";
+};
 
 export default function ModalOTIndividual({
   isOpen,
@@ -20,129 +128,360 @@ export default function ModalOTIndividual({
   const [mostrarConfirmacionSalida, setMostrarConfirmacionSalida] = useState(false);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   const [mostrarInfoAviso, setMostrarInfoAviso] = useState(false);
+
   const [tratamientoData, setTratamientoData] = useState(null);
+
   const [archivosAdjuntos, setArchivosAdjuntos] = useState([]);
   const [subiendoArchivos, setSubiendoArchivos] = useState(false);
 
   const [trabajadores, setTrabajadores] = useState([]);
   const [supervisores, setSupervisores] = useState([]);
   const [cargandoTrabajadores, setCargandoTrabajadores] = useState(false);
-  const [equipoDetalleModal, setEquipoDetalleModal] = useState(false);
-  const [equipoDetalleData, setEquipoDetalleData] = useState(null);
-  const [cargandoEquipoDetalle, setCargandoEquipoDetalle] = useState(false);
-  
+
+  const [equipoDetalleModalId, setEquipoDetalleModalId] = useState(null);
+
   const [planesDisponibles, setPlanesDisponibles] = useState([]);
+  const [cargandoPlanes, setCargandoPlanes] = useState(false);
+
   const [numeroOTGenerado, setNumeroOTGenerado] = useState("");
+  const [errors, setErrors] = useState({});
+
+  const tratamientoAplicadoRef = useRef(false);
+
+  const tipoMantenimiento = aviso?.tipoMantenimiento;
+  const esPreventivo = tipoMantenimiento === "Preventivo";
+  const esCorrectivo = tipoMantenimiento === "Correctivo";
+  const isEditableActividades = esCorrectivo;
+
+  const hayEquiposPendientes =
+    progresoEquipos && progresoEquipos.actual < progresoEquipos.total;
+
+  const tratamiento = tratamientoData?.tratamiento || tratamientoData || null;
 
   const [formData, setFormData] = useState({
     descripcionGeneral: "",
+    descripcionDetallada: "",
     supervisorId: "",
     fechaProgramadaInicio: "",
     fechaProgramadaFin: "",
     observaciones: "",
-    // Datos específicos del equipo
+
+    // Equipo
     descripcionEquipo: "",
-    tipoActividad: "Mantenimiento Preventivo",
-    tipoActividadPersonalizada: "",
     prioridad: "MEDIA",
+
     planMantenimientoId: null,
     planMantenimiento: null,
-    actividadesPlan: [],
+
+    actividadesOT: [],
+
     trabajadoresAsignados: [],
     encargadoId: null,
+
     fechaInicioProgramada: "",
     fechaFinProgramada: "",
+
+    // adjuntos por equipo
     adjuntosEquipo: [],
-    subiendoAdjuntosEquipo: false
+    subiendoAdjuntosEquipo: false,
+
+    estado: "PENDIENTE",
   });
 
-  const [errors, setErrors] = useState({});
+  /* ─────────────────────────────────────────────
+     RESET AL CERRAR
+  ───────────────────────────────────────────── */
+  useEffect(() => {
+    if (!isOpen) {
+      tratamientoAplicadoRef.current = false;
+      setMostrarConfirmacion(false);
+      setMostrarConfirmacionSalida(false);
+      setMostrarInfoAviso(false);
+      setTratamientoData(null);
 
-  // Detectar si hay equipos pendientes
-  const hayEquiposPendientes = progresoEquipos && progresoEquipos.actual < progresoEquipos.total;
+      setArchivosAdjuntos([]);
+      setPlanesDisponibles([]);
+      setErrors({});
+      setEquipoDetalleModalId(null);
 
-  // Cargar trabajadores y supervisores
+      setFormData({
+        descripcionGeneral: "",
+        descripcionDetallada: "",
+        supervisorId: "",
+        fechaProgramadaInicio: "",
+        fechaProgramadaFin: "",
+        observaciones: "",
+
+        descripcionEquipo: "",
+        prioridad: "MEDIA",
+        planMantenimientoId: null,
+        planMantenimiento: null,
+        actividadesOT: [],
+        trabajadoresAsignados: [],
+        encargadoId: null,
+        fechaInicioProgramada: "",
+        fechaFinProgramada: "",
+        adjuntosEquipo: [],
+        subiendoAdjuntosEquipo: false,
+        estado: "PENDIENTE",
+      });
+    }
+  }, [isOpen]);
+
+  /* ─────────────────────────────────────────────
+     CARGA TRABAJADORES / SUPERVISORES
+  ───────────────────────────────────────────── */
   useEffect(() => {
     if (!isOpen) return;
 
     setCargandoTrabajadores(true);
-    
     Promise.all([
-      getTrabajadores().then(data => {
-        const trabajadoresNoSupervisores = data.filter(t => t.rol !== "supervisor");
-        setTrabajadores(trabajadoresNoSupervisores);
-      }),
-      getTrabajadores("supervisor").then(data => {
-        setSupervisores(data);
-      })
+      getTrabajadores().then((data) =>
+        setTrabajadores((data || []).filter((t) => t.rol !== "supervisor"))
+      ),
+      getTrabajadores("supervisor").then((data) => setSupervisores(data || [])),
     ])
-    .catch(err => {
-      console.error("Error cargando trabajadores:", err);
-    })
-    .finally(() => {
-      setCargandoTrabajadores(false);
-    });
+      .catch((err) => console.error("Error cargando trabajadores:", err))
+      .finally(() => setCargandoTrabajadores(false));
   }, [isOpen]);
 
+  /* ─────────────────────────────────────────────
+     AUTOGENERAR NUMERO OT + PRESET FECHAS
+  ───────────────────────────────────────────── */
   useEffect(() => {
-    if (isOpen && aviso) {
-      const numeroGenerado = onGenerarNumeroOT ? onGenerarNumeroOT() : `OT-${Date.now().toString().slice(-6)}`;
-      setNumeroOTGenerado(numeroGenerado);
+    if (!isOpen || !aviso) return;
 
-      setFormData(prev => ({
-        ...prev,
-        descripcionGeneral: aviso.descripcion || "",
-        fechaProgramadaInicio: aviso.fechaSugerida || "",
-        fechaProgramadaFin: aviso.fechaSugeridaFin || "",
-      }));
-    }
+    const numero = onGenerarNumeroOT
+      ? onGenerarNumeroOT()
+      : `OT-${Date.now().toString().slice(-6)}`;
+
+    setNumeroOTGenerado(numero);
+
+    setFormData((prev) => ({
+      ...prev,
+      descripcionGeneral: aviso.descripcion || "",
+      fechaProgramadaInicio: aviso.fechaSugerida || "",
+      fechaProgramadaFin: aviso.fechaSugeridaFin || "",
+    }));
   }, [isOpen, aviso, onGenerarNumeroOT]);
 
+  /* ─────────────────────────────────────────────
+     CARGA TRATAMIENTO (SIEMPRE)
+  ───────────────────────────────────────────── */
   useEffect(() => {
-    if (mostrarInfoAviso && aviso?.id && !tratamientoData) {
-      getTratamientoByAviso(aviso.id)
-        .then(data => {
-          setTratamientoData(data);
-        })
-        .catch(err => {
-          console.error("Error al cargar tratamiento:", err);
-        });
-    }
-  }, [mostrarInfoAviso, aviso?.id]);
+    if (!isOpen || !aviso?.id) return;
 
-  const cargarPlanesEquipo = async () => {
+    getTratamientoByAviso(aviso.id)
+      .then((data) => setTratamientoData(data))
+      .catch((err) => {
+        console.error("[OTIndividual] Error cargando tratamiento:", err);
+        setTratamientoData(null);
+      });
+  }, [isOpen, aviso?.id]);
+
+  /* ─────────────────────────────────────────────
+     AUTO-CARGA PLANES POR EQUIPO (preventivo)
+  ───────────────────────────────────────────── */
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!esPreventivo) return;
     if (!equipoActual?.id) return;
-    
+
+    let cancelled = false;
+
+    const run = async () => {
+      setCargandoPlanes(true);
+      try {
+        const planes = await planMantenimientoService.getPlanesByEquipo(equipoActual.id);
+        if (cancelled) return;
+        setPlanesDisponibles(Array.isArray(planes) ? planes : []);
+      } catch (e) {
+        console.error("[OTIndividual] Error cargando planes del equipo", e);
+        if (!cancelled) setPlanesDisponibles([]);
+      } finally {
+        if (!cancelled) setCargandoPlanes(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, esPreventivo, equipoActual?.id]);
+
+  /* ─────────────────────────────────────────────
+     ✅ APLICAR TRATAMIENTO AL EQUIPO (una sola vez)
+     tratamientoData.equipos[i] = { equipoId, planMantenimientoId, planMantenimiento, actividades:[...] }
+  ───────────────────────────────────────────── */
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!tratamientoData) return;
+    if (!equipoActual?.id) return;
+    if (tratamientoAplicadoRef.current) return;
+
+    const tratEquipos = Array.isArray(tratamientoData.equipos)
+      ? tratamientoData.equipos
+      : [];
+
+    if (!tratEquipos.length) return;
+
+    const te = tratEquipos.find(
+      (t) => t.equipoId === equipoActual.id || t.equipo?.id === equipoActual.id
+    );
+
+    // Si no existe match, igual marcamos aplicado para no reintentar infinitamente
+    tratamientoAplicadoRef.current = true;
+
+    if (!te) return;
+
+    const rawActs = Array.isArray(te.actividades) ? te.actividades : [];
+    const actividadesOT = rawActs.map((a) =>
+      mkActOT(
+        {
+          id: a.id,
+          sistema: a.sistema,
+          subsistema: a.subsistema,
+          componente: a.componente,
+          tarea: a.tarea,
+          descripcion: a.descripcion,
+          tipoTrabajo: a.tipoTrabajo,
+          duracionEstimadaValor: a.duracionEstimadaValor,
+          unidadDuracion: a.unidadDuracion,
+          duracionEstimadaMin: a.duracionEstimadaMin,
+          observaciones: a.observaciones,
+          estado: "PENDIENTE",
+        },
+        { forceSelected: true }
+      )
+    );
+
+    setFormData((prev) => ({
+      ...prev,
+      planMantenimientoId: te.planMantenimientoId || null,
+      planMantenimiento: te.planMantenimiento || null,
+      actividadesOT,
+    }));
+  }, [isOpen, tratamientoData, equipoActual?.id]);
+
+  /* ─────────────────────────────────────────────
+     INPUT HANDLERS
+  ───────────────────────────────────────────── */
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
+  };
+
+  /* ─────────────────────────────────────────────
+     PLAN (preventivo): seleccionar si no vino del tratamiento
+  ───────────────────────────────────────────── */
+  const seleccionarPlan = async (planId) => {
+    if (!planId) {
+      setFormData((prev) => ({
+        ...prev,
+        planMantenimientoId: null,
+        planMantenimiento: null,
+        actividadesOT: [],
+      }));
+      return;
+    }
+
     try {
-      const planes = await planMantenimientoService.getPlanesByEquipo(equipoActual.id);
-      setPlanesDisponibles(planes);
+      const planSel = await planMantenimientoService.getPlanById(planId);
+
+      const actsRaw = planSel?.actividades || [];
+      const acts = actsRaw.map((a) =>
+        mkActOT(
+          {
+            sistema: a.sistema,
+            subsistema: a.subsistema,
+            componente: a.componente,
+            tarea: a.tarea,
+            descripcion: a.descripcion || "",
+            tipoTrabajo: a.tipoTrabajo,
+            duracionEstimadaValor: a.duracionMinutos || 0,
+            unidadDuracion: a.unidadDuracion || "min",
+            duracionEstimadaMin: a.duracionMinutos || null,
+            observaciones: a.observaciones || "",
+            estado: "PENDIENTE",
+          },
+          { forceSelected: true }
+        )
+      );
+
+      setFormData((prev) => ({
+        ...prev,
+        planMantenimientoId: planId,
+        planMantenimiento: planSel,
+        actividadesOT: acts,
+      }));
+
+      if (errors.plan) setErrors((prev) => ({ ...prev, plan: null }));
     } catch (error) {
-      console.error("Error cargando planes del equipo", error);
+      console.error("Error cargando detalles del plan", error);
+      alert("Error cargando plan");
     }
   };
 
-  const handleVerDetallesEquipo = async () => {
-    if (!equipoActual?.id) return;
-    
-    setEquipoDetalleModal(true);
-    setCargandoEquipoDetalle(true);
-    
-    try {
-      const equipos = await equipoService.getEquipos();
-      const equipo = equipos.find(e => e.id === equipoActual.id);
-      setEquipoDetalleData(equipo);
-    } catch (err) {
-      console.error("Error cargando detalles del equipo:", err);
-    } finally {
-      setCargandoEquipoDetalle(false);
-    }
+  /* ─────────────────────────────────────────────
+     ACTIVIDADES OT (solo correctivo)
+  ───────────────────────────────────────────── */
+  const addActividadOT = () => {
+    if (!isEditableActividades) return;
+    setFormData((prev) => ({
+      ...prev,
+      actividadesOT: [
+        ...(prev.actividadesOT || []),
+        mkActOT(
+          {
+            tipoTrabajo: "REPARACION",
+            unidadDuracion: "min",
+            duracionEstimadaValor: 0,
+          },
+          { forceSelected: true }
+        ),
+      ],
+    }));
   };
 
+  const updateActividadOT = (actIndex, field, value) => {
+    setFormData((prev) => {
+      const acts = [...(prev.actividadesOT || [])];
+      acts[actIndex] = { ...acts[actIndex], [field]: value };
+
+      if (field === "duracionEstimadaValor" || field === "unidadDuracion") {
+        const unidad = acts[actIndex].unidadDuracion || "min";
+        const valor = Number(acts[actIndex].duracionEstimadaValor) || 0;
+        acts[actIndex].duracionEstimadaMin = toMinutes(valor, unidad) || null;
+      }
+
+      if (esCorrectivo && field === "tipoTrabajo") {
+        if (!TIPOS_TRABAJO_CORRECTIVO.includes(value)) {
+          acts[actIndex].tipoTrabajo = "REPARACION";
+        }
+      }
+
+      return { ...prev, actividadesOT: acts };
+    });
+  };
+
+  const removeActividadOT = (actIndex) => {
+    if (!isEditableActividades) return;
+    setFormData((prev) => ({
+      ...prev,
+      actividadesOT: (prev.actividadesOT || []).filter((_, i) => i !== actIndex),
+    }));
+  };
+
+  /* ─────────────────────────────────────────────
+     ADJUNTOS GENERALES / EQUIPO
+  ───────────────────────────────────────────── */
   const handleUploadAdjuntos = async (files) => {
     try {
+      if (!files || !files.length) return;
       setSubiendoArchivos(true);
       const data = await adjuntosService.uploadArchivos(files);
-      setArchivosAdjuntos(prev => [...prev, ...data]);
+      setArchivosAdjuntos((prev) => [...prev, ...(data || [])]);
     } catch (err) {
       console.error("Error subiendo archivos", err);
       alert("Error subiendo archivos");
@@ -153,85 +492,93 @@ export default function ModalOTIndividual({
 
   const handleUploadAdjuntosEquipo = async (files) => {
     try {
-      setFormData(prev => ({ ...prev, subiendoAdjuntosEquipo: true }));
+      if (!files || !files.length) return;
+
+      setFormData((prev) => ({ ...prev, subiendoAdjuntosEquipo: true }));
       const data = await adjuntosService.uploadArchivos(files);
-      setFormData(prev => ({
+
+      setFormData((prev) => ({
         ...prev,
-        adjuntosEquipo: [...prev.adjuntosEquipo, ...data],
-        subiendoAdjuntosEquipo: false
+        adjuntosEquipo: [...(prev.adjuntosEquipo || []), ...(data || [])],
+        subiendoAdjuntosEquipo: false,
       }));
     } catch (err) {
       console.error("Error subiendo adjuntos equipo", err);
       alert("Error subiendo archivos del equipo");
-      setFormData(prev => ({ ...prev, subiendoAdjuntosEquipo: false }));
+      setFormData((prev) => ({ ...prev, subiendoAdjuntosEquipo: false }));
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: null }));
-    }
-  };
-
+  /* ─────────────────────────────────────────────
+     VALIDACIONES (MISMA IDEA QUE GRUPAL)
+  ───────────────────────────────────────────── */
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.descripcionGeneral.trim()) {
+    if (!formData.descripcionGeneral.trim())
       newErrors.descripcionGeneral = "La descripción general es requerida";
-    }
-
-    if (!formData.supervisorId) {
+    if (!formData.supervisorId)
       newErrors.supervisorId = "El supervisor es requerido";
-    }
-
-    if (!formData.fechaProgramadaInicio) {
+    if (!formData.fechaProgramadaInicio)
       newErrors.fechaProgramadaInicio = "La fecha de inicio programada es requerida";
-    }
-
-    if (!formData.fechaProgramadaFin) {
+    if (!formData.fechaProgramadaFin)
       newErrors.fechaProgramadaFin = "La fecha de fin programada es requerida";
-    }
 
     if (formData.fechaProgramadaInicio && formData.fechaProgramadaFin) {
-      if (new Date(formData.fechaProgramadaFin) < new Date(formData.fechaProgramadaInicio)) {
+      if (new Date(formData.fechaProgramadaFin) < new Date(formData.fechaProgramadaInicio))
         newErrors.fechaProgramadaFin = "La fecha de fin debe ser posterior a la de inicio";
-      }
     }
 
-    // Validaciones del equipo
-    if (!formData.descripcionEquipo.trim()) {
+    // Equipo
+    if (!formData.descripcionEquipo.trim())
       newErrors.descripcionEquipo = "La descripción del trabajo es obligatoria";
-    }
 
-    if (!formData.trabajadoresAsignados || formData.trabajadoresAsignados.length === 0) {
+    // preventivo: si no vino plan del tratamiento, obligar a seleccionar uno
+    const planLockedByTratamiento = Boolean(
+      formData.planMantenimientoId && formData.planMantenimiento
+    );
+    if (esPreventivo && !planLockedByTratamiento && !formData.planMantenimientoId)
+      newErrors.plan = "En preventivo debe seleccionar un plan";
+
+    if (!formData.trabajadoresAsignados || formData.trabajadoresAsignados.length === 0)
       newErrors.trabajadores = "Debe asignar al menos un trabajador";
-    }
 
-    if (!formData.encargadoId) {
+    if (!formData.encargadoId)
       newErrors.encargado = "Debe seleccionar un encargado";
-    }
 
-    if (!formData.fechaInicioProgramada) {
+    if (!formData.fechaInicioProgramada)
       newErrors.fechaInicioProgramada = "Fecha de inicio requerida";
-    }
 
-    if (!formData.fechaFinProgramada) {
+    if (!formData.fechaFinProgramada)
       newErrors.fechaFinProgramada = "Fecha de fin requerida";
-    }
 
     if (formData.fechaInicioProgramada && formData.fechaFinProgramada) {
-      if (new Date(formData.fechaFinProgramada) < new Date(formData.fechaInicioProgramada)) {
+      if (new Date(formData.fechaFinProgramada) < new Date(formData.fechaInicioProgramada))
         newErrors.fechaFinProgramada = "La fecha fin debe ser posterior a inicio";
-      }
     }
 
-    if (formData.tipoActividad === "Otro" && !formData.tipoActividadPersonalizada?.trim()) {
-      newErrors.tipoActividadPersonalizada = "Especifica el tipo de actividad";
+    // Actividades
+    const acts = formData.actividadesOT || [];
+
+    if (esCorrectivo) {
+      if (!acts.length) {
+        newErrors.acts = "Debes agregar al menos 1 actividad";
+      } else {
+        const selected = acts.filter((a) => a.selected);
+        if (selected.length === 0) {
+          newErrors.acts = "Debes dejar al menos 1 actividad seleccionada";
+        } else if (selected.some((a) => !a.tarea?.trim())) {
+          newErrors.acts = "Hay actividades seleccionadas sin tarea";
+        } else if (
+          selected.some((a) => a.tipoTrabajo && !TIPOS_TRABAJO_CORRECTIVO.includes(a.tipoTrabajo))
+        ) {
+          newErrors.acts = "En correctivo solo se permite REPARACION o CAMBIO";
+        }
+      }
+    } else {
+      // preventivo
+      if (formData.planMantenimientoId && acts.length === 0)
+        newErrors.acts = "El plan seleccionado no tiene actividades";
     }
 
     setErrors(newErrors);
@@ -243,9 +590,16 @@ export default function ModalOTIndividual({
     setMostrarConfirmacion(true);
   };
 
+  /* ─────────────────────────────────────────────
+     CONFIRMAR Y ARMAR PAYLOAD
+  ───────────────────────────────────────────── */
   const confirmarCreacion = () => {
     if (!aviso?.tratamientos || aviso.tratamientos.length === 0) {
       alert("Este aviso no tiene tratamiento.");
+      return;
+    }
+    if (!equipoActual?.id) {
+      alert("No hay equipo actual.");
       return;
     }
 
@@ -258,40 +612,49 @@ export default function ModalOTIndividual({
       avisoId: aviso.id,
       tratamientoId,
       supervisorId: formData.supervisorId,
+
       fechaProgramadaInicio: new Date(formData.fechaProgramadaInicio).toISOString(),
       fechaProgramadaFin: new Date(formData.fechaProgramadaFin).toISOString(),
+
       observaciones: formData.observaciones || null,
-      equipos: [{
-        equipoId: equipoActual.id,
-        descripcionEquipo: formData.descripcionEquipo.trim(),
-        tipoActividad:
-          formData.tipoActividad === "Otro"
-            ? formData.tipoActividadPersonalizada.trim()
-            : formData.tipoActividad,
-        prioridad: formData.prioridad,
-        planMantenimientoId: formData.planMantenimientoId,
-        actividades: formData.actividadesPlan,
-        fechaInicioProgramada: new Date(formData.fechaInicioProgramada).toISOString(),
-        fechaFinProgramada: new Date(formData.fechaFinProgramada).toISOString(),
-        trabajadores: formData.trabajadoresAsignados.map(id => ({
-          trabajadorId: id,
-          esEncargado: id === formData.encargadoId
-        })),
-        adjuntos: formData.adjuntosEquipo
-      }],
-      adjuntos: archivosAdjuntos
+
+      equipos: [
+        {
+          equipoId: equipoActual.id,
+          descripcionEquipo: formData.descripcionEquipo.trim(),
+          prioridad: formData.prioridad,
+
+          planMantenimientoId: formData.planMantenimientoId || null,
+
+          fechaInicioProgramada: new Date(formData.fechaInicioProgramada).toISOString(),
+          fechaFinProgramada: new Date(formData.fechaFinProgramada).toISOString(),
+
+          actividades: (formData.actividadesOT || [])
+            .filter((a) => (esPreventivo ? true : a.selected))
+            .map(normalizeActOTForPayload),
+
+          trabajadores: (formData.trabajadoresAsignados || []).map((id) => ({
+            trabajadorId: id,
+            esEncargado: id === formData.encargadoId,
+          })),
+
+          adjuntos: formData.adjuntosEquipo || [],
+        },
+      ],
+
+      adjuntos: archivosAdjuntos || [],
     };
 
     onGuardar(payload);
     setMostrarConfirmacion(false);
   };
 
+  /* ─────────────────────────────────────────────
+     CERRAR (si hay pendientes)
+  ───────────────────────────────────────────── */
   const handleCerrar = () => {
-    if (hayEquiposPendientes) {
-      setMostrarConfirmacionSalida(true);
-    } else {
-      onClose();
-    }
+    if (hayEquiposPendientes) setMostrarConfirmacionSalida(true);
+    else onClose();
   };
 
   const confirmarSalida = () => {
@@ -301,90 +664,81 @@ export default function ModalOTIndividual({
 
   if (!isOpen) return null;
 
-  const tiposActividad = [
-    "Mantenimiento Preventivo",
-    "Mantenimiento Correctivo",
-    "Inspección",
-    "Reparación",
-    "Instalación",
-    "Calibración",
-    "Otro"
-  ];
-
-  const getEstadoBadgeColor = (estado) => {
-    const colores = {
-      PENDIENTE: "bg-amber-100 text-amber-700 border-amber-300",
-      EN_PROCESO: "bg-blue-100 text-blue-700 border-blue-300",
-      FINALIZADO: "bg-green-100 text-green-700 border-green-300"
-    };
-    return colores[estado] || "bg-gray-100 text-gray-700 border-gray-300";
-  };
-
-  const getPrioridadColor = (prioridad) => {
-    const colores = {
-      ALTA: "bg-red-100 text-red-700 border-red-300",
-      MEDIA: "bg-yellow-100 text-yellow-700 border-yellow-300",
-      BAJA: "bg-green-100 text-green-700 border-green-300",
-      CRITICA: "bg-red-200 text-red-900 border-red-400",
-      Alta: "bg-red-100 text-red-700 border-red-300",
-      Media: "bg-yellow-100 text-yellow-700 border-yellow-300",
-      Baja: "bg-green-100 text-green-700 border-green-300"
-    };
-    return colores[prioridad] || "bg-gray-100 text-gray-700 border-gray-300";
-  };
+  const isReadOnlyActividades = esPreventivo;
+  const planLockedByTratamiento = Boolean(formData.planMantenimientoId && formData.planMantenimiento);
 
   return (
     <>
       <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[95vh] flex flex-col border border-slate-200">
-          
-          {/* HEADER CON PROGRESO */}
+          {/* HEADER */}
           <div className="relative bg-gradient-to-r from-violet-600 via-purple-700 to-violet-600 p-8 rounded-t-3xl overflow-hidden">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjA1IiBzdHJva2Utd2lkdGg9IjIiLz48L2c+PC9zdmc+')] opacity-20"></div>
-            
+            <div className="absolute inset-0 opacity-20" />
+
             <div className="relative">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-5">
                   <div className="p-4 bg-white/20 backdrop-blur-sm rounded-2xl border border-white/30">
                     <FileText className="w-8 h-8 text-white" strokeWidth={2.5} />
                   </div>
+
                   <div>
                     <h3 className="text-3xl font-bold text-white mb-1">
                       Crear Orden de Trabajo Individual
                     </h3>
-                    <div className="flex items-center gap-4">
+
+                    <div className="flex items-center gap-4 flex-wrap">
                       <span className="px-4 py-1.5 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-white font-bold">
                         {numeroOTGenerado}
                       </span>
+
                       <span className="text-violet-200">•</span>
                       <span className="text-violet-200">
-                        Aviso: <span className="text-white font-bold">{aviso?.numeroAviso}</span>
+                        Aviso:{" "}
+                        <span className="text-white font-bold">
+                          {aviso?.numeroAviso}
+                        </span>
                       </span>
+
+                      {tipoMantenimiento && (
+                        <>
+                          <span className="text-violet-200">•</span>
+                          <span
+                            className={`px-3 py-1 backdrop-blur-sm border rounded-full text-sm font-bold ${
+                              esPreventivo
+                                ? "bg-green-500/30 border-green-400/40 text-green-100"
+                                : "bg-orange-500/30 border-orange-400/40 text-orange-100"
+                            }`}
+                          >
+                            {tipoMantenimiento}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => 
-                      setMostrarInfoAviso(true)
-                    }
+                    onClick={() => setMostrarInfoAviso(true)}
                     className="px-5 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-xl transition-all duration-200 flex items-center gap-2 text-white font-semibold border border-white/30 hover:border-white/50"
+                    type="button"
                   >
                     <FileText className="w-5 h-5" />
                     Info del Aviso
                   </button>
-                  
+
                   <button
                     onClick={handleCerrar}
                     className="p-2.5 hover:bg-white/15 rounded-xl transition-all duration-200"
+                    type="button"
                   >
                     <X className="w-6 h-6 text-white" />
                   </button>
                 </div>
               </div>
 
-              {/* 🆕 BARRA DE PROGRESO */}
+              {/* PROGRESO */}
               {progresoEquipos && (
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
                   <div className="flex items-center justify-between mb-2">
@@ -392,21 +746,24 @@ export default function ModalOTIndividual({
                       Equipo {progresoEquipos.actual} de {progresoEquipos.total}
                     </span>
                     <span className="text-violet-200 text-xs font-semibold">
-                      {Math.round((progresoEquipos.actual / progresoEquipos.total) * 100)}% completado
+                      {Math.round(
+                        (progresoEquipos.actual / progresoEquipos.total) * 100
+                      )}
+                      % completado
                     </span>
                   </div>
-                  
-                  {/* Barra de progreso */}
+
                   <div className="w-full bg-white/20 rounded-full h-2.5 overflow-hidden">
                     <div
                       className="bg-gradient-to-r from-green-400 to-emerald-500 h-full rounded-full transition-all duration-500"
-                      style={{ 
-                        width: `${(progresoEquipos.actual / progresoEquipos.total) * 100}%` 
+                      style={{
+                        width: `${
+                          (progresoEquipos.actual / progresoEquipos.total) * 100
+                        }%`,
                       }}
-                    ></div>
+                    />
                   </div>
 
-                  {/* Info del equipo actual */}
                   {equipoActual && (
                     <div className="mt-3 flex items-center gap-3 bg-white/10 rounded-lg p-3 border border-white/20">
                       <Settings className="w-5 h-5 text-violet-200" />
@@ -425,23 +782,61 @@ export default function ModalOTIndividual({
             </div>
           </div>
 
-          {/* CONTENIDO DEL FORMULARIO */}
-          <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-slate-50 to-violet-50">
-            <div className="space-y-6">
-              
-              {/* ALERTA DE PROGRESO */}
+          {/* BODY */}
+          <div className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 to-violet-50">
+            <div className="p-8 space-y-6">
+              {/* ALERTA TIPO MANTENIMIENTO */}
+              {tipoMantenimiento && (
+                <div
+                  className={`p-5 rounded-2xl border-l-4 ${
+                    esPreventivo
+                      ? "bg-green-50 border-green-500"
+                      : "bg-orange-50 border-orange-500"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertCircle
+                      className={`w-6 h-6 mt-0.5 flex-shrink-0 ${
+                        esPreventivo ? "text-green-600" : "text-orange-600"
+                      }`}
+                    />
+                    <div>
+                      <p
+                        className={`font-bold text-lg ${
+                          esPreventivo ? "text-green-900" : "text-orange-900"
+                        }`}
+                      >
+                        Mantenimiento {tipoMantenimiento}
+                      </p>
+                      <p
+                        className={`text-sm mt-1 ${
+                          esPreventivo ? "text-green-700" : "text-orange-700"
+                        }`}
+                      >
+                        {esPreventivo
+                          ? "En preventivo se muestran el plan y actividades (solo lectura)."
+                          : "En correctivo puedes editar/agregar/eliminar actividades antes de crear la OT."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ALERTA PROGRESO */}
               {hayEquiposPendientes && (
                 <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-5">
                   <div className="flex items-start gap-3">
                     <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-bold text-blue-900 mb-1">
-                        Creando OT Individual - Equipo {progresoEquipos.actual} de {progresoEquipos.total}
+                        Creando OT Individual - Equipo {progresoEquipos.actual} de{" "}
+                        {progresoEquipos.total}
                       </p>
                       <p className="text-xs text-blue-700">
-                        Complete los datos para generar la orden de trabajo de este equipo específico.
+                        Complete los datos para generar la OT de este equipo.
                         <span className="block mt-1 font-bold">
-                          ⚠️ Después de guardar, continuará con los {progresoEquipos.total - progresoEquipos.actual} equipos restantes.
+                          ⚠️ Luego continuarás con los{" "}
+                          {progresoEquipos.total - progresoEquipos.actual} restantes.
                         </span>
                       </p>
                     </div>
@@ -449,31 +844,33 @@ export default function ModalOTIndividual({
                 </div>
               )}
 
-              {/* INFORMACIÓN GENERAL */}
+              {/* INFO GENERAL */}
               <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2.5 bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl">
                     <ClipboardCheck className="w-5 h-5 text-white" />
                   </div>
-                  <h4 className="text-xl font-bold text-slate-900">Información General</h4>
+                  <h4 className="text-xl font-bold text-slate-900">
+                    Información General
+                  </h4>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Número OT */}
                   <div className="md:col-span-2">
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Número de Orden de Trabajo
                     </label>
                     <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl">
                       <Zap className="w-5 h-5 text-green-600" />
-                      <span className="font-bold text-green-700 text-lg">{numeroOTGenerado}</span>
+                      <span className="font-bold text-green-700 text-lg">
+                        {numeroOTGenerado}
+                      </span>
                       <span className="ml-auto text-xs bg-green-600 text-white px-3 py-1 rounded-full font-bold">
                         Autogenerado
                       </span>
                     </div>
                   </div>
 
-                  {/* Supervisor */}
                   <div className="md:col-span-2">
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Supervisor Responsable <span className="text-red-500">*</span>
@@ -483,13 +880,15 @@ export default function ModalOTIndividual({
                       value={formData.supervisorId}
                       onChange={handleChange}
                       className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium bg-white ${
-                        errors.supervisorId ? 'border-red-400 bg-red-50' : 'border-slate-300'
+                        errors.supervisorId
+                          ? "border-red-400 bg-red-50"
+                          : "border-slate-300"
                       }`}
                     >
                       <option value="">Seleccione un supervisor</option>
-                      {supervisores.map(supervisor => (
-                        <option key={supervisor.id} value={supervisor.id}>
-                          {supervisor.nombre} - {supervisor.empresa}
+                      {supervisores.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.nombre} - {s.empresa}
                         </option>
                       ))}
                     </select>
@@ -501,19 +900,21 @@ export default function ModalOTIndividual({
                     )}
                   </div>
 
-                  {/* Descripción General */}
                   <div className="md:col-span-2">
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Descripción General del Trabajo <span className="text-red-500">*</span>
+                      Descripción General del Trabajo{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <textarea
                       name="descripcionGeneral"
                       value={formData.descripcionGeneral}
                       onChange={handleChange}
                       rows={3}
-                      placeholder="Describe el alcance general de la orden de trabajo..."
+                      placeholder="Describe el alcance general..."
                       className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all resize-none font-medium ${
-                        errors.descripcionGeneral ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white'
+                        errors.descripcionGeneral
+                          ? "border-red-400 bg-red-50"
+                          : "border-slate-300 bg-white"
                       }`}
                     />
                     {errors.descripcionGeneral && (
@@ -523,18 +924,35 @@ export default function ModalOTIndividual({
                       </p>
                     )}
                   </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Descripción Detallada{" "}
+                      <span className="text-xs text-slate-500 font-normal">(Opcional)</span>
+                    </label>
+                    <textarea
+                      name="descripcionDetallada"
+                      value={formData.descripcionDetallada}
+                      onChange={handleChange}
+                      rows={3}
+                      placeholder="Procedimientos, seguridad..."
+                      className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all resize-none font-medium bg-white"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* FECHAS PROGRAMADAS GENERALES */}
+              {/* FECHAS GENERALES */}
               <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl">
                     <Calendar className="w-5 h-5 text-white" />
                   </div>
-                  <h4 className="text-xl font-bold text-slate-900">Periodo de Ejecución General</h4>
+                  <h4 className="text-xl font-bold text-slate-900">
+                    Periodo de Ejecución General
+                  </h4>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
@@ -547,7 +965,9 @@ export default function ModalOTIndividual({
                       value={formData.fechaProgramadaInicio}
                       onChange={handleChange}
                       className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium ${
-                        errors.fechaProgramadaInicio ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white'
+                        errors.fechaProgramadaInicio
+                          ? "border-red-400 bg-red-50"
+                          : "border-slate-300 bg-white"
                       }`}
                     />
                     {errors.fechaProgramadaInicio && (
@@ -569,7 +989,9 @@ export default function ModalOTIndividual({
                       value={formData.fechaProgramadaFin}
                       onChange={handleChange}
                       className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium ${
-                        errors.fechaProgramadaFin ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white'
+                        errors.fechaProgramadaFin
+                          ? "border-red-400 bg-red-50"
+                          : "border-slate-300 bg-white"
                       }`}
                     />
                     {errors.fechaProgramadaFin && (
@@ -582,23 +1004,28 @@ export default function ModalOTIndividual({
                 </div>
               </div>
 
-              {/* CONFIGURACIÓN DEL EQUIPO */}
+              {/* CONFIG EQUIPO */}
               {equipoActual && (
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border-2 border-indigo-200">
+                <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl">
                         <Settings className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <h4 className="text-xl font-bold text-slate-900">{equipoActual.nombre}</h4>
-                        <p className="text-sm text-slate-600">{equipoActual.tipo} • {equipoActual.codigo}</p>
+                        <h4 className="text-xl font-bold text-slate-900">
+                          {equipoActual.nombre}
+                        </h4>
+                        <p className="text-sm text-slate-600">
+                          {equipoActual.tipo} • {equipoActual.codigo}
+                        </p>
                       </div>
                     </div>
-                    
+
                     <button
-                      onClick={handleVerDetallesEquipo}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                      onClick={() => setEquipoDetalleModalId(equipoActual.id)}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-md"
+                      type="button"
                     >
                       <Eye className="w-4 h-4" />
                       Ver Detalles
@@ -606,7 +1033,7 @@ export default function ModalOTIndividual({
                   </div>
 
                   <div className="space-y-4">
-                    {/* Descripción del Trabajo */}
+                    {/* Descripción */}
                     <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4">
                       <label className="block text-sm font-bold text-amber-900 mb-2 flex items-center gap-2">
                         <AlertCircle className="w-4 h-4" />
@@ -617,9 +1044,11 @@ export default function ModalOTIndividual({
                         value={formData.descripcionEquipo}
                         onChange={handleChange}
                         rows={3}
-                        placeholder={`Detalla el trabajo específico a realizar en ${equipoActual.nombre}...`}
+                        placeholder={`Detalla el trabajo en ${equipoActual.nombre}...`}
                         className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium resize-none ${
-                          errors.descripcionEquipo ? 'border-red-400 bg-red-50' : 'border-amber-300 bg-white'
+                          errors.descripcionEquipo
+                            ? "border-red-400 bg-red-50"
+                            : "border-amber-300 bg-white"
                         }`}
                       />
                       {errors.descripcionEquipo && (
@@ -630,189 +1059,169 @@ export default function ModalOTIndividual({
                       )}
                     </div>
 
-                    {/* Grid de configuración */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      
-                      {/* Tipo de Actividad */}
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          Tipo de Actividad <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          name="tipoActividad"
-                          value={formData.tipoActividad}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl bg-white focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium"
-                        >
-                          {tiposActividad.map(tipo => (
-                            <option key={tipo} value={tipo}>{tipo}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Prioridad */}
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          Prioridad <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          name="prioridad"
-                          value={formData.prioridad}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl bg-white focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium"
-                        >
-                          <option value="BAJA">🟢 Baja</option>
-                          <option value="MEDIA">🟡 Media</option>
-                          <option value="ALTA">🟠 Alta</option>
-                          <option value="CRITICA">🔴 Crítica</option>
-                        </select>
-                      </div>
-
-                      {/* Actividad Personalizada */}
-                      {formData.tipoActividad === "Otro" && (
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            Especificar Tipo de Actividad <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            name="tipoActividadPersonalizada"
-                            value={formData.tipoActividadPersonalizada}
-                            onChange={handleChange}
-                            placeholder="Describe el tipo de actividad personalizada..."
-                            className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
-                              errors.tipoActividadPersonalizada ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white'
-                            }`}
-                          />
-                          {errors.tipoActividadPersonalizada && (
-                            <p className="mt-2 text-xs text-red-600 flex items-center gap-1 font-medium">
-                              <AlertCircle className="w-3 h-3" />
-                              {errors.tipoActividadPersonalizada}
-                            </p>
-                          )}
-                        </div>
-                      )}
+                    {/* Prioridad */}
+                    <div className="max-w-xs">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Prioridad <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="prioridad"
+                        value={formData.prioridad}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl bg-white focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium"
+                      >
+                        <option value="BAJA">🟢 Baja</option>
+                        <option value="MEDIA">🟡 Media</option>
+                        <option value="ALTA">🟠 Alta</option>
+                        <option value="CRITICA">🔴 Crítica</option>
+                      </select>
                     </div>
 
-                    {/* Plan de Mantenimiento */}
-                    <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <label className="text-sm font-bold text-indigo-900 flex items-center gap-2">
+                    {/* PLAN (solo preventivo) */}
+                    {esPreventivo && (
+                      <div className="border-2 rounded-xl p-4 bg-green-50 border-green-200">
+                        <label className="text-sm font-bold flex items-center gap-2 text-green-900 mb-3">
                           <Wrench className="w-4 h-4" />
-                          Plan de Mantenimiento
+                          Plan de Mantenimiento <span className="text-red-500">*</span>
                         </label>
-                        <button
-                          onClick={cargarPlanesEquipo}
-                          className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-bold transition-all"
-                        >
-                          Cargar Planes
-                        </button>
+
+                        {cargandoPlanes && planesDisponibles.length === 0 && !formData.planMantenimientoId ? (
+                          <div className="flex items-center gap-2 text-slate-500 text-sm mb-3">
+                            <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                            Cargando planes del equipo...
+                          </div>
+                        ) : null}
+
+                        {planLockedByTratamiento ? (
+                          <div className="bg-white border border-green-200 rounded-xl p-4">
+                            <p className="text-xs font-semibold text-green-800">
+                              Plan (del tratamiento)
+                            </p>
+                            <p className="font-bold text-slate-900">
+                              {formData.planMantenimiento?.codigoPlan
+                                ? `${formData.planMantenimiento.codigoPlan} — `
+                                : ""}
+                              {formData.planMantenimiento?.nombre || "—"}
+                            </p>
+                            {formData.planMantenimiento?.descripcion && (
+                              <p className="text-sm text-slate-600 mt-1">
+                                {formData.planMantenimiento.descripcion}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <select
+                              className={`w-full px-4 py-2.5 border-2 rounded-lg bg-white focus:ring-4 transition-all font-medium
+                                border-green-300 focus:ring-green-500/20 focus:border-green-500
+                                ${errors.plan ? "border-red-400 bg-red-50" : ""}`}
+                              value={formData.planMantenimientoId || ""}
+                              onChange={(e) => seleccionarPlan(e.target.value)}
+                            >
+                              <option value="">— Seleccione un plan —</option>
+                              {planesDisponibles.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {(p.codigoPlan ? `${p.codigoPlan} — ` : "") + (p.nombre || "Plan")}
+                                </option>
+                              ))}
+                            </select>
+
+                            {planesDisponibles.length === 0 && (
+                              <p className="mt-2 text-xs text-amber-700">
+                                ⚠️ Este equipo no tiene planes asociados
+                              </p>
+                            )}
+
+                            {errors.plan && (
+                              <p className="mt-2 text-xs text-red-600 flex items-center gap-1 font-medium">
+                                <AlertCircle className="w-3 h-3" /> {errors.plan}
+                              </p>
+                            )}
+                          </>
+                        )}
+
+                        {formData.planMantenimiento && (
+                          <div className="mt-3 bg-white border border-green-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <p className="text-xs font-semibold text-green-800">Nombre</p>
+                              <p className="font-medium text-slate-900">
+                                {formData.planMantenimiento.nombre || "—"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-green-800">Código</p>
+                              <p className="font-medium text-slate-900">
+                                {formData.planMantenimiento.codigoPlan || "—"}
+                              </p>
+                            </div>
+                            <div className="md:col-span-2">
+                              <p className="text-xs font-semibold text-green-800">Descripción</p>
+                              <p className="font-medium text-slate-900">
+                                {formData.planMantenimiento.descripcion || "—"}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TRABAJADORES */}
+                    <div className="bg-white border-2 border-slate-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm font-bold text-slate-900">Asignación de Personal</p>
+                        {cargandoTrabajadores && (
+                          <span className="text-xs text-slate-500">Cargando...</span>
+                        )}
                       </div>
 
-                      {planesDisponibles.length > 0 && (
-                        <select
-                          className="w-full px-4 py-2.5 border-2 border-indigo-300 rounded-lg bg-white focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
-                          value={formData.planMantenimientoId || ""}
-                          onChange={async (e) => {
-                            const planId = e.target.value;
-                            
-                            if (!planId) {
-                              setFormData(prev => ({
-                                ...prev,
-                                planMantenimientoId: null,
-                                planMantenimiento: null,
-                                actividadesPlan: []
-                              }));
-                              return;
-                            }
-
-                            const plan = await planMantenimientoService.getPlanById(planId);
-                            setFormData(prev => ({
-                              ...prev,
-                              planMantenimientoId: planId,
-                              planMantenimiento: plan,
-                              actividadesPlan: plan.actividades.map((a) => ({
-                                planMantenimientoActividadId: a.id,
-                                componente: a.componente,
-                                tarea: a.tarea,
-                                tipoTrabajo: a.tipoTrabajo,
-                                duracionEstimadaMin: a.duracionMinutos,
-                                estado: "PENDIENTE",
-                                observaciones: "",
-                              }))
-                            }));
-                          }}
-                        >
-                          <option value="">— Trabajo manual (sin plan) —</option>
-                          {planesDisponibles.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.nombre}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      {/* Actividades del Plan */}
-                      {formData.actividadesPlan.length > 0 && (
-                        <div className="mt-4 space-y-2">
-                          <p className="text-xs font-bold text-indigo-900 mb-2">Actividades incluidas:</p>
-                          {formData.actividadesPlan.map((act, idx) => (
-                            <div key={idx} className="flex items-start gap-3 bg-white rounded-lg p-3 border border-indigo-200">
-                              <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                              <div className="flex-1">
-                                <p className="font-semibold text-sm text-slate-900">
-                                  {act.componente} — {act.tarea}
-                                </p>
-                                <p className="text-xs text-slate-600 mt-1">
-                                  {act.tipoTrabajo} • {act.duracionEstimadaMin} min
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Trabajadores Asignados */}
-                    <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-                      <label className="block text-sm font-bold text-purple-900 mb-3 flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        Trabajadores Asignados <span className="text-red-500">*</span>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Trabajadores <span className="text-red-500">*</span>
                       </label>
 
-                      <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-white rounded-lg border border-purple-200">
-                        {trabajadores.map(trab => {
-                          const seleccionado = formData.trabajadoresAsignados.includes(trab.id);
-                          return (
-                            <label 
-                              key={trab.id} 
-                              className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
-                                seleccionado ? 'bg-purple-100 border-2 border-purple-300' : 'bg-slate-50 border-2 border-transparent hover:bg-purple-50'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={seleccionado}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setFormData(prev => ({
+                      <div
+                        className={`p-3 rounded-xl border-2 bg-slate-50 ${
+                          errors.trabajadores ? "border-red-400" : "border-slate-200"
+                        }`}
+                      >
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {trabajadores.map((t) => {
+                            const checked = (formData.trabajadoresAsignados || []).includes(t.id);
+                            return (
+                              <label
+                                key={t.id}
+                                className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    const current = new Set(formData.trabajadoresAsignados || []);
+                                    if (current.has(t.id)) current.delete(t.id);
+                                    else current.add(t.id);
+
+                                    const nuevos = Array.from(current);
+
+                                    let encargadoId = formData.encargadoId;
+                                    if (encargadoId && !current.has(encargadoId)) encargadoId = null;
+
+                                    setFormData((prev) => ({
                                       ...prev,
-                                      trabajadoresAsignados: [...prev.trabajadoresAsignados, trab.id]
+                                      trabajadoresAsignados: nuevos,
+                                      encargadoId,
                                     }));
-                                  } else {
-                                    setFormData(prev => ({
-                                      ...prev,
-                                      trabajadoresAsignados: prev.trabajadoresAsignados.filter(id => id !== trab.id),
-                                      encargadoId: prev.encargadoId === trab.id ? null : prev.encargadoId
-                                    }));
-                                  }
-                                }}
-                                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
-                              />
-                              <span className="text-sm font-medium text-slate-800">{trab.nombre}</span>
-                            </label>
-                          );
-                        })}
+                                  }}
+                                  className="w-4 h-4"
+                                />
+                                <span>
+                                  {t.nombre}{" "}
+                                  <span className="text-xs text-slate-400">
+                                    ({t.empresa || "—"})
+                                  </span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
 
                       {errors.trabajadores && (
@@ -822,81 +1231,88 @@ export default function ModalOTIndividual({
                         </p>
                       )}
 
-                      {/* Encargado */}
-                      {formData.trabajadoresAsignados.length > 0 && (
-                        <div className="mt-4">
-                          <label className="block text-sm font-semibold text-purple-900 mb-2">
-                            Encargado del Equipo <span className="text-red-500">*</span>
-                          </label>
-                          <select
-                            name="encargadoId"
-                            value={formData.encargadoId || ""}
-                            onChange={handleChange}
-                            className="w-full px-4 py-2.5 border-2 border-purple-300 rounded-lg bg-white focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium"
-                          >
-                            <option value="">Seleccione un encargado</option>
-                            {trabajadores
-                              .filter(t => formData.trabajadoresAsignados.includes(t.id))
-                              .map(t => (
-                                <option key={t.id} value={t.id}>
-                                  {t.nombre}
-                                </option>
-                              ))}
-                          </select>
-                          {errors.encargado && (
-                            <p className="mt-2 text-xs text-red-600 flex items-center gap-1 font-medium">
-                              <AlertCircle className="w-3 h-3" />
-                              {errors.encargado}
-                            </p>
-                          )}
-                        </div>
-                      )}
+                      <div className="mt-4">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                          Encargado <span className="text-red-500">*</span>
+                        </label>
+
+                        <select
+                          value={formData.encargadoId || ""}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, encargadoId: e.target.value }))
+                          }
+                          className={`w-full px-4 py-3 border-2 rounded-xl bg-white focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
+                            errors.encargado ? "border-red-400 bg-red-50" : "border-slate-300"
+                          }`}
+                        >
+                          <option value="">Seleccione encargado</option>
+                          {(formData.trabajadoresAsignados || []).map((id) => {
+                            const t = trabajadores.find((x) => x.id === id);
+                            if (!t) return null;
+                            return (
+                              <option key={id} value={id}>
+                                {t.nombre} {t.empresa ? `- ${t.empresa}` : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
+
+                        {errors.encargado && (
+                          <p className="mt-2 text-xs text-red-600 flex items-center gap-1 font-medium">
+                            <AlertCircle className="w-3 h-3" />
+                            {errors.encargado}
+                          </p>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Fechas Específicas */}
-                    <div className="bg-sky-50 border-2 border-sky-200 rounded-xl p-4">
-                      <h6 className="text-sm font-bold text-sky-900 mb-3 flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        Programación Específica del Equipo
-                      </h6>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* FECHAS EQUIPO */}
+                    <div className="bg-white border-2 border-slate-200 rounded-xl p-4">
+                      <p className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-slate-600" />
+                        Programación del equipo
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-2">
-                            Fecha/Hora Inicio <span className="text-red-500">*</span>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Inicio programado <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="datetime-local"
                             name="fechaInicioProgramada"
                             value={formData.fechaInicioProgramada}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 transition-all text-sm font-medium ${
-                              errors.fechaInicioProgramada ? 'border-red-400 bg-red-50' : 'border-sky-300 bg-white'
+                            className={`w-full px-3 py-2 border-2 rounded-lg text-sm font-medium bg-white ${
+                              errors.fechaInicioProgramada
+                                ? "border-red-400 bg-red-50"
+                                : "border-slate-200"
                             }`}
                           />
                           {errors.fechaInicioProgramada && (
-                            <p className="mt-1 text-xs text-red-600 flex items-center gap-1 font-medium">
-                              <AlertCircle className="w-3 h-3" />
+                            <p className="mt-1 text-xs text-red-600">
                               {errors.fechaInicioProgramada}
                             </p>
                           )}
                         </div>
 
                         <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-2">
-                            Fecha/Hora Fin <span className="text-red-500">*</span>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Fin programado <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="datetime-local"
                             name="fechaFinProgramada"
                             value={formData.fechaFinProgramada}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 transition-all text-sm font-medium ${
-                              errors.fechaFinProgramada ? 'border-red-400 bg-red-50' : 'border-sky-300 bg-white'
+                            className={`w-full px-3 py-2 border-2 rounded-lg text-sm font-medium bg-white ${
+                              errors.fechaFinProgramada
+                                ? "border-red-400 bg-red-50"
+                                : "border-slate-200"
                             }`}
                           />
                           {errors.fechaFinProgramada && (
-                            <p className="mt-1 text-xs text-red-600 flex items-center gap-1 font-medium">
-                              <AlertCircle className="w-3 h-3" />
+                            <p className="mt-1 text-xs text-red-600">
                               {errors.fechaFinProgramada}
                             </p>
                           )}
@@ -904,46 +1320,298 @@ export default function ModalOTIndividual({
                       </div>
                     </div>
 
-                    {/* Adjuntos del Equipo */}
+                    {/* ADJUNTOS EQUIPO */}
                     <div className="bg-white border-2 border-slate-200 rounded-xl p-4">
-                      <label className="block text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                        <Upload className="w-4 h-4" />
-                        Archivos Adjuntos del Equipo
-                      </label>
+                      <p className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-slate-600" />
+                        Adjuntos del equipo
+                      </p>
 
                       <input
                         type="file"
                         multiple
                         onChange={(e) => handleUploadAdjuntosEquipo(e.target.files)}
-                        className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-violet-600 file:text-white file:font-semibold hover:file:bg-violet-700 cursor-pointer"
+                        className="w-full text-sm file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border-0 file:bg-slate-900 file:text-white file:font-bold hover:file:bg-slate-800 cursor-pointer border-2 border-dashed border-slate-300 rounded-xl p-3 hover:border-slate-400 transition-all"
                       />
 
                       {formData.subiendoAdjuntosEquipo && (
-                        <div className="mt-3 flex items-center gap-2 text-violet-600">
-                          <div className="w-4 h-4 border-2 border-violet-600 border-t-transparent rounded-full animate-spin"></div>
-                          <p className="text-xs font-medium">Subiendo archivos...</p>
+                        <div className="mt-3 flex items-center gap-2 text-violet-600 bg-violet-50 p-3 rounded-xl border border-violet-200">
+                          <div className="w-4 h-4 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+                          <p className="text-sm font-semibold">Subiendo adjuntos del equipo...</p>
                         </div>
                       )}
 
-                      {formData.adjuntosEquipo.length > 0 && (
+                      {(formData.adjuntosEquipo || []).length > 0 && (
                         <div className="mt-3 space-y-2">
-                          {formData.adjuntosEquipo.map((file, i) => (
-                            <div key={i} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
-                              <div className="flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-violet-600" />
-                                <span className="text-sm font-medium text-slate-800">{file.nombre}</span>
+                          {(formData.adjuntosEquipo || []).map((file, i) => (
+                            <div
+                              key={file.id || i}
+                              className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200"
+                            >
+                              <div className="flex items-center gap-3">
+                                <FileText className="w-4 h-4 text-slate-700" />
+                                <span className="text-sm font-semibold text-slate-800">
+                                  {file.nombre || file.filename || "Archivo"}
+                                </span>
                               </div>
                               <button
-                                onClick={() => {
-                                  setFormData(prev => ({
+                                type="button"
+                                onClick={() =>
+                                  setFormData((prev) => ({
                                     ...prev,
-                                    adjuntosEquipo: prev.adjuntosEquipo.filter((_, idx) => idx !== i)
-                                  }));
-                                }}
-                                className="text-red-600 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors"
+                                    adjuntosEquipo: (prev.adjuntosEquipo || []).filter(
+                                      (_, idx) => idx !== i
+                                    ),
+                                  }))
+                                }
+                                className="text-red-600 hover:text-red-700"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ACTIVIDADES */}
+                    <div className="bg-white border-2 border-slate-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <p className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <ClipboardCheck className="w-4 h-4 text-slate-600" />
+                            Actividades
+                            {(formData.actividadesOT || []).length > 0 && (
+                              <span className="ml-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">
+                                {(formData.actividadesOT || []).length}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {esPreventivo ? "Preventivo · Solo lectura" : "Correctivo · Editables"}
+                          </p>
+                        </div>
+
+                        {isEditableActividades && (
+                          <button
+                            type="button"
+                            onClick={addActividadOT}
+                            className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-all"
+                          >
+                            + Agregar
+                          </button>
+                        )}
+                      </div>
+
+                      {errors.acts && (
+                        <p className="mb-3 text-xs text-red-600 flex items-center gap-1 font-medium bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+                          <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                          {errors.acts}
+                        </p>
+                      )}
+
+                      {(formData.actividadesOT || []).length === 0 ? (
+                        <div className="text-center py-6 text-slate-400">
+                          <ClipboardCheck className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                          <p className="text-xs">
+                            {esPreventivo
+                              ? "Selecciona un plan para cargar actividades"
+                              : "No hay actividades. Agrega una."}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {(formData.actividadesOT || []).map((act, actIdx) => (
+                            <div
+                              key={act.id || actIdx}
+                              className={`rounded-xl border-2 p-4 transition-all ${
+                                esPreventivo
+                                  ? "bg-green-50 border-green-200"
+                                  : "bg-slate-50 border-slate-200"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <p className="text-sm font-bold text-slate-900">
+                                  Actividad #{actIdx + 1}
+                                </p>
+
+                                {isEditableActividades && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeActividadOT(actIdx)}
+                                    className="px-2 py-1 bg-red-100 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    Eliminar
+                                  </button>
+                                )}
+                              </div>
+
+                              {esCorrectivo && (
+                                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!act.selected}
+                                    onChange={(e) =>
+                                      updateActividadOT(actIdx, "selected", e.target.checked)
+                                    }
+                                    className="w-4 h-4"
+                                  />
+                                  Incluir en la OT
+                                </label>
+                              )}
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                    Sistema
+                                  </label>
+                                  <input
+                                    value={act.sistema}
+                                    onChange={(e) =>
+                                      updateActividadOT(actIdx, "sistema", e.target.value)
+                                    }
+                                    disabled={isReadOnlyActividades}
+                                    className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                    Subsistema
+                                  </label>
+                                  <input
+                                    value={act.subsistema}
+                                    onChange={(e) =>
+                                      updateActividadOT(actIdx, "subsistema", e.target.value)
+                                    }
+                                    disabled={isReadOnlyActividades}
+                                    className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                    Componente
+                                  </label>
+                                  <input
+                                    value={act.componente}
+                                    onChange={(e) =>
+                                      updateActividadOT(actIdx, "componente", e.target.value)
+                                    }
+                                    disabled={isReadOnlyActividades}
+                                    className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                    Tarea <span className="text-red-500">*</span>
+                                  </label>
+                                  <input
+                                    value={act.tarea}
+                                    onChange={(e) =>
+                                      updateActividadOT(actIdx, "tarea", e.target.value)
+                                    }
+                                    disabled={isReadOnlyActividades}
+                                    className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                  />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                    Descripción
+                                  </label>
+                                  <input
+                                    value={act.descripcion}
+                                    onChange={(e) =>
+                                      updateActividadOT(actIdx, "descripcion", e.target.value)
+                                    }
+                                    disabled={isReadOnlyActividades}
+                                    className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                    Tipo de Trabajo
+                                  </label>
+                                  <select
+                                    value={act.tipoTrabajo}
+                                    onChange={(e) =>
+                                      updateActividadOT(actIdx, "tipoTrabajo", e.target.value)
+                                    }
+                                    disabled={isReadOnlyActividades}
+                                    className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                  >
+                                    {(esCorrectivo
+                                      ? TIPOS_TRABAJO_CORRECTIVO
+                                      : TIPOS_TRABAJO_ENUM
+                                    ).map((t) => (
+                                      <option key={t} value={t}>
+                                        {t}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                    Duración
+                                  </label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                      type="number"
+                                      value={act.duracionEstimadaValor}
+                                      onChange={(e) =>
+                                        updateActividadOT(
+                                          actIdx,
+                                          "duracionEstimadaValor",
+                                          e.target.value
+                                        )
+                                      }
+                                      disabled={isReadOnlyActividades}
+                                      className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                    />
+                                    <select
+                                      value={act.unidadDuracion}
+                                      onChange={(e) =>
+                                        updateActividadOT(
+                                          actIdx,
+                                          "unidadDuracion",
+                                          e.target.value
+                                        )
+                                      }
+                                      disabled={isReadOnlyActividades}
+                                      className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                    >
+                                      <option value="min">min</option>
+                                      <option value="h">h</option>
+                                    </select>
+                                  </div>
+                                  <p className="text-[11px] text-slate-500 mt-1">
+                                    Normalizado: {act.duracionEstimadaMin ?? 0} min
+                                  </p>
+                                </div>
+
+                                <div className="md:col-span-2">
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                    Observaciones
+                                  </label>
+                                  <input
+                                    value={act.observaciones}
+                                    onChange={(e) =>
+                                      updateActividadOT(
+                                        actIdx,
+                                        "observaciones",
+                                        e.target.value
+                                      )
+                                    }
+                                    disabled={isReadOnlyActividades}
+                                    className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                  />
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -959,8 +1627,9 @@ export default function ModalOTIndividual({
                   <div className="p-2.5 bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl">
                     <Upload className="w-5 h-5 text-white" />
                   </div>
-                  <h4 className="text-xl font-bold text-slate-900">Archivos Adjuntos Generales</h4>
-                  <span className="text-xs text-slate-600 bg-slate-100 px-3 py-1 rounded-full">(Opcional)</span>
+                  <h4 className="text-xl font-bold text-slate-900">
+                    Archivos Adjuntos Generales
+                  </h4>
                 </div>
 
                 <input
@@ -972,27 +1641,30 @@ export default function ModalOTIndividual({
 
                 {subiendoArchivos && (
                   <div className="mt-4 flex items-center gap-3 text-violet-600 bg-violet-50 p-4 rounded-xl border border-violet-200">
-                    <div className="w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
                     <p className="text-sm font-semibold">Subiendo archivos...</p>
                   </div>
                 )}
 
                 {archivosAdjuntos.length > 0 && (
                   <div className="mt-4 space-y-2">
-                    <p className="text-sm font-semibold text-slate-700 mb-2">
-                      Archivos adjuntos ({archivosAdjuntos.length})
-                    </p>
                     {archivosAdjuntos.map((file, i) => (
-                      <div key={i} className="flex items-center justify-between bg-gradient-to-r from-violet-50 to-purple-50 p-4 rounded-xl border border-violet-200">
+                      <div
+                        key={file.id || i}
+                        className="flex items-center justify-between bg-gradient-to-r from-violet-50 to-purple-50 p-4 rounded-xl border border-violet-200"
+                      >
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-violet-600 rounded-lg">
-                            <FileText className="w-4 h-4 text-white" />
-                          </div>
-                          <span className="text-sm font-semibold text-slate-800">{file.nombre}</span>
+                          <FileText className="w-4 h-4 text-violet-600" />
+                          <span className="text-sm font-semibold text-slate-800">
+                            {file.nombre || file.filename || "Archivo"}
+                          </span>
                         </div>
                         <button
-                          onClick={() => setArchivosAdjuntos(prev => prev.filter((_, idx) => idx !== i))}
-                          className="text-red-600 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                          type="button"
+                          onClick={() =>
+                            setArchivosAdjuntos((prev) => prev.filter((_, idx) => idx !== i))
+                          }
+                          className="text-red-600 hover:text-red-700"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1004,8 +1676,7 @@ export default function ModalOTIndividual({
 
               {/* OBSERVACIONES */}
               <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200">
-                <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-slate-600" />
+                <label className="block text-sm font-semibold text-slate-700 mb-3">
                   Observaciones Generales
                 </label>
                 <textarea
@@ -1013,55 +1684,40 @@ export default function ModalOTIndividual({
                   value={formData.observaciones}
                   onChange={handleChange}
                   rows={3}
-                  placeholder="Notas adicionales, consideraciones especiales, información relevante..."
                   className="w-full px-4 py-3 border-2 border-slate-300 rounded-xl focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all resize-none font-medium bg-white"
                 />
               </div>
             </div>
           </div>
 
-          {/* FOOTER CON INFO DE EQUIPOS PENDIENTES */}
-          <div className="p-6 border-t-2 border-slate-200 bg-gradient-to-r from-slate-50 to-violet-50 rounded-b-3xl">
-            {hayEquiposPendientes && (
-              <div className="mb-4 bg-amber-50 border-2 border-amber-300 rounded-xl p-4">
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-600" />
-                  <div>
-                    <p className="text-sm font-bold text-amber-900">
-                      Equipos pendientes de procesar
-                    </p>
-                    <p className="text-xs text-amber-700">
-                      Quedan {progresoEquipos.total - progresoEquipos.actual} equipo(s) más después de este.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+          {/* FOOTER */}
+          <div className="p-6 border-t-2 border-slate-200 bg-slate-50 flex items-center justify-between rounded-b-3xl">
+            <button
+              onClick={handleCerrar}
+              className="px-6 py-3 border-2 border-slate-400 rounded-xl hover:bg-white transition-all font-bold text-slate-700 flex items-center gap-2"
+              type="button"
+            >
+              <X className="w-5 h-5" />
+              {hayEquiposPendientes ? "Cancelar Todo" : "Cancelar"}
+            </button>
 
-            <div className="flex items-center justify-between">
-              <button
-                onClick={handleCerrar}
-                className="px-6 py-3 border-2 border-slate-400 rounded-xl hover:bg-white hover:border-slate-500 transition-all font-bold text-slate-700 flex items-center gap-2"
-              >
-                <X className="w-5 h-5" />
-                {hayEquiposPendientes ? "Cancelar Todo" : "Cancelar"}
-              </button>
-
-              <button
-                onClick={handleSubmitInternal}
-                className="px-8 py-3 bg-gradient-to-r from-violet-600 via-purple-600 to-violet-700 text-white rounded-xl hover:from-violet-700 hover:via-purple-700 hover:to-violet-800 transition-all font-bold shadow-xl shadow-violet-500/40 flex items-center gap-3 transform hover:scale-105 active:scale-95"
-              >
-                <CheckCircle2 className="w-5 h-5" strokeWidth={2.5} />
-                {hayEquiposPendientes ? `Guardar y Continuar (${progresoEquipos.actual}/${progresoEquipos.total})` : "Crear OT Individual"}
-              </button>
-            </div>
+            <button
+              onClick={handleSubmitInternal}
+              className="px-8 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-bold shadow-xl flex items-center gap-3"
+              type="button"
+            >
+              <CheckCircle2 className="w-5 h-5" />
+              {hayEquiposPendientes
+                ? `Guardar y Continuar (${progresoEquipos.actual}/${progresoEquipos.total})`
+                : "Crear OT Individual"}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* MODAL DE CONFIRMACIÓN DE SALIDA */}
+      {/* CONFIRMACIÓN DE SALIDA */}
       {mostrarConfirmacionSalida && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border-2 border-amber-300">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-3 bg-amber-100 rounded-xl">
@@ -1069,21 +1725,24 @@ export default function ModalOTIndividual({
               </div>
               <h3 className="text-xl font-bold text-slate-900">¿Está seguro de salir?</h3>
             </div>
-            
+
             <div className="space-y-3 mb-6">
               <p className="text-slate-700">
-                Está procesando <span className="font-bold text-violet-600">OTs individuales</span> para múltiples equipos.
+                Estás procesando <span className="font-bold text-violet-600">OTs individuales</span>.
               </p>
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-sm font-bold text-amber-900 mb-1">
-                  ⚠️ Equipos pendientes de procesar:
+                  ⚠️ Equipos pendientes:
                 </p>
                 <p className="text-sm text-amber-800">
-                  <span className="font-bold text-lg">{progresoEquipos?.total - progresoEquipos?.actual}</span> de {progresoEquipos?.total} equipos aún sin OT
+                  <span className="font-bold text-lg">
+                    {progresoEquipos?.total - progresoEquipos?.actual}
+                  </span>{" "}
+                  de {progresoEquipos?.total} equipos aún sin OT
                 </p>
               </div>
               <p className="text-sm text-slate-600">
-                Si sale ahora, deberá volver a iniciar el proceso para los equipos restantes.
+                Si sales ahora, tendrás que reiniciar el proceso para los equipos restantes.
               </p>
             </div>
 
@@ -1091,23 +1750,25 @@ export default function ModalOTIndividual({
               <button
                 onClick={() => setMostrarConfirmacionSalida(false)}
                 className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl hover:bg-slate-50 transition-all font-bold text-slate-700"
+                type="button"
               >
-                Continuar procesando
+                Continuar
               </button>
               <button
                 onClick={confirmarSalida}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all font-bold shadow-lg shadow-red-500/30"
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all font-bold"
+                type="button"
               >
-                Salir de todos modos
+                Salir
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL DE CONFIRMACIÓN */}
+      {/* CONFIRMACIÓN CREACIÓN */}
       {mostrarConfirmacion && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-3 bg-violet-100 rounded-xl">
@@ -1115,14 +1776,21 @@ export default function ModalOTIndividual({
               </div>
               <h3 className="text-xl font-bold text-slate-900">Confirmar Creación</h3>
             </div>
-            
+
             <div className="space-y-2 mb-6 text-sm text-slate-700">
-              <p><strong>OT:</strong> {numeroOTGenerado}</p>
-              <p><strong>Equipo:</strong> {equipoActual?.nombre}</p>
-              <p><strong>Supervisor:</strong> {supervisores.find(s => s.id === formData.supervisorId)?.nombre || 'N/A'}</p>
+              <p>
+                <strong>OT:</strong> {numeroOTGenerado}
+              </p>
+              <p>
+                <strong>Equipo:</strong> {equipoActual?.nombre}
+              </p>
+              <p>
+                <strong>Supervisor:</strong>{" "}
+                {supervisores.find((s) => s.id === formData.supervisorId)?.nombre || "N/A"}
+              </p>
               {hayEquiposPendientes && (
                 <p className="text-amber-600 font-bold">
-                  Progreso: {progresoEquipos.actual}/{progresoEquipos.total} equipos
+                  Progreso: {progresoEquipos.actual}/{progresoEquipos.total}
                 </p>
               )}
             </div>
@@ -1131,15 +1799,14 @@ export default function ModalOTIndividual({
               <button
                 onClick={() => setMostrarConfirmacion(false)}
                 className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl hover:bg-slate-50 transition-all font-bold text-slate-700"
+                type="button"
               >
                 Cancelar
               </button>
               <button
-                onClick={() => {
-                  confirmarCreacion();
-                  setMostrarConfirmacion(false);
-                }}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all font-bold shadow-lg shadow-green-500/30"
+                onClick={confirmarCreacion}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all font-bold"
+                type="button"
               >
                 Confirmar
               </button>
@@ -1148,12 +1815,19 @@ export default function ModalOTIndividual({
         </div>
       )}
 
-     <ModalInfoAviso
-  isOpen={mostrarInfoAviso}
-  onClose={() => setMostrarInfoAviso(false)}
-  aviso={aviso}
-/>
+      {/* MODALES AUX */}
+      <ModalInfoAviso
+        isOpen={mostrarInfoAviso}
+        onClose={() => setMostrarInfoAviso(false)}
+        aviso={aviso}
+      />
 
+      {/* Si quieres usar el modal de detalle existente (recomendado) */}
+      <ModalDetallesEquipo
+        equipoId={equipoDetalleModalId}
+        isOpen={!!equipoDetalleModalId}
+        onClose={() => setEquipoDetalleModalId(null)}
+      />
     </>
   );
 }

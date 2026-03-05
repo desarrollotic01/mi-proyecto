@@ -7,11 +7,12 @@ import MainLayout from "./layouts/MainLayout";
 import Mantenimiento from "./features/mantenimiento/pages/Mantenimiento";
 import OrdenTrabajo from "./pages/OrdenTrabajo";
 import EquiposPage from "../src/features/Equipo/Equipo";
-import UbicacionesTecnicasPage from "./pages/UbicacionesTecnicasPage";
+import UbicacionesTecnicasPage from "./features/UbicacionTecnica/Pages/UbicacionesTecnicasPage";
 import ClientesPage from "./pages/ClientesPage";
 import PlanesMantenimiento from "./features/PlanMantenimiento/pages/planesMantenimiento";
 import TrabajadoresPage from "./features/Trabajores/pages/TrabajadorPage";
 import MaintenanceGuides from "./features/GuiaMantenimiento/GuiaMantenimiento";
+import GuiasKanban from "./pages/GuiaMantenimientoKanban";
 
 function AppLayout() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
   <Route path="planes-mantenimiento" element={<PlanesMantenimiento />} />
   <Route path="trabajadores" element={<TrabajadoresPage />} />
   <Route path="guiaMantenimiento" element={<MaintenanceGuides />} />
+  <Route path="GuiasKanban" element={<GuiasKanban/>} />
 
 </Route>
 

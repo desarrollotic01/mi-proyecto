@@ -1,223 +1,722 @@
 import { useEffect, useState } from "react";
 import {
-  X, Save, ShoppingCart, Settings, CheckCircle, Briefcase,
-  Wrench, FileText, Package, Plus, Trash2, ClipboardList,
-  ChevronDown, ChevronUp, Clock, Layers, Tag, Cpu
+  X,
+  Save,
+  ShoppingCart,
+  CheckCircle,
+  Briefcase,
+  Wrench,
+  FileText,
+  Package,
+  Plus,
+  Trash2,
+  ClipboardList,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Layers,
+  Tag,
 } from "lucide-react";
 
-import { createTratamiento } from "../../features/mantenimiento/services/tratamientoService";
-import { getTrabajadores } from "../../features/mantenimiento/services/trabajadoresService";
+import {
+  createTratamiento,
+  saveTratamientoDraft,
+} from "../../features/mantenimiento/services/tratamientoService";
 import { equipoService } from "../../features/mantenimiento/services/equipoService";
 import ModalSolicitudCompra from "./ModalSolicitudCompra";
 import ModalConfiguracionCampos from "./ModalConfiguracionTratamiento";
 import { CAMPOS_AVISO } from "./camposAviso";
+import { planMantenimientoService } from "../../features/PlanMantenimiento/services/planMantenimientoService";
 
 /* ══════════════════════════════════════════════
-   CONSTANTES
+   CONSTANTES / TEMPLATES
 ══════════════════════════════════════════════ */
 
-const TIPOS_TRABAJO = [
-  "TORQUEO_REGULACION", "APLICACION", "REVISION", "INSPECCION",
-  "CAMBIO", "LIMPIEZA", "AJUSTE", "LUBRICACION",
+// ✅ Correctivo: solo REPARACION o CAMBIO
+const TIPOS_TRABAJO_CORRECTIVO = ["REPARACION", "CAMBIO"];
+
+// ✅ Roles técnicos (igual a tu ENUM backend)
+const ROLES_TECNICOS = [
+  { value: "tecnico_electrico", label: "Técnico Eléctrico" },
+  { value: "operario_de_mantenimiento", label: "Operario Mantenimiento" },
+  { value: "tecnico_mecanico", label: "Técnico Mecánico" },
+  { value: "supervisor", label: "Supervisor" },
 ];
 
+// ✅ Actividad manual (Correctivo) — incluye rol + cantidad
 const ACTIVIDAD_VACIA = {
-  sistema: "", subsistema: "", componente: "", tarea: "",
-  tipoTrabajo: "REVISION", duracionEstimadaMin: 0, observaciones: "",
+  sistema: "",
+  subsistema: "",
+  componente: "",
+  tarea: "",
+  descripcion: "",
+  tipoTrabajo: "REPARACION",
+  rolTecnico: "tecnico_mecanico",
+  cantidadTecnicos: 1,
+  duracionEstimadaValor: 0,
+  unidadDuracion: "min", // "min" | "h"
+  observaciones: "",
 };
-
-const COLOR_TIPO = {
-  TORQUEO_REGULACION: "bg-orange-100 text-orange-700 border-orange-200",
-  APLICACION:         "bg-blue-100 text-blue-700 border-blue-200",
-  REVISION:           "bg-purple-100 text-purple-700 border-purple-200",
-  INSPECCION:         "bg-cyan-100 text-cyan-700 border-cyan-200",
-  CAMBIO:             "bg-red-100 text-red-700 border-red-200",
-  LIMPIEZA:           "bg-green-100 text-green-700 border-green-200",
-  AJUSTE:             "bg-yellow-100 text-yellow-700 border-yellow-200",
-  LUBRICACION:        "bg-indigo-100 text-indigo-700 border-indigo-200",
-};
-
-/* ══════════════════════════════════════════════
-   COMPONENTE PRINCIPAL
-══════════════════════════════════════════════ */
 
 export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) {
-  const [trabajadores, setTrabajadores]         = useState([]);
-  const [equipos, setEquipos]                   = useState([]);
-  const [loading, setLoading]                   = useState(false);
-  const [showSolicitud, setShowSolicitud]       = useState(false);
-  const [showConfigCampos, setShowConfigCampos] = useState(false);
-  const [solicitudes, setSolicitudes]           = useState(null);
-  const [collapsed, setCollapsed]               = useState({});
+  const [equipos, setEquipos] = useState([]);
+  const [loading, setLoading] = useState(false);
 
+  const [showSolicitud, setShowSolicitud] = useState(false);
+  const [showConfigCampos, setShowConfigCampos] = useState(false);
+
+  // ✅ valor que se manda al backend (solicitudGeneral + solicitudesPorEquipo)
+  const [solicitudes, setSolicitudes] = useState(null);
+
+  const [collapsed, setCollapsed] = useState({});
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // ✅ data alineada a tu backend
   const [data, setData] = useState({
-    contratista: "",
-    requerimientos: [
-      { rol: "tecnico_electrico",         label: "Técnico Eléctrico",     cantidad: 0, personas: [], search: "", icon: Wrench,    color: "blue"   },
-      { rol: "operario_de_mantenimiento", label: "Operario Mantenimiento", cantidad: 0, personas: [], search: "", icon: Settings,  color: "green"  },
-      { rol: "tecnico_mecanico",          label: "Técnico Mecánico",      cantidad: 0, personas: [], search: "", icon: Briefcase, color: "purple" },
-    ],
-    actividadesManuales: {},
-    planesSeleccionados: {},
+    actividadesManuales: {}, // { [equipoId]: ActividadManual[] }
+    planesSeleccionados: {}, // { [equipoId]: planId }
+    // ✅ preventivo editable por equipo
+    preventivoPorEquipo: {}, // { [equipoId]: { planId, nombrePlan, codigoPlan, actividades: [] } }
   });
 
-  /* ── Carga inicial ── */
+  /* ─────────────────────────────
+     Flags
+  ───────────────────────────── */
+  const esCorrectivo = aviso?.tipoMantenimiento === "Correctivo";
+  const esPreventivo =
+    aviso?.tipoAviso === "mantenimiento" &&
+    aviso?.tipoMantenimiento === "Preventivo";
+
+  const tieneEquipos = (aviso?.equiposRelacion?.length || 0) > 0;
+  const tieneUbicaciones = (aviso?.ubicacionesRelacion?.length || 0) > 0;
+
+  const cantSolicitudesIndividuales = Object.keys(
+    solicitudes?.solicitudesPorEquipo || {}
+  ).length;
+
+  /* ─────────────────────────────
+     Carga inicial + RESET (bug de estados pegados)
+  ───────────────────────────── */
   useEffect(() => {
-    if (!isOpen) return;
-    Promise.all([
-      getTrabajadores({ activo: true }),
-      equipoService.getEquipos(),
-    ]).then(([tData, eData]) => {
-      setTrabajadores(tData);
-      setEquipos(eData);
+    if (!isOpen || !aviso) return;
+
+    setErrorMsg("");
+
+    // ✅ limpiar estado cuando abres otro aviso
+    setSolicitudes(null);
+    setCollapsed({});
+    setData({
+      actividadesManuales: {},
+      planesSeleccionados: {},
+      preventivoPorEquipo: {},
     });
-  }, [isOpen]);
 
-  /* ── Helpers ── */
-  const getEquipoInfo   = (id) => equipos.find(e => e.id === id) || { nombre: id, tag: id };
-  const getEquipoFull   = (id) => equipos.find(e => e.id === id);
-  const toggleCollapse  = (key) => setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
+    equipoService
+      .getEquipos()
+      .then((eData) => {
+        setEquipos(eData || []);
+      })
+      .catch(() => {
+        setEquipos([]);
+      });
+  }, [isOpen, aviso?.id]);
 
-  /* ── Requerimientos ── */
-  const updateReq = (i, changes) => {
-    const reqs = [...data.requerimientos];
-    reqs[i] = { ...reqs[i], ...changes };
-    if (changes.cantidad !== undefined) reqs[i].personas = reqs[i].personas.slice(0, changes.cantidad);
-    setData({ ...data, requerimientos: reqs });
+  /* ─────────────────────────────
+     Helpers
+  ───────────────────────────── */
+  const getEquipoInfo = (id) =>
+    equipos.find((e) => e.id === id) || { nombre: id, tag: id };
+
+  const getEquipoFull = (id) => equipos.find((e) => e.id === id);
+
+  const getUbicacionInfo = (id) => {
+    return { nombre: `Ubicación técnica`, tag: id };
   };
 
-  const togglePersona = (i, persona) => {
-    const r = data.requerimientos[i];
-    const exists = r.personas.some(p => p.id === persona.id);
-    if (!exists && r.personas.length >= r.cantidad) return;
-    updateReq(i, {
-      personas: exists ? r.personas.filter(p => p.id !== persona.id) : [...r.personas, persona],
-    });
+  const toggleCollapse = (key) =>
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const toMinutes = (valor, unidad) => {
+    const v = Number(valor);
+    if (!Number.isFinite(v) || v <= 0) return 0;
+    if (unidad === "h") return Math.round(v * 60);
+    return Math.round(v);
   };
 
-  /* ── Actividades manuales (Correctivo) ── */
-  const agregarActividad = (equipoId) =>
-    setData(prev => ({
-      ...prev,
-      actividadesManuales: {
-        ...prev.actividadesManuales,
-        [equipoId]: [...(prev.actividadesManuales[equipoId] || []), { ...ACTIVIDAD_VACIA }],
-      },
-    }));
+  const minutesToEditableValue = (min, unidad) => {
+    if (!Number.isFinite(Number(min))) return 0;
+    return unidad === "h" ? Number(min) / 60 : Number(min);
+  };
 
-  const actualizarActividad = (equipoId, idx, campo, valor) =>
-    setData(prev => {
-      const lista = [...(prev.actividadesManuales[equipoId] || [])];
-      lista[idx] = { ...lista[idx], [campo]: valor };
-      return { ...prev, actividadesManuales: { ...prev.actividadesManuales, [equipoId]: lista } };
-    });
+  /* ─────────────────────────────
+     AUTO-CARGA: PlanActividadItem -> lineas solicitud
+  ───────────────────────────── */
+  const getActividadesFromPlan = (planSel) => {
+    return (
+      planSel?.actividades ||
+      planSel?.PlanMantenimientoActividades ||
+      planSel?.planMantenimientoActividades ||
+      planSel?.actividadesPlan ||
+      []
+    );
+  };
 
-  const eliminarActividad = (equipoId, idx) =>
-    setData(prev => ({
-      ...prev,
-      actividadesManuales: {
-        ...prev.actividadesManuales,
-        [equipoId]: (prev.actividadesManuales[equipoId] || []).filter((_, i) => i !== idx),
-      },
-    }));
+  const getItemsFromActividad = (act) => {
+    return (
+      act?.items ||
+      act?.PlanActividadItems ||
+      act?.plan_actividad_items ||
+      act?.actividadItems ||
+      []
+    );
+  };
 
-  /* ── Planes preventivos ── */
-  const seleccionarPlan = (equipoId, planId) =>
-    setData(prev => ({
+  const planItemsToLineas = (planSel) => {
+    const lineas = [];
+    const actividades = getActividadesFromPlan(planSel);
+
+    for (const act of actividades) {
+      const items = getItemsFromActividad(act);
+
+      for (const it of items) {
+        lineas.push({
+          id: crypto.randomUUID(),
+          itemCode: it.itemCode || "",
+          description: it.item || act.tarea || "Recurso de plan",
+          quantity: Number(it.cantidad) || 1,
+          warehouseCode: "01",
+          costCenter: "",
+          projectCode: "",
+          rubro: it.recurso || "",
+          paqueteTrabajo: "",
+          origen: "PLAN", // ✅ CLAVE PARA BORRAR/REEMPLAZAR
+        });
+      }
+    }
+
+    // dedupe (sumar cantidades)
+    const keyOf = (l) =>
+      `${(l.itemCode || "").trim()}__${(l.description || "").trim()}__${(
+        l.rubro || ""
+      ).trim()}__${(l.paqueteTrabajo || "").trim()}__${l.origen || ""}`;
+
+    const map = new Map();
+    for (const l of lineas) {
+      const k = keyOf(l);
+      if (!map.has(k)) map.set(k, { ...l });
+      else map.get(k).quantity += Number(l.quantity) || 0;
+    }
+
+    return Array.from(map.values()).filter((l) => l.itemCode || l.description);
+  };
+
+  /* ─────────────────────────────
+     PREVENTIVO: seleccionar plan (FIX items pegados)
+     - REEMPLAZA items PLAN previos por equipo
+     - mantiene lineas manuales
+  ───────────────────────────── */
+  const seleccionarPlan = async (equipoId, planId) => {
+    setData((prev) => ({
       ...prev,
       planesSeleccionados: { ...prev.planesSeleccionados, [equipoId]: planId },
     }));
 
-  /* ── Guardar ── */
+    // ✅ si quitan el plan: borrar items origen PLAN y limpiar actividades cargadas
+    if (!planId) {
+      setSolicitudes((prev) => {
+        if (!prev) return prev;
+        const base = {
+          ...prev,
+          solicitudesPorEquipo: { ...(prev.solicitudesPorEquipo || {}) },
+        };
+        const actual = base.solicitudesPorEquipo?.[equipoId];
+        if (!actual) return prev;
+
+        return {
+          ...base,
+          solicitudesPorEquipo: {
+            ...base.solicitudesPorEquipo,
+            [equipoId]: {
+              ...actual,
+              lineas: (actual.lineas || []).filter((l) => l.origen !== "PLAN"),
+            },
+          },
+        };
+      });
+
+      setData((prev) => {
+        const copy = { ...(prev.preventivoPorEquipo || {}) };
+        delete copy[equipoId];
+        return { ...prev, preventivoPorEquipo: copy };
+      });
+
+      return;
+    }
+
+    try {
+      const planSel = await planMantenimientoService.getPlanById(planId);
+
+      // 1) ✅ auto-carga items: reemplazar PLAN anterior
+      const lineasAuto = planItemsToLineas(planSel);
+
+      setSolicitudes((prev) => {
+        const base = prev || { solicitudGeneral: null, solicitudesPorEquipo: {} };
+
+        const actual = base.solicitudesPorEquipo?.[equipoId] || {
+          department: base.solicitudGeneral?.department || "",
+          email: base.solicitudGeneral?.email || "",
+          requiredDate:
+            base.solicitudGeneral?.requiredDate ||
+            new Date().toISOString().slice(0, 10),
+          comments: "",
+          lineas: [],
+        };
+
+        const manuales = (actual.lineas || []).filter((l) => l.origen !== "PLAN");
+
+        // dedupe global
+        const keyOf = (l) =>
+          `${(l.itemCode || "").trim()}__${(l.description || "").trim()}__${(
+            l.rubro || ""
+          ).trim()}__${(l.paqueteTrabajo || "").trim()}__${l.origen || ""}`;
+
+        const map = new Map();
+        for (const l of [...manuales, ...lineasAuto]) {
+          const k = keyOf(l);
+          if (!map.has(k)) map.set(k, { ...l });
+          else map.get(k).quantity += Number(l.quantity) || 0;
+        }
+
+        return {
+          ...base,
+          solicitudesPorEquipo: {
+            ...(base.solicitudesPorEquipo || {}),
+            [equipoId]: {
+              ...actual,
+              lineas: Array.from(map.values()),
+            },
+          },
+        };
+      });
+
+      // 2) actividades editables por equipo (desde plan)
+      const actividades = getActividadesFromPlan(planSel);
+
+      const editable = (actividades || []).map((a) => {
+        const unidad = a.unidadDuracion || "min";
+        const min = Number(a.duracionMinutos) || 0;
+
+        return {
+          planMantenimientoActividadId: a.id,
+          codigoActividad: a.codigoActividad || null,
+
+          sistema: a.sistema || "",
+          subsistema: a.subsistema || "",
+          componente: a.componente || "",
+          tarea: a.tarea || "",
+          tipoTrabajo: a.tipoTrabajo || "",
+          rolTecnico: a.rolTecnico || null,
+
+          duracionEstimadaValor: minutesToEditableValue(min, unidad),
+          unidadDuracion: unidad,
+          cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
+
+          observaciones: "",
+        };
+      });
+
+      setData((prev) => ({
+        ...prev,
+        preventivoPorEquipo: {
+          ...prev.preventivoPorEquipo,
+          [equipoId]: {
+            planId,
+            nombrePlan: planSel?.nombre || "",
+            codigoPlan: planSel?.codigoPlan || "",
+            actividades: editable,
+          },
+        },
+      }));
+    } catch (e) {
+      console.error("Error cargando plan para autocarga:", e);
+    }
+  };
+
+  const updatePreventivoActividad = (equipoId, idx, campo, valor) => {
+    setData((prev) => {
+      const prevEq = prev.preventivoPorEquipo?.[equipoId];
+      if (!prevEq) return prev;
+
+      const acts = [...(prevEq.actividades || [])];
+      acts[idx] = { ...acts[idx], [campo]: valor };
+
+      if (campo === "cantidadTecnicos") {
+        const n = Number(valor);
+        acts[idx].cantidadTecnicos = Number.isFinite(n)
+          ? Math.max(1, Math.floor(n))
+          : 1;
+      }
+      if (campo === "duracionEstimadaValor") {
+        const n = Number(valor);
+        acts[idx].duracionEstimadaValor = Number.isFinite(n) ? n : 0;
+      }
+
+      return {
+        ...prev,
+        preventivoPorEquipo: {
+          ...prev.preventivoPorEquipo,
+          [equipoId]: { ...prevEq, actividades: acts },
+        },
+      };
+    });
+  };
+
+  /* ─────────────────────────────
+     Correctivo: actividades manuales
+  ───────────────────────────── */
+  const agregarActividad = (equipoId) =>
+    setData((prev) => ({
+      ...prev,
+      actividadesManuales: {
+        ...prev.actividadesManuales,
+        [equipoId]: [
+          ...(prev.actividadesManuales[equipoId] || []),
+          { ...ACTIVIDAD_VACIA },
+        ],
+      },
+    }));
+
+  const actualizarActividad = (equipoId, idx, campo, valor) =>
+    setData((prev) => {
+      const lista = [...(prev.actividadesManuales[equipoId] || [])];
+      lista[idx] = { ...lista[idx], [campo]: valor };
+
+      if (campo === "cantidadTecnicos") {
+        const n = Number(valor);
+        lista[idx].cantidadTecnicos = Number.isFinite(n)
+          ? Math.max(1, Math.floor(n))
+          : 1;
+      }
+      if (campo === "duracionEstimadaValor") {
+        const n = Number(valor);
+        lista[idx].duracionEstimadaValor = Number.isFinite(n) ? n : 0;
+      }
+
+      return {
+        ...prev,
+        actividadesManuales: { ...prev.actividadesManuales, [equipoId]: lista },
+      };
+    });
+
+  const eliminarActividad = (equipoId, idx) =>
+    setData((prev) => ({
+      ...prev,
+      actividadesManuales: {
+        ...prev.actividadesManuales,
+        [equipoId]: (prev.actividadesManuales[equipoId] || []).filter(
+          (_, i) => i !== idx
+        ),
+      },
+    }));
+
+  /* ─────────────────────────────
+     Validaciones antes de guardar
+  ───────────────────────────── */
+  const validateBeforeSave = () => {
+    const targets = [
+      ...(aviso?.equiposRelacion || []).map((e) => e.equipoId),
+      ...(aviso?.ubicacionesRelacion || []).map((u) => u.ubicacionTecnicaId),
+    ];
+
+    if (!targets.length) return "El aviso no tiene equipos ni ubicaciones asociadas.";
+
+    // preventivo: plan por equipo
+    if (esPreventivo && tieneEquipos) {
+      for (const rel of aviso.equiposRelacion) {
+        const planId = data.planesSeleccionados?.[rel.equipoId];
+        if (!planId) {
+          const info = getEquipoInfo(rel.equipoId);
+          return `Seleccioná un plan para el equipo: ${info.nombre || info.tag || rel.equipoId}`;
+        }
+
+        const acts = data.preventivoPorEquipo?.[rel.equipoId]?.actividades || [];
+        if (!acts.length) {
+          const info = getEquipoInfo(rel.equipoId);
+          return `No se cargaron actividades del plan para el equipo: ${info.nombre || info.tag || rel.equipoId}`;
+        }
+
+        for (const [i, a] of acts.entries()) {
+          if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0) {
+            const info = getEquipoInfo(rel.equipoId);
+            return `Equipo ${info.nombre || info.tag || rel.equipoId}: actividad #${i + 1} cantidadTecnicos inválida.`;
+          }
+        }
+      }
+    }
+
+    // correctivo: actividades manuales
+    if (esCorrectivo && tieneEquipos) {
+      for (const rel of aviso.equiposRelacion) {
+        const acts = data.actividadesManuales?.[rel.equipoId] || [];
+        if (acts.length === 0) {
+          const info = getEquipoInfo(rel.equipoId);
+          return `Equipo ${info.nombre || info.tag || rel.equipoId}: agregá al menos 1 actividad.`;
+        }
+
+        for (const [idx, a] of acts.entries()) {
+          if (!a.tarea || !String(a.tarea).trim()) {
+            const info = getEquipoInfo(rel.equipoId);
+            return `Equipo ${info.nombre || info.tag || rel.equipoId}: actividad #${idx + 1} sin tarea.`;
+          }
+          if (a.tipoTrabajo && !TIPOS_TRABAJO_CORRECTIVO.includes(a.tipoTrabajo)) {
+            const info = getEquipoInfo(rel.equipoId);
+            return `Equipo ${info.nombre || info.tag || rel.equipoId}: tipoTrabajo inválido (solo REPARACION/CAMBIO).`;
+          }
+          if (!a.rolTecnico) {
+            const info = getEquipoInfo(rel.equipoId);
+            return `Equipo ${info.nombre || info.tag || rel.equipoId}: actividad #${idx + 1} sin rolTecnico.`;
+          }
+          if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0) {
+            const info = getEquipoInfo(rel.equipoId);
+            return `Equipo ${info.nombre || info.tag || rel.equipoId}: actividad #${idx + 1} cantidadTecnicos inválida.`;
+          }
+        }
+      }
+    }
+
+    // backend exige solicitudGeneral
+    if (!solicitudes?.solicitudGeneral) {
+      return "Falta completar la Solicitud de Compra (General).";
+    }
+
+    return "";
+  };
+
+  /* ─────────────────────────────
+     Construir payload (reusable)
+  ───────────────────────────── */
+  const buildPayload = () => {
+    // 1) manuales normalizados
+    const actividadesManualesNormalizadas = {};
+    for (const [equipoId, acts] of Object.entries(data.actividadesManuales || {})) {
+      actividadesManualesNormalizadas[equipoId] = (acts || []).map((a) => {
+        const unidad = a.unidadDuracion || "min";
+        const valor = Number(a.duracionEstimadaValor) || 0;
+
+        return {
+          sistema: a.sistema || null,
+          subsistema: a.subsistema || null,
+          componente: a.componente || null,
+          tarea: a.tarea || null,
+          descripcion: a.descripcion || null,
+          tipoTrabajo: a.tipoTrabajo || "REPARACION",
+          rolTecnico: a.rolTecnico || null,
+          cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
+          duracionEstimadaValor: valor,
+          unidadDuracion: unidad,
+          duracionEstimadaMin: toMinutes(valor, unidad) || null,
+          observaciones: a.observaciones || null,
+        };
+      });
+    }
+
+    // 2) preventivo overrides
+    const actividadesPlanEditadas = {};
+    for (const rel of aviso.equiposRelacion || []) {
+      const equipoId = rel.equipoId;
+      const pack = data.preventivoPorEquipo?.[equipoId];
+      if (!pack?.actividades?.length) continue;
+
+      actividadesPlanEditadas[equipoId] = pack.actividades.map((a) => ({
+        planMantenimientoActividadId: a.planMantenimientoActividadId,
+        duracionEstimadaValor: Number(a.duracionEstimadaValor) || 0,
+        unidadDuracion: a.unidadDuracion || "min",
+        duracionEstimadaMin: toMinutes(a.duracionEstimadaValor, a.unidadDuracion) || 0,
+        cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
+        observaciones: a.observaciones || null,
+      }));
+    }
+
+    return {
+      tratamiento: {
+        actividadesManuales: actividadesManualesNormalizadas,
+        planesSeleccionados: data.planesSeleccionados,
+        actividadesPlanEditadas,
+      },
+      solicitudGeneral: solicitudes?.solicitudGeneral || null,
+      solicitudesPorEquipo: solicitudes?.solicitudesPorEquipo || {},
+    };
+  };
+
+  /* ─────────────────────────────
+     Guardar FINAL
+  ───────────────────────────── */
   const handleGuardar = async () => {
+    setErrorMsg("");
+    const msg = validateBeforeSave();
+    if (msg) {
+      setErrorMsg(msg);
+      return;
+    }
+
     setLoading(true);
     try {
-      await createTratamiento(aviso.id, {
-        tratamiento: {
-          contratista: data.contratista,
-          requerimientos: data.requerimientos
-            .filter(r => r.cantidad > 0)
-            .map(r => ({ rol: r.rol, label: r.label, cantidad: r.cantidad, personas: r.personas.map(p => p.id) })),
-          actividadesManuales: data.actividadesManuales,
-          planesSeleccionados: data.planesSeleccionados,
-        },
-        solicitudGeneral:     solicitudes?.solicitudGeneral || null,
-        solicitudesPorEquipo: solicitudes?.solicitudesPorEquipo || {},
-      });
+      await createTratamiento(aviso.id, buildPayload());
       onSuccess?.();
-      onClose();
+      onClose?.();
+    } catch (err) {
+      console.log("BACKEND ERROR:", err?.response?.data);
+      setErrorMsg(
+        err?.response?.data?.message || err?.message || "Error guardando tratamiento."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  /* ── Flags ── */
-  const esCorrectivo = aviso?.tipoMantenimiento === "Correctivo";
-  const esPreventivo = aviso?.tipoAviso === "mantenimiento" && aviso?.tipoMantenimiento === "Preventivo";
-  const tieneEquipos = (aviso?.equiposRelacion?.length || 0) > 0;
-  const cantSolicitudesIndividuales = Object.keys(solicitudes?.solicitudesPorEquipo || {}).length;
+  /* ─────────────────────────────
+     Guardar CAMBIOS (PENDIENTE)
+  ───────────────────────────── */
+  const handleGuardarCambios = async () => {
+    setErrorMsg("");
+    const msg = validateBeforeSave();
+    if (msg) {
+      setErrorMsg(msg);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await saveTratamientoDraft(aviso.id, buildPayload());
+      alert("✅ Cambios guardados como PENDIENTE.");
+    } catch (err) {
+      console.log("BACKEND ERROR:", err?.response?.data);
+      setErrorMsg(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Error guardando cambios (pendiente)."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!isOpen || !aviso) return null;
 
   return (
     <>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex justify-center items-center p-4">
-        <div className="bg-white w-full max-w-7xl h-[94vh] rounded-3xl shadow-2xl flex flex-col">
-
+        <div className="bg-white w-full max-w-[92rem] h-[94vh] rounded-2xl shadow-2xl flex flex-col border border-slate-200">
           {/* ── HEADER ── */}
-          <div className="p-6 border-b bg-gradient-to-r from-indigo-50 to-purple-50 flex justify-between items-center shrink-0">
+          <div className="p-6 border-b bg-slate-50 flex justify-between items-center shrink-0">
             <div className="flex gap-4 items-center">
-              <div className="p-3 bg-indigo-600 rounded-xl">
+              <div className="p-3 bg-slate-900 rounded-xl">
                 <FileText className="text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-black">Tratamiento del Aviso</h2>
+                <h2 className="text-2xl font-black text-slate-900">
+                  Tratamiento del Aviso
+                </h2>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-sm text-gray-600">Aviso #{aviso.numeroAviso}</p>
+                  <p className="text-sm text-slate-600">Aviso #{aviso.numeroAviso}</p>
                   {aviso.tipoMantenimiento && (
-                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
-                      esCorrectivo ? "bg-orange-100 text-orange-700" : "bg-emerald-100 text-emerald-700"
-                    }`}>
+                    <span className="text-xs px-2.5 py-1 rounded-full font-semibold border border-slate-200 bg-white text-slate-700">
                       {aviso.tipoMantenimiento}
                     </span>
                   )}
                 </div>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white rounded-xl transition-colors border border-transparent hover:border-slate-200"
+            >
               <X />
             </button>
           </div>
 
           {/* ── BODY ── */}
           <div className="flex-1 overflow-y-auto p-8 space-y-8">
+            {/* ERROR */}
+            {errorMsg && (
+              <div className="border border-rose-200 bg-rose-50 text-rose-700 rounded-2xl p-4 text-sm font-medium">
+                ⚠️ {errorMsg}
+              </div>
+            )}
 
             {/* INFORMACIÓN DEL AVISO */}
-            <Section title="🧾 Información del Aviso">
+            <Section title="Información del Aviso">
               <Grid>
                 {Object.entries(CAMPOS_AVISO).map(([key, label]) =>
-                  aviso[key] && <Info key={key} label={label} value={aviso[key]} />
+                  aviso[key] ? <Info key={key} label={label} value={aviso[key]} /> : null
                 )}
               </Grid>
+
               {aviso.descripcion && (
                 <div className="mt-4">
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Descripción</p>
-                  <p className="text-sm text-gray-800">{aviso.descripcion}</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-1">
+                    Descripción
+                  </p>
+                  <p className="text-sm text-slate-800">{aviso.descripcion}</p>
                 </div>
               )}
+
               {tieneEquipos && (
-                <div className="mt-4">
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Equipos Asociados</p>
+                <div className="mt-5">
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
+                    Equipos Asociados
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {aviso.equiposRelacion.map(e => {
+                    {aviso.equiposRelacion.map((e) => {
                       const info = getEquipoInfo(e.equipoId);
                       return (
-                        <div key={e.id} className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl">
-                          <div className="p-2 bg-indigo-600 rounded-lg shrink-0"><Package className="w-5 h-5 text-white" /></div>
+                        <div
+                          key={e.id}
+                          className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl"
+                        >
+                          <div className="p-2 bg-slate-900 rounded-lg shrink-0">
+                            <Package className="w-5 h-5 text-white" />
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 truncate">{info.nombre || info.tag || 'Sin nombre'}</p>
-                            {info.tag && info.nombre && <p className="text-xs text-indigo-600 font-medium">TAG: {info.tag}</p>}
-                            {info.ubicacion && <p className="text-xs text-gray-500">📍 {info.ubicacion}</p>}
+                            <p className="font-semibold text-slate-900 truncate">
+                              {info.nombre || info.tag || "Sin nombre"}
+                            </p>
+                            {info.tag && info.nombre && (
+                              <p className="text-xs text-slate-500 font-medium">
+                                TAG: {info.tag}
+                              </p>
+                            )}
+                            {info.ubicacion && (
+                              <p className="text-xs text-slate-500">📍 {info.ubicacion}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {tieneUbicaciones && (
+                <div className="mt-5">
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
+                    Ubicaciones Técnicas Asociadas
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {aviso.ubicacionesRelacion.map((u) => {
+                      const info = getUbicacionInfo(u.ubicacionTecnicaId);
+                      return (
+                        <div
+                          key={u.id || u.ubicacionTecnicaId}
+                          className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl"
+                        >
+                          <div className="p-2 bg-slate-900 rounded-lg shrink-0">
+                            <Tag className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-900 truncate">{info.nombre}</p>
+                            <p className="text-xs text-slate-500 font-medium truncate">{info.tag}</p>
                           </div>
                         </div>
                       );
@@ -227,372 +726,329 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               )}
             </Section>
 
-            {/* CONTRATISTA */}
-            <Section title="👷 Contratista">
-              <input
-                className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                placeholder="Nombre del contratista"
-                value={data.contratista}
-                onChange={e => setData({ ...data, contratista: e.target.value })}
-              />
-            </Section>
-
-            {/* REQUERIMIENTOS */}
-            <Section title="👥 Requerimientos de Personal">
-              {data.requerimientos.map((r, i) => {
-                const lista = trabajadores.filter(t =>
-                  t.rol === r.rol && t.nombre.toLowerCase().includes(r.search.toLowerCase())
-                );
-                const Icon = r.icon;
-                return (
-                  <div key={r.rol} className="border rounded-xl p-5 bg-slate-50 mb-4 last:mb-0">
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="flex gap-2 items-center">
-                        <Icon className="w-5 h-5 text-gray-600" />
-                        <strong className="text-gray-800">{r.label}</strong>
-                        {r.cantidad > 0 && (
-                          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
-                            {r.personas.length}/{r.cantidad} asignados
-                          </span>
-                        )}
-                      </div>
-                      <input
-                        type="number" min="0"
-                        value={r.cantidad}
-                        onChange={e => updateReq(i, { cantidad: +e.target.value })}
-                        className="w-20 border rounded-lg px-3 py-2 text-center font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                      />
-                    </div>
-                    {r.cantidad > 0 && (
-                      <>
-                        <input
-                          className="w-full mb-3 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                          placeholder="Buscar trabajador..."
-                          value={r.search}
-                          onChange={e => updateReq(i, { search: e.target.value })}
-                        />
-                        <div className="flex flex-wrap gap-2">
-                          {lista.length === 0 && (
-                            <p className="text-sm text-gray-400 py-1">Sin resultados para "{r.search}"</p>
-                          )}
-                          {lista.map(t => {
-                            const selected = r.personas.some(p => p.id === t.id);
-                            const lleno    = !selected && r.personas.length >= r.cantidad;
-                            return (
-                              <button
-                                key={t.id}
-                                onClick={() => togglePersona(i, t)}
-                                disabled={lleno}
-                                className={`flex items-center gap-1 px-3 py-2 rounded-lg border text-sm transition-colors ${
-                                  selected ? "bg-indigo-100 border-indigo-400 text-indigo-800 font-medium"
-                                  : lleno   ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
-                                  : "bg-white hover:bg-slate-50"
-                                }`}
-                              >
-                                {selected && <CheckCircle className="w-4 h-4 text-indigo-600" />}
-                                {t.nombre}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </Section>
-
-            {/* ══ CORRECTIVO ══ */}
+            {/* ══ CORRECTIVO (VISTA SOBRIA) ══ */}
             {esCorrectivo && tieneEquipos && (
-              <Section title="🔧 Actividades por Equipo">
-                {aviso.equiposRelacion.map(e => {
-                  const info        = getEquipoInfo(e.equipoId);
-                  const actividades = data.actividadesManuales[e.equipoId] || [];
-                  const key         = `corr-${e.equipoId}`;
-                  const abierto     = !collapsed[key];
-                  return (
-                    <div key={e.equipoId} className="border rounded-xl bg-slate-50 mb-4 last:mb-0 overflow-hidden">
-                      <div className="flex justify-between items-center p-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => toggleCollapse(key)}>
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-orange-500 rounded-lg shrink-0"><Package className="w-4 h-4 text-white" /></div>
-                          <div>
-                            <p className="font-semibold text-gray-800">{info.nombre || info.tag || 'Sin nombre'}</p>
-                            {info.tag && info.nombre && <p className="text-xs text-orange-600">TAG: {info.tag}</p>}
-                          </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${actividades.length > 0 ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-500"}`}>
-                            {actividades.length} actividad{actividades.length !== 1 ? "es" : ""}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button onClick={ev => { ev.stopPropagation(); agregarActividad(e.equipoId); if (!abierto) toggleCollapse(key); }}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600 transition-colors">
-                            <Plus className="w-4 h-4" /> Agregar
-                          </button>
-                          {abierto ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-                        </div>
-                      </div>
-                      {abierto && (
-                        <div className="p-4 pt-0 space-y-3">
-                          {actividades.length === 0 && (
-                            <div className="flex flex-col items-center py-6 text-gray-400">
-                              <ClipboardList className="w-8 h-8 mb-2 opacity-40" />
-                              <p className="text-sm">Sin actividades. Presioná "+ Agregar".</p>
-                            </div>
-                          )}
-                          {actividades.map((act, idx) => (
-                            <div key={idx} className="border rounded-xl p-4 bg-white shadow-sm">
-                              <div className="grid grid-cols-2 gap-3 mb-3">
-                                <InputField placeholder="Sistema"    value={act.sistema}    onChange={v => actualizarActividad(e.equipoId, idx, "sistema", v)} />
-                                <InputField placeholder="Subsistema" value={act.subsistema} onChange={v => actualizarActividad(e.equipoId, idx, "subsistema", v)} />
-                                <InputField placeholder="Componente" value={act.componente} onChange={v => actualizarActividad(e.equipoId, idx, "componente", v)} />
-                                <InputField placeholder="Tarea *"    value={act.tarea}      onChange={v => actualizarActividad(e.equipoId, idx, "tarea", v)} />
-                              </div>
-                              <div className="grid grid-cols-2 gap-3 mb-3">
-                                <select className="border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
-                                  value={act.tipoTrabajo} onChange={ev => actualizarActividad(e.equipoId, idx, "tipoTrabajo", ev.target.value)}>
-                                  {TIPOS_TRABAJO.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
-                                </select>
-                                <InputField type="number" placeholder="Duración (min)" value={act.duracionEstimadaMin} onChange={v => actualizarActividad(e.equipoId, idx, "duracionEstimadaMin", +v)} />
-                              </div>
-                              <div className="flex gap-2">
-                                <InputField placeholder="Observaciones (opcional)" value={act.observaciones} onChange={v => actualizarActividad(e.equipoId, idx, "observaciones", v)} className="flex-1" />
-                                <button onClick={() => eliminarActividad(e.equipoId, idx)}
-                                  className="px-3 py-2 text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors shrink-0">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </Section>
-            )}
+              <Section title="Actividades por Equipo (Correctivo)">
+                <p className="text-sm text-slate-600">
+                  Crea actividades manuales. Campos obligatorios: <b>Tarea</b>.
+                </p>
 
-            {/* ══ PREVENTIVO — Selección de plan + actividades ══ */}
-            {esPreventivo && tieneEquipos && (
-              <Section title="🧩 Plan de mantenimiento por equipo">
-                {aviso.equiposRelacion.map(rel => {
-                  const info        = getEquipoInfo(rel.equipoId);
-                  const equipoFull  = getEquipoFull(rel.equipoId);
-                  const planes      = equipoFull?.planesMantenimiento || [];
-                  const planIdSel   = data.planesSeleccionados[rel.equipoId] || "";
-                  const planSel     = planes.find(p => p.id === planIdSel);
-                  const actividades = planSel?.actividades || [];
-                  const key         = `prev-${rel.equipoId}`;
-                  const abierto     = !collapsed[key];
+                <div className="space-y-4">
+                  {aviso.equiposRelacion.map((e) => {
+                    const info = getEquipoInfo(e.equipoId);
+                    const actividades = data.actividadesManuales[e.equipoId] || [];
+                    const key = `corr-${e.equipoId}`;
+                    const abierto = !collapsed[key];
 
-                  // Estadísticas del plan
-                  const totalMin = actividades.reduce((acc, a) => acc + (a.duracionMinutos || 0), 0);
-                  const sistemas = [...new Set(actividades.map(a => a.sistema).filter(Boolean))];
-
-                  return (
-                    <div key={rel.equipoId} className="border rounded-xl bg-slate-50 mb-4 last:mb-0 overflow-hidden">
-
-                      {/* ── Cabecera equipo ── */}
-                      <div className="p-4 border-b bg-white">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="p-2 bg-emerald-600 rounded-lg shrink-0">
-                            <Package className="w-4 h-4 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-800">{info.nombre || info.tag || "Sin nombre"}</p>
-                            {info.tag && info.nombre && <p className="text-xs text-emerald-600">TAG: {info.tag}</p>}
-                            {info.ubicacion && <p className="text-xs text-gray-400">📍 {info.ubicacion}</p>}
-                          </div>
-                        </div>
-
-                        {/* Selector de plan */}
-                        <div>
-                          <label className="text-xs font-semibold text-gray-500 uppercase block mb-1.5">
-                            Plan de mantenimiento *
-                          </label>
-                          <select
-                            value={planIdSel}
-                            onChange={e => seleccionarPlan(rel.equipoId, e.target.value)}
-                            className={`w-full border rounded-xl px-3 py-2.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-colors ${
-                              planIdSel ? "border-emerald-300 text-gray-800" : "border-gray-200 text-gray-400"
-                            }`}
-                          >
-                            <option value="">Seleccionar plan...</option>
-                            {planes.map(plan => (
-                              <option key={plan.id} value={plan.id}>
-                                {plan.codigoPlan} — {plan.nombre}
-                              </option>
-                            ))}
-                          </select>
-                          {planes.length === 0 && (
-                            <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
-                              ⚠️ Este equipo no tiene planes asociados
+                    return (
+                      <div
+                        key={e.equipoId}
+                        className="border border-slate-200 rounded-xl bg-white overflow-hidden"
+                      >
+                        {/* Header equipo */}
+                        <button
+                          type="button"
+                          onClick={() => toggleCollapse(key)}
+                          className="w-full flex items-center justify-between gap-4 px-4 py-4 bg-white hover:bg-slate-50 transition border-b border-slate-200"
+                        >
+                          <div className="min-w-0 text-left">
+                            <p className="font-semibold text-slate-900 truncate">
+                              {info.nombre || info.tag || "Equipo"}
                             </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* ── Detalles del plan seleccionado ── */}
-                      {planSel && (
-                        <>
-                          {/* Resumen del plan */}
-                          <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-100">
-                            <div className="flex items-center justify-between flex-wrap gap-3">
-                              <div className="flex items-center gap-3 flex-wrap">
-                                {/* Nombre plan */}
-                                <span className="flex items-center gap-1.5 text-sm font-semibold text-emerald-800">
-                                  <ClipboardList className="w-4 h-4" />
-                                  {planSel.nombre}
-                                </span>
-                                {planSel.codigoPlan && (
-                                  <span className="text-xs bg-white border border-emerald-300 text-emerald-700 px-2 py-0.5 rounded-full font-mono">
-                                    {planSel.codigoPlan}
-                                  </span>
-                                )}
-                                {planSel.frecuencia && (
-                                  <span className="text-xs bg-white border border-emerald-300 text-emerald-700 px-2 py-0.5 rounded-full">
-                                    🔄 {planSel.frecuencia}
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Stats */}
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-1 text-xs text-emerald-700 bg-white border border-emerald-200 px-2.5 py-1 rounded-full">
-                                  <ClipboardList className="w-3.5 h-3.5" />
-                                  <span>{actividades.length} actividad{actividades.length !== 1 ? "es" : ""}</span>
-                                </div>
-                                {totalMin > 0 && (
-                                  <div className="flex items-center gap-1 text-xs text-emerald-700 bg-white border border-emerald-200 px-2.5 py-1 rounded-full">
-                                    <Clock className="w-3.5 h-3.5" />
-                                    <span>{totalMin >= 60 ? `${Math.floor(totalMin/60)}h ${totalMin%60 > 0 ? `${totalMin%60}m` : ""}` : `${totalMin}m`}</span>
-                                  </div>
-                                )}
-                                {sistemas.length > 0 && (
-                                  <div className="flex items-center gap-1 text-xs text-emerald-700 bg-white border border-emerald-200 px-2.5 py-1 rounded-full">
-                                    <Layers className="w-3.5 h-3.5" />
-                                    <span>{sistemas.length} sistema{sistemas.length !== 1 ? "s" : ""}</span>
-                                  </div>
-                                )}
-                                {/* Botón colapsar/expandir */}
-                                <button
-                                  onClick={() => toggleCollapse(key)}
-                                  className="flex items-center gap-1 text-xs text-emerald-700 bg-white border border-emerald-200 px-2.5 py-1 rounded-full hover:bg-emerald-50 transition-colors"
-                                >
-                                  {abierto ? <><ChevronUp className="w-3.5 h-3.5" /> Ocultar</> : <><ChevronDown className="w-3.5 h-3.5" /> Ver actividades</>}
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Descripción del plan */}
-                            {planSel.descripcion && (
-                              <p className="text-xs text-emerald-700 mt-2 opacity-80">{planSel.descripcion}</p>
+                            {info.tag && (
+                              <p className="text-xs text-slate-500 truncate">TAG: {info.tag}</p>
                             )}
                           </div>
 
-                          {/* ── Lista de actividades ── */}
-                          {abierto && (
-                            <div className="p-4">
-                              {actividades.length === 0 ? (
-                                <div className="flex flex-col items-center py-8 text-gray-400">
-                                  <ClipboardList className="w-8 h-8 mb-2 opacity-40" />
-                                  <p className="text-sm">Este plan no tiene actividades registradas.</p>
-                                </div>
-                              ) : (
-                                <>
-                                  {/* Agrupadas por sistema */}
-                                  {sistemas.length > 0
-                                    ? sistemas.map(sistema => {
-                                        const actsDelSistema = actividades.filter(a => a.sistema === sistema);
-                                        return (
-                                          <div key={sistema} className="mb-4 last:mb-0">
-                                            {/* Header sistema */}
-                                            <div className="flex items-center gap-2 mb-2">
-                                              <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-semibold">
-                                                <Cpu className="w-3.5 h-3.5" />
-                                                {sistema}
-                                              </div>
-                                              <div className="flex-1 h-px bg-emerald-200" />
-                                              <span className="text-xs text-gray-400">{actsDelSistema.length} tarea{actsDelSistema.length !== 1 ? "s" : ""}</span>
-                                            </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+                              {actividades.length} actividad
+                              {actividades.length !== 1 ? "es" : ""}
+                            </span>
 
-                                            {/* Actividades del sistema */}
-                                            <div className="space-y-2 pl-2">
-                                              {actsDelSistema.map((act, idx) => (
-                                                <ActividadCard key={act.id || idx} act={act} />
-                                              ))}
-                                            </div>
-                                          </div>
-                                        );
-                                      })
-                                    : (
-                                      <div className="space-y-2">
-                                        {actividades.map((act, idx) => (
-                                          <ActividadCard key={act.id || idx} act={act} />
-                                        ))}
-                                      </div>
-                                    )
-                                  }
-                                </>
-                              )}
+                            {abierto ? (
+                              <ChevronUp className="w-5 h-5 text-slate-500" />
+                            ) : (
+                              <ChevronDown className="w-5 h-5 text-slate-500" />
+                            )}
+                          </div>
+                        </button>
+
+                        {abierto && (
+                          <div className="p-4 space-y-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-xs text-slate-500">
+                                Agrega actividades y completa los campos.
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => agregarActividad(e.equipoId)}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm hover:bg-slate-800 transition"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Agregar actividad
+                              </button>
                             </div>
-                          )}
-                        </>
-                      )}
 
-                      {/* Sin plan seleccionado → placeholder */}
-                      {!planSel && planes.length > 0 && (
-                        <div className="flex flex-col items-center py-8 text-gray-400">
-                          <ClipboardList className="w-8 h-8 mb-2 opacity-30" />
-                          <p className="text-sm">Seleccioná un plan para ver sus actividades.</p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                            {actividades.length === 0 && (
+                              <div className="border border-dashed border-slate-300 rounded-xl p-6 text-center text-slate-500">
+                                <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                                <p className="text-sm">Aún no hay actividades.</p>
+                              </div>
+                            )}
+
+                            {actividades.map((act, idx) => (
+                              <ActividadCorrectivaForm
+                                key={idx}
+                                idx={idx}
+                                act={act}
+                                onChange={(campo, valor) =>
+                                  actualizarActividad(e.equipoId, idx, campo, valor)
+                                }
+                                onDelete={() => eliminarActividad(e.equipoId, idx)}
+                                toMinutes={toMinutes}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </Section>
             )}
 
+            {/* ══ PREVENTIVO (VISTA SOBRIA) ══ */}
+            {esPreventivo && tieneEquipos && (
+              <Section title="Plan por Equipo + Edición de Actividades">
+                <p className="text-sm text-slate-600">
+                  Selecciona un plan por equipo. Luego puedes ajustar: duración, unidad, técnicos y
+                  observaciones.
+                </p>
+
+                <div className="space-y-4">
+                  {aviso.equiposRelacion.map((rel) => {
+                    const info = getEquipoInfo(rel.equipoId);
+                    const equipoFull = getEquipoFull(rel.equipoId);
+
+                    const planes = equipoFull?.planesMantenimiento || [];
+                    const planIdSel = data.planesSeleccionados[rel.equipoId] || "";
+                    const pack = data.preventivoPorEquipo?.[rel.equipoId];
+                    const actividades = pack?.actividades || [];
+
+                    const key = `prev-${rel.equipoId}`;
+                    const abierto = !collapsed[key];
+
+                    const totalMin = actividades.reduce(
+                      (acc, a) =>
+                        acc + (toMinutes(a.duracionEstimadaValor, a.unidadDuracion) || 0),
+                      0
+                    );
+
+                    const sistemas = [
+                      ...new Set(actividades.map((a) => a.sistema).filter(Boolean)),
+                    ];
+
+                    return (
+                      <div
+                        key={rel.equipoId}
+                        className="border border-slate-200 rounded-xl bg-white overflow-hidden"
+                      >
+                        {/* Header + Plan selector */}
+                        <div className="p-4 border-b border-slate-200 bg-white">
+                          <div className="flex items-start justify-between gap-4 flex-wrap">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-900 truncate">
+                                {info.nombre || info.tag || "Equipo"}
+                              </p>
+                              {info.tag && (
+                                <p className="text-xs text-slate-500 truncate">TAG: {info.tag}</p>
+                              )}
+                              {info.ubicacion && (
+                                <p className="text-xs text-slate-500">📍 {info.ubicacion}</p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {planIdSel && (
+                                <>
+                                  <MiniStat
+                                    icon={ClipboardList}
+                                    label={`${actividades.length} act.`}
+                                  />
+                                  {totalMin > 0 && (
+                                    <MiniStat
+                                      icon={Clock}
+                                      label={
+                                        totalMin >= 60
+                                          ? `${Math.floor(totalMin / 60)}h ${
+                                              totalMin % 60 ? `${totalMin % 60}m` : ""
+                                            }`
+                                          : `${totalMin}m`
+                                      }
+                                    />
+                                  )}
+                                  {sistemas.length > 0 && (
+                                    <MiniStat
+                                      icon={Layers}
+                                      label={`${sistemas.length} sistema${
+                                        sistemas.length !== 1 ? "s" : ""
+                                      }`}
+                                    />
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-4">
+                            <SelectField
+                              label="Plan de mantenimiento *"
+                              value={planIdSel}
+                              onChange={(v) => seleccionarPlan(rel.equipoId, v)}
+                            >
+                              <option value="">Seleccionar plan...</option>
+                              {planes.map((plan) => (
+                                <option key={plan.id} value={plan.id}>
+                                  {plan.codigoPlan} — {plan.nombre}
+                                </option>
+                              ))}
+                            </SelectField>
+
+                            {planes.length === 0 && (
+                              <p className="text-xs text-amber-700 mt-2">
+                                Este equipo no tiene planes asociados.
+                              </p>
+                            )}
+
+                            {planIdSel && (
+                              <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+                                <div className="text-xs text-slate-500">
+                                  Plan:{" "}
+                                  <b className="text-slate-700">
+                                    {pack?.codigoPlan || "-"} {pack?.nombrePlan || ""}
+                                  </b>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCollapse(key)}
+                                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm text-slate-700 transition"
+                                >
+                                  {abierto ? (
+                                    <>
+                                      <ChevronUp className="w-4 h-4" />
+                                      Ocultar actividades
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ChevronDown className="w-4 h-4" />
+                                      Ver / Editar actividades
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actividades */}
+                        {planIdSel && actividades.length > 0 && abierto && (
+                          <div className="p-4 space-y-3 bg-slate-50">
+                            {actividades.map((act, idx) => (
+                              <ActividadPreventivaEditable
+                                key={act.planMantenimientoActividadId || idx}
+                                act={act}
+                                idx={idx}
+                                onChange={(campo, valor) =>
+                                  updatePreventivoActividad(rel.equipoId, idx, campo, valor)
+                                }
+                                toMinutes={toMinutes}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {planIdSel && actividades.length === 0 && abierto && (
+                          <div className="p-4 bg-slate-50">
+                            <div className="border border-dashed border-slate-300 rounded-xl p-6 text-center text-slate-500">
+                              <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                              <p className="text-sm">No se cargaron actividades del plan.</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Section>
+            )}
           </div>
 
           {/* ── FOOTER ── */}
-          <div className="p-6 border-t bg-gray-50 flex justify-between items-center shrink-0">
-            <button onClick={onClose} className="px-6 py-3 border rounded-xl hover:bg-gray-100 transition-colors">
+          <div className="p-6 border-t bg-white flex justify-between items-center shrink-0">
+            <button
+              onClick={onClose}
+              className="px-6 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-700"
+            >
               Cancelar
             </button>
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowSolicitud(true)}
                 className={`flex items-center gap-2 px-6 py-3 border rounded-xl transition-colors ${
                   solicitudes
-                    ? "border-green-400 bg-green-50 text-green-700"
-                    : "hover:bg-gray-100"
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                    : "border-slate-200 hover:bg-slate-50 text-slate-700"
                 }`}
               >
                 <ShoppingCart className="w-4 h-4" />
                 {solicitudes
-                  ? `Solicitud cargada ✓${cantSolicitudesIndividuales > 0 ? ` (+${cantSolicitudesIndividuales} equipo${cantSolicitudesIndividuales > 1 ? "s" : ""})` : ""}`
-                  : "Solicitud de Compra"
-                }
+                  ? `Solicitud cargada ✓${
+                      cantSolicitudesIndividuales > 0
+                        ? ` (+${cantSolicitudesIndividuales} equipo${
+                            cantSolicitudesIndividuales > 1 ? "s" : ""
+                          })`
+                        : ""
+                    }`
+                  : "Solicitud de Compra"}
               </button>
+
+              <button
+                onClick={handleGuardarCambios}
+                disabled={loading}
+                className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl hover:bg-slate-800 disabled:opacity-60 transition-colors"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {loading ? "Guardando..." : "Guardar Cambios (Pendiente)"}
+              </button>
+
               <button
                 onClick={handleGuardar}
                 disabled={loading}
                 className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition-colors"
               >
                 <Save className="w-4 h-4" />
-                {loading ? "Guardando..." : "Guardar Tratamiento"}
+                {loading ? "Guardando..." : "Cambio de estado a Tratado"}
               </button>
             </div>
           </div>
         </div>
       </div>
 
+      {/* MODAL SOLICITUD */}
       <ModalSolicitudCompra
         isOpen={showSolicitud}
         onClose={() => setShowSolicitud(false)}
-        onConfirm={result => { setSolicitudes(result); setShowSolicitud(false); }}
+        onConfirm={(result) => {
+          setSolicitudes(result);
+          setShowSolicitud(false);
+          setErrorMsg("");
+        }}
         equiposRelacion={aviso?.equiposRelacion || []}
         equiposInfo={equipos}
+        initialValue={solicitudes}
       />
 
       <ModalConfiguracionCampos
@@ -604,74 +1060,259 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 }
 
 /* ══════════════════════════════════════════════
-   CARD DE ACTIVIDAD DEL PLAN
+   CORRECTIVO: Form sobrio (3 columnas)
 ══════════════════════════════════════════════ */
 
-function ActividadCard({ act }) {
+function ActividadCorrectivaForm({ idx, act, onChange, onDelete, toMinutes }) {
+  const normalizado = toMinutes(act.duracionEstimadaValor, act.unidadDuracion);
+
   return (
-    <div className="flex items-start gap-3 p-3.5 bg-white border border-gray-200 rounded-xl hover:border-emerald-200 hover:shadow-sm transition-all">
-      {/* Indicador lateral */}
-      <div className="w-1 self-stretch bg-emerald-400 rounded-full shrink-0" />
-
-      <div className="flex-1 min-w-0">
-        {/* Tarea principal */}
-        <div className="flex items-center gap-2 flex-wrap mb-1.5">
-          <p className="font-semibold text-sm text-gray-900">{act.tarea}</p>
-          {act.tipoTrabajo && (
-            <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${COLOR_TIPO[act.tipoTrabajo] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
-              {act.tipoTrabajo.replace(/_/g, " ")}
-            </span>
-          )}
+    <div className="border border-slate-200 rounded-xl bg-white p-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-900">
+            Actividad #{idx + 1}
+            {act.tarea ? (
+              <span className="text-slate-500 font-normal"> — {act.tarea}</span>
+            ) : null}
+          </p>
+          <div className="mt-2 flex gap-2 flex-wrap">
+            <Badge text={act.tipoTrabajo || "—"} />
+            <Badge text={act.rolTecnico || "—"} />
+            <Badge text={`${normalizado} min`} icon={Clock} />
+          </div>
         </div>
 
-        {/* Ruta: sistema › subsistema › componente */}
-        {(act.subsistema || act.componente) && (
-          <p className="text-xs text-gray-500 mb-2">
-            {[act.sistema, act.subsistema, act.componente].filter(Boolean).join(" › ")}
-          </p>
-        )}
+        <button
+          type="button"
+          onClick={onDelete}
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 transition"
+        >
+          <Trash2 className="w-4 h-4" />
+          Eliminar
+        </button>
+      </div>
 
-        {/* Metadatos */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {act.duracionMinutos > 0 && (
-            <span className="flex items-center gap-1 text-xs text-gray-400">
-              <Clock className="w-3 h-3" />
-              {act.duracionMinutos} min
-            </span>
-          )}
-          {act.subsistema && (
-            <span className="flex items-center gap-1 text-xs text-gray-400">
-              <Layers className="w-3 h-3" />
-              {act.subsistema}
-            </span>
-          )}
-          {act.componente && (
-            <span className="flex items-center gap-1 text-xs text-gray-400">
-              <Tag className="w-3 h-3" />
-              {act.componente}
-            </span>
-          )}
+      {/* Grid 3 columnas */}
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <TextField
+          label="Sistema"
+          value={act.sistema}
+          onChange={(v) => onChange("sistema", v)}
+        />
+        <TextField
+          label="Subsistema"
+          value={act.subsistema}
+          onChange={(v) => onChange("subsistema", v)}
+        />
+        <TextField
+          label="Componente"
+          value={act.componente}
+          onChange={(v) => onChange("componente", v)}
+        />
+
+        <TextField
+          label="Tarea *"
+          value={act.tarea}
+          onChange={(v) => onChange("tarea", v)}
+        />
+        <TextField
+          label="Descripción"
+          value={act.descripcion}
+          onChange={(v) => onChange("descripcion", v)}
+        />
+        <SelectField
+          label="Tipo de trabajo"
+          value={act.tipoTrabajo}
+          onChange={(v) => onChange("tipoTrabajo", v)}
+        >
+          {TIPOS_TRABAJO_CORRECTIVO.map((t) => (
+            <option key={t} value={t}>
+              {t.replace(/_/g, " ")}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField
+          label="Rol técnico"
+          value={act.rolTecnico}
+          onChange={(v) => onChange("rolTecnico", v)}
+        >
+          {ROLES_TECNICOS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </SelectField>
+
+        <NumberField
+          label="Cantidad técnicos"
+          min={1}
+          value={act.cantidadTecnicos}
+          onChange={(v) => onChange("cantidadTecnicos", Number(v))}
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField
+            label="Duración"
+            value={act.duracionEstimadaValor}
+            onChange={(v) => onChange("duracionEstimadaValor", Number(v))}
+          />
+          <SelectField
+            label="Unidad"
+            value={act.unidadDuracion}
+            onChange={(v) => onChange("unidadDuracion", v)}
+          >
+            <option value="min">Min</option>
+            <option value="h">Hrs</option>
+          </SelectField>
         </div>
 
-        {/* Observaciones */}
-        {act.observaciones && (
-          <p className="mt-1.5 text-xs text-gray-400 italic border-t border-gray-100 pt-1.5">
-            {act.observaciones}
-          </p>
-        )}
+        <div className="md:col-span-3">
+          <TextAreaField
+            label="Observaciones"
+            value={act.observaciones || ""}
+            onChange={(v) => onChange("observaciones", v)}
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 text-xs text-slate-500 flex items-center gap-1">
+        <Clock className="w-3.5 h-3.5" />
+        Normalizado: {normalizado} min
       </div>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════
-   UI HELPERS
+   PREVENTIVO: Actividad editable (sobria)
+══════════════════════════════════════════════ */
+
+function ActividadPreventivaEditable({ act, idx, onChange, toMinutes }) {
+  const normalizado = toMinutes(act.duracionEstimadaValor, act.unidadDuracion);
+
+  const resumen = [
+    act?.codigoActividad ? `#${act.codigoActividad}` : null,
+    act?.tarea ? act.tarea : "Sin tarea",
+    act?.tipoTrabajo ? act.tipoTrabajo.replace(/_/g, " ") : null,
+    act?.rolTecnico ? act.rolTecnico.replace(/_/g, " ") : null,
+  ].filter(Boolean);
+
+  const ruta = [act?.sistema, act?.subsistema, act?.componente].filter(Boolean);
+
+  return (
+    <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+      {/* HEADER RESUMEN */}
+      <div className="px-4 py-3 border-b border-slate-200 bg-white">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-900">
+              {idx + 1}. {resumen.join(" · ")}
+            </p>
+
+            <p className="text-xs text-slate-500 mt-1">
+              {ruta.length ? ruta.join("  ›  ") : "Sin sistema / subsistema / componente"}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+              {normalizado} min
+            </span>
+
+            {act?.cantidadTecnicos ? (
+              <span className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+                {act.cantidadTecnicos} técnico{act.cantidadTecnicos !== 1 ? "s" : ""}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* BODY: Detalle + Edición */}
+      <div className="p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 bg-slate-50">
+        {/* DETALLES (tipo ficha) */}
+        <div className="lg:col-span-7">
+          <p className="text-xs font-semibold text-slate-500 mb-2 uppercase">
+            Detalles de la actividad
+          </p>
+
+          <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+            <table className="w-full text-sm">
+              <tbody>
+                <FilaDetalle label="Código" value={act?.codigoActividad || "—"} />
+                <FilaDetalle label="Sistema" value={act?.sistema || "—"} />
+                <FilaDetalle label="Subsistema" value={act?.subsistema || "—"} />
+                <FilaDetalle label="Componente" value={act?.componente || "—"} />
+                <FilaDetalle label="Tarea" value={act?.tarea || "—"} />
+                <FilaDetalle
+                  label="Tipo trabajo"
+                  value={act?.tipoTrabajo ? act.tipoTrabajo.replace(/_/g, " ") : "—"}
+                />
+                <FilaDetalle
+                  label="Rol técnico"
+                  value={act?.rolTecnico ? act.rolTecnico.replace(/_/g, " ") : "—"}
+                />
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* EDICIÓN (claro y 3 por fila) */}
+        <div className="lg:col-span-5">
+          <p className="text-xs font-semibold text-slate-500 mb-2 uppercase">
+            Ajustes (editables)
+          </p>
+
+          <div className="border border-slate-200 rounded-xl bg-white p-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <NumberField
+                label="Duración"
+                value={act.duracionEstimadaValor}
+                onChange={(v) => onChange("duracionEstimadaValor", Number(v))}
+              />
+
+              <SelectField
+                label="Unidad"
+                value={act.unidadDuracion}
+                onChange={(v) => onChange("unidadDuracion", v)}
+              >
+                <option value="min">Min</option>
+                <option value="h">Hrs</option>
+              </SelectField>
+
+              <NumberField
+                label="Técnicos"
+                min={1}
+                value={act.cantidadTecnicos}
+                onChange={(v) => onChange("cantidadTecnicos", Number(v))}
+              />
+            </div>
+
+            <TextAreaField
+              label="Observaciones"
+              value={act.observaciones || ""}
+              onChange={(v) => onChange("observaciones", v)}
+            />
+
+            <div className="text-xs text-slate-500">
+              Normalizado: <b className="text-slate-700">{normalizado} min</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+/* ══════════════════════════════════════════════
+   UI HELPERS (sobrios)
 ══════════════════════════════════════════════ */
 
 function Section({ title, children }) {
   return (
-    <div className="bg-white border rounded-2xl p-6 space-y-4">
-      <h3 className="font-bold text-lg">{title}</h3>
+    <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+      <h3 className="font-bold text-lg text-slate-900">{title}</h3>
       {children}
     </div>
   );
@@ -683,21 +1324,104 @@ function Grid({ children }) {
 
 function Info({ label, value }) {
   return (
-    <div className="bg-slate-50 border rounded-xl p-3">
-      <p className="text-xs font-semibold text-gray-500 uppercase">{label}</p>
-      <p className="text-sm font-medium">{value}</p>
+    <div className="bg-white border border-slate-200 rounded-xl p-3">
+      <p className="text-xs font-semibold text-slate-500 uppercase">{label}</p>
+      <p className="text-sm font-medium text-slate-900">{value}</p>
     </div>
   );
 }
 
-function InputField({ placeholder, value, onChange, type = "text", className = "" }) {
+function Badge({ text, icon: Icon }) {
   return (
-    <input
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className={`border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full ${className}`}
-    />
+    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+      {Icon ? <Icon className="w-3.5 h-3.5" /> : null}
+      {String(text || "").replace(/_/g, " ")}
+    </span>
+  );
+}
+
+function MiniStat({ icon: Icon, label }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+    </span>
+  );
+}
+
+function BaseField({ label, children }) {
+  return (
+    <div className="w-full">
+      <label className="block text-xs font-semibold text-slate-500 mb-1">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function TextField({ label, value, onChange }) {
+  return (
+    <BaseField label={label}>
+      <input
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-300"
+      />
+    </BaseField>
+  );
+}
+
+function TextAreaField({ label, value, onChange }) {
+  return (
+    <BaseField label={label}>
+      <textarea
+        rows={3}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-300 resize-none"
+      />
+    </BaseField>
+  );
+}
+
+function NumberField({ label, value, onChange, min }) {
+  return (
+    <BaseField label={label}>
+      <input
+        type="number"
+        min={min}
+        value={Number.isFinite(Number(value)) ? value : ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-300"
+      />
+    </BaseField>
+  );
+}
+
+function SelectField({ label, value, onChange, children }) {
+  return (
+    <BaseField label={label}>
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-300"
+      >
+        {children}
+      </select>
+    </BaseField>
+  );
+}
+
+function FilaDetalle({ label, value }) {
+  return (
+    <tr className="border-b border-slate-100 last:border-b-0">
+      <td className="w-[180px] px-3 py-2 text-xs font-semibold text-slate-500 bg-slate-50">
+        {label}
+      </td>
+      <td className="px-3 py-2 text-sm text-slate-800">
+        {String(value ?? "—")}
+      </td>
+    </tr>
   );
 }

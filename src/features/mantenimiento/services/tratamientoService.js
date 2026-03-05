@@ -9,3 +9,6 @@ export const createTratamiento = (avisoId, payload) =>
 export const getTratamientoByAviso = (avisoId) =>
   api.get(`tratamiento/avisos/${avisoId}/tratamiento`)
      .then(r => r.data);
+
+export const saveTratamientoDraft = (tratamientoId, payload) =>
+  api.post(`tratamiento/${tratamientoId}/guardar`, payload).then((r) => r.data);

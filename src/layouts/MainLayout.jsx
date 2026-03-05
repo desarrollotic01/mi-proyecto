@@ -6,7 +6,8 @@ const pages = [
   { name: "Avisos", path: "/Avisos" },
   { name: "Orden de Trabajo", path: "/orden-trabajo" },
   { name: "Planes de Mantenimiento", path: "/planes-mantenimiento" },
-  { name: "guiaMantenimiento", path: "/guiaMantenimiento" }
+  { name: "Guia de Mantenimiento", path: "/guiaMantenimiento" },
+  {name: "Alertas", path: "/GuiasKanban" }
 ];
 
 const catalogos = [

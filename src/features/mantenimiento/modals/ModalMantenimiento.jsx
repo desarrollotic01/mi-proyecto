@@ -599,6 +599,22 @@ const getUbicacionData = (ubicacionId) => {
   </select>
 </div>
 
+<div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Tipo de Atencion
+                  </label>
+                  <select
+                    name="tipoAtencion"
+                    value={formData.tipoAtencion || ""}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                  >
+                    <option value="">Seleccionar</option>
+                    <option value="interna">Interna</option>
+                    <option value="venta">Venta</option>
+                  </select>
+                </div>
+
 
                 {/* 🔄 CAMBIO: Renderizamos equipos usando sus IDs */}
                 <div className="col-span-full">

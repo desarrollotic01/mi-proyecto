@@ -1,80 +1,92 @@
 import { useState, useEffect } from "react";
-import { X, Loader2, AlertCircle, Calendar, Package, User, MapPin, Wrench, Plus, ShoppingCart, Building2, Globe } from "lucide-react";
-
+import { X, Loader2, AlertCircle, Calendar, Package, User, MapPin, Wrench, Plus, ShoppingCart, Building2, Globe,CheckCircle2  } from "lucide-react";
+import { planMantenimientoService } from "../PlanMantenimiento/services/planMantenimientoService";
 export default function EquipoModal({ isOpen, onClose, onSave, initialData, clientes = [], familias = [], paises = [] }) {
-  const [form, setForm] = useState({
-    numeroOV: "",
-    fechaOV: "",
-    numeroOrdenCliente: "",
-    fechaOrdenCliente: "",
-    clienteId: "",
-     id_cliente:"",
-    paisId: "",
-    tipoEquipoPropiedad: "Vendido",
-    sede: "",
-    almacen: "",
-    operadorLogistico: "",
-    status: "Almacen",
-    idPlaca: "",
-    nombre: "",
-    descripcion: "",
-    marca: "",
-    modelo: "",
-    serie: "",
-    fechaEntregaPrevista: "",
-    fechaEntregaReal: "",
-    estado: "No instalado",
-    finGarantia: "",
-    familiaId: "",
-    tipoEquipo: "",
-    linea: "Acceso",
-    lineaOtroTexto: "",
-    codigo: "",
-  });
 
+
+  const DEFAULT_FORM = {
+  numeroOV: "",
+  fechaOV: "",
+  numeroOrdenCliente: "",
+  fechaOrdenCliente: "",
+  clienteId: "",
+  id_cliente: "",
+  paisId: "",
+  tipoEquipoPropiedad: "Vendido",
+  sede: "",
+  almacen: "",
+  operadorLogistico: "",
+  status: "Almacen",
+  idPlaca: "",
+  nombre: "",
+  descripcion: "",
+  marca: "",
+  modelo: "",
+  serie: "",
+  fechaEntregaPrevista: "",
+  fechaEntregaReal: "",
+  estado: "No instalado",
+  finGarantia: "",
+  familiaId: "",
+  tipoEquipo: "",
+  linea: "Acceso",
+  lineaOtroTexto: "",
+  codigo: "",
+  creticidad:"B",
+  planesMantenimientoIds: [],
+};
+
+const [form, setForm] = useState(DEFAULT_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("general");
   const [showNewFamilia, setShowNewFamilia] = useState(false);
   const [newFamilia, setNewFamilia] = useState({ nombre: "", descripcion: "" });
+const [planes, setPlanes] = useState([]);
+const [loadingPlanes, setLoadingPlanes] = useState(false);
 
-  useEffect(() => {
-    if (initialData) {
-      setForm(initialData);
-    } else {
-      setForm({
-        numeroOV: "",
-        fechaOV: "",
-        numeroOrdenCliente: "",
-        fechaOrdenCliente: "",
-        clienteId: "",
-         id_cliente:"",
-        paisId: "",
-        tipoEquipoPropiedad: "Vendido",
-        sede: "",
-        almacen: "",
-        operadorLogistico: "",
-        status: "Almacen",
-        idPlaca: "",
-        nombre: "",
-        descripcion: "",
-        marca: "",
-        modelo: "",
-        serie: "",
-        fechaEntregaPrevista: "",
-        fechaEntregaReal: "",
-        estado: "No instalado",
-        finGarantia: "",
-        familiaId: "",
-        tipoEquipo: "",
-        linea: "Acceso",
-        lineaOtroTexto: "",
-        codigo: "",
-      });
+
+
+useEffect(() => {
+  const loadPlanes = async () => {
+    setLoadingPlanes(true);
+    try {
+      const data = await planMantenimientoService.getPlanes();
+      setPlanes(Array.isArray(data) ? data.filter(p => p.activo) : []);
+    } catch (e) {
+      console.error("Error cargando planes", e);
+      setPlanes([]);
+    } finally {
+      setLoadingPlanes(false);
     }
-    setError(null);
-    setActiveTab("general");
-  }, [initialData, isOpen]);
+  };
+
+  if (isOpen) loadPlanes();
+}, [isOpen]);
+
+
+useEffect(() => {
+  if (!isOpen) return;
+
+  if (initialData) {
+    setForm({
+      ...DEFAULT_FORM,
+      ...initialData,
+      planesMantenimientoIds: Array.isArray(initialData.planesMantenimiento)
+        ? initialData.planesMantenimiento.map((p) => p.id)
+        : Array.isArray(initialData.planesMantenimientoIds)
+          ? initialData.planesMantenimientoIds
+          : [],
+    });
+  } else {
+    setForm(DEFAULT_FORM);
+  }
+
+  setError(null);
+  setActiveTab("general");
+  setShowNewFamilia(false);
+  setNewFamilia({ nombre: "", descripcion: "" });
+}, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
@@ -115,6 +127,7 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
     { id: "orden", label: "Orden de Venta", icon: User },
     { id: "equipo", label: "Datos del Equipo", icon: Wrench },
     { id: "fechas", label: "Fechas y Garantía", icon: Calendar },
+    { id: "planes", label: "Planes", icon: Wrench },
   ];
 
   const getTipoPropiedadIcon = (tipo) => {
@@ -351,6 +364,22 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
                   <option value="Almacen">Almacén</option>
                   <option value="En compra">En compra</option>
                   <option value="Entregado">Entregado</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Creticidad
+                </label>
+                <select
+                  value={form.creticidad}
+                  onChange={(e) => setForm({ ...form, creticidad: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                  disabled={loading}
+                >
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
                 </select>
               </div>
 
@@ -673,6 +702,110 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
               </div>
             </div>
           )}
+
+
+
+          {/* TAB: Planes de Mantenimiento */}
+{activeTab === "planes" && (
+  <div className="space-y-4">
+    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+      <p className="text-sm font-semibold text-blue-900">
+        Vincular Planes de Mantenimiento al Equipo
+      </p>
+      <p className="text-xs text-blue-700 mt-1">
+        Selecciona uno o varios planes. Se guardarán como relación (belongsToMany).
+      </p>
+    </div>
+
+    {loadingPlanes ? (
+      <div className="flex items-center gap-2 text-slate-600">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        Cargando planes...
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {planes.length === 0 ? (
+          <div className="md:col-span-2 p-6 border border-dashed border-slate-300 rounded-xl text-center">
+            <p className="text-slate-700 font-medium">No hay planes activos</p>
+            <p className="text-slate-500 text-sm mt-1">
+              Crea un plan de mantenimiento para poder vincularlo.
+            </p>
+          </div>
+        ) : (
+          planes.map((p) => {
+            const checked = form.planesMantenimientoIds.includes(p.id);
+
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setForm((prev) => {
+                    const existe = prev.planesMantenimientoIds.includes(p.id);
+                    return {
+                      ...prev,
+                      planesMantenimientoIds: existe
+                        ? prev.planesMantenimientoIds.filter((x) => x !== p.id)
+                        : [...prev.planesMantenimientoIds, p.id],
+                    };
+                  });
+                }}
+                className={`text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 ${
+                  checked
+                    ? "border-emerald-400 bg-emerald-50"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+                disabled={loading}
+              >
+                <div className={`mt-0.5 ${checked ? "text-emerald-600" : "text-slate-400"}`}>
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+
+                <div className="flex-1">
+                  <p className="font-bold text-slate-800">{p.nombre}</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <span className="text-xs px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+                      {p.codigoPlan || "SIN CÓDIGO"}
+                    </span>
+                    <span className="text-xs px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+                      {p.tipo}
+                    </span>
+                    {p.esEspecifico && (
+                      <span className="text-xs px-2 py-1 rounded-full border border-emerald-200 bg-emerald-100 text-emerald-700 font-bold">
+                        ESPECÍFICO
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-slate-500 mt-2">
+                    {p.actividades?.length || 0} actividades
+                  </p>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    )}
+
+    {/* resumen */}
+    <div className="flex items-center justify-between border-t pt-4">
+      <p className="text-sm text-slate-600">
+        Seleccionados:{" "}
+        <b className="text-slate-800">{form.planesMantenimientoIds.length}</b>
+      </p>
+
+      <button
+        type="button"
+        onClick={() => setForm((p) => ({ ...p, planesMantenimientoIds: [] }))}
+        className="text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-lg hover:bg-slate-100 transition"
+        disabled={loading}
+      >
+        Limpiar selección
+      </button>
+    </div>
+  </div>
+)}
         </div>
 
         {/* Actions */}
