@@ -3,7 +3,7 @@ import {
   Search, Plus, Edit2, Trash2, Package, AlertCircle, 
   Loader2, Eye, Filter, X, ChevronDown, Calendar, MapPin, 
   Truck, Shield, Box, FileText, ShoppingCart, Building2, 
-  Wrench, MoveRight, Globe, CheckCircle, CreditCard, RefreshCw
+  Wrench, MoveRight, Globe, CheckCircle, CreditCard, RefreshCw, List
 } from "lucide-react";
 
 import { equipoService } from "../mantenimiento/services/equipoService";
@@ -20,9 +20,7 @@ function EquipoDetailModal({ isOpen, onClose, equipo }) {
   const formatDate = (date) => {
     if (!date) return "-";
     return new Date(date).toLocaleDateString("es-PE", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+      year: "numeric", month: "long", day: "numeric",
     });
   };
 
@@ -31,17 +29,13 @@ function EquipoDetailModal({ isOpen, onClose, equipo }) {
       <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-              <Package size={24} />
-            </div>
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Package size={24} /></div>
             <div>
               <h3 className="text-2xl font-black text-slate-800">{equipo.codigo}</h3>
               <p className="text-sm font-bold text-slate-500">{equipo.nombre || "Sin nombre"}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
-            <X size={24} strokeWidth={2.5} />
-          </button>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"><X size={24} strokeWidth={2.5} /></button>
         </div>
 
         <div className="p-6 overflow-y-auto bg-slate-50/50">
@@ -65,10 +59,7 @@ function EquipoDetailModal({ isOpen, onClose, equipo }) {
                   <p className="text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Propiedad</p>
                   <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-black bg-slate-100 text-slate-700 border border-slate-200">{equipo.tipoEquipoPropiedad}</span>
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase mb-1">País</p>
-                  <p className="font-bold text-slate-800">{equipo.pais?.nombre || "-"}</p>
-                </div>
+                <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">País</p><p className="font-bold text-slate-800">{equipo.pais?.nombre || "-"}</p></div>
               </div>
             </div>
 
@@ -134,47 +125,63 @@ function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, mo
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-300 transition-all p-4 group relative">
-      <div className="flex items-start justify-between mb-3">
-        <h4 className="font-mono font-black text-blue-700 text-xs bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
+    <div className="bg-white rounded-[1rem] border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all group relative flex flex-col h-full">
+      <div className="flex justify-between items-start mb-3">
+        <span className="px-3 py-1 bg-blue-50 text-blue-700 font-black text-xs rounded-lg">
           {equipo.codigo}
-        </h4>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onCreatePlan(equipo)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"><Wrench size={16} /></button>
-          <button onClick={() => onView(equipo)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye size={16} /></button>
-          <button onClick={() => onEdit(equipo)} className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"><Edit2 size={16} /></button>
-          <button onClick={() => onDelete(equipo.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+        </span>
+        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => onCreatePlan(equipo)} className="text-slate-400 hover:text-emerald-600 transition-colors"><Wrench size={16} strokeWidth={2.5}/></button>
+          <button onClick={() => onView(equipo)} className="text-slate-400 hover:text-blue-600 transition-colors"><Eye size={16} strokeWidth={2.5}/></button>
+          <button onClick={() => onEdit(equipo)} className="text-slate-400 hover:text-amber-600 transition-colors"><Edit2 size={16} strokeWidth={2.5}/></button>
+          <button onClick={() => onDelete(equipo.id)} className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16} strokeWidth={2.5}/></button>
         </div>
       </div>
 
-      <p className="text-sm font-black text-slate-800 mb-1 leading-tight line-clamp-2">{equipo.nombre}</p>
-      <p className="text-[11px] font-bold text-slate-500 truncate mb-3">{equipo.cliente?.razonSocial || "Sin Cliente"}</p>
+      <div>
+        <h4 className="text-sm font-black text-slate-800 leading-tight">{equipo.nombre}</h4>
+        <p className="text-[11px] font-medium text-slate-500 mt-1 truncate">{equipo.cliente?.razonSocial || "Sin Cliente"}</p>
+      </div>
 
-      <div className="flex flex-wrap gap-1.5 mb-3">
+      <div className="mt-3 mb-4">
         {isPropiedad ? (
-          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-100">
-            Status: {equipo.status}
+          <span className="px-2.5 py-1 rounded bg-amber-50 text-amber-700 font-black text-[10px] uppercase border border-amber-100/50">
+            STATUS: {equipo.status}
           </span>
         ) : (
-          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 border border-blue-100">
-            Prop: {equipo.tipoEquipoPropiedad}
+          <span className="px-2.5 py-1 rounded bg-blue-50 text-blue-700 font-black text-[10px] uppercase border border-blue-100/50">
+            PROP: {equipo.tipoEquipoPropiedad}
           </span>
         )}
       </div>
 
-      <div className="flex items-center justify-between pt-3 border-t border-slate-50 mt-auto">
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><FileText size={12}/> OV: {equipo.numeroOV}</span>
+      <div className="flex-1"></div>
+
+      <div className="flex items-center justify-between pt-3 mt-auto border-t border-slate-100">
+        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+          <FileText size={14}/> OV: {equipo.numeroOV}
+        </span>
         
         <div className="relative">
-          <button onClick={() => setShowMoveMenu(!showMoveMenu)} className="flex items-center gap-1 text-[10px] font-black text-slate-600 hover:text-blue-600 uppercase transition-colors bg-slate-50 px-2 py-1 rounded-lg">
-            Mover <MoveRight size={12}/>
+          <button 
+            onClick={() => setShowMoveMenu(!showMoveMenu)} 
+            className="flex items-center gap-1 text-[10px] font-black text-slate-600 uppercase transition-colors hover:text-blue-700"
+          >
+            MOVER <MoveRight size={14} strokeWidth={2.5}/>
           </button>
           
           {showMoveMenu && (
             <div className="absolute bottom-full right-0 mb-2 bg-white shadow-2xl border border-slate-100 rounded-xl p-1 z-20 min-w-[130px] animate-in slide-in-from-bottom-2">
               <div className="fixed inset-0" onClick={() => setShowMoveMenu(false)}></div>
               {moveOptions.map(opt => (
-                <button key={opt} onClick={() => { onMove(equipo, isPropiedad ? "tipoEquipoPropiedad" : "status", opt); setShowMoveMenu(false); }} className="relative w-full text-left px-3 py-2.5 text-[11px] font-black text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-2 transition-colors uppercase">
+                <button 
+                  key={opt} 
+                  onClick={() => { 
+                    onMove(equipo, isPropiedad ? "tipoEquipoPropiedad" : "status", opt); 
+                    setShowMoveMenu(false); 
+                  }} 
+                  className="relative w-full text-left px-3 py-2.5 text-[11px] font-black text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-2 transition-colors uppercase"
+                >
                   {getIcon(opt)} {opt}
                 </button>
               ))}
@@ -186,7 +193,7 @@ function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, mo
   );
 }
 
-/* ================= COLUMNA KANBAN (ESTILO IMÁGENES REFERENCIA) ================= */
+/* ================= COLUMNA KANBAN ================= */
 function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onView, onMove, onCreatePlan, moveCategory }) {
   const colorStyles = {
     blue: "bg-[#3b82f6]",
@@ -202,30 +209,36 @@ function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onV
 
   return (
     <div className="flex flex-col min-w-[320px] flex-1">
-      {/* Cabecera Sólida con Icono Circular y Contador */}
-      <div className={`${bgHeader} rounded-t-2xl p-4 flex items-center justify-between shadow-sm`}>
-        <div className="flex items-center gap-3">
-          <div className="bg-white/20 p-2 rounded-xl flex items-center justify-center text-white shadow-inner">
-            <Icon size={18} strokeWidth={2.5} />
+      <div className={`${bgHeader} rounded-t-[1rem] p-3.5 flex items-center justify-between shadow-sm`}>
+        <div className="flex items-center gap-2.5">
+          <div className="text-white/90">
+            <Icon size={20} strokeWidth={2} />
           </div>
-          <h3 className="text-white font-black text-sm tracking-tight uppercase">{title}</h3>
+          <h3 className="text-white font-black text-sm uppercase tracking-wide">{title}</h3>
         </div>
-        <span className="bg-white/20 text-white text-[11px] font-black px-3 py-1 rounded-full border border-white/10 shadow-sm">
+        <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white text-[11px] font-black shadow-inner">
           {equipos.length}
-        </span>
+        </div>
       </div>
 
-      {/* Contenedor de Tarjetas Gris Claro */}
-      <div className="bg-[#f8fafc] border-x border-b border-slate-200 p-3 min-h-[450px] space-y-3 rounded-b-2xl shadow-sm">
+      <div className="bg-[#f8fafc] border-x border-b border-slate-200 p-3 min-h-[450px] space-y-3 rounded-b-[1rem] shadow-sm">
         {equipos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 opacity-30">
             <Box size={48} className="text-slate-400 mb-3" />
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sin equipos</p>
-            <p className="text-[9px] text-slate-400 mt-1 font-bold">Esta columna está vacía</p>
           </div>
         ) : (
           equipos.map((equipo) => (
-            <EquipoCard key={equipo.id} equipo={equipo} onEdit={onEdit} onDelete={onDelete} onView={onView} onMove={onMove} onCreatePlan={onCreatePlan} moveCategory={moveCategory} />
+            <EquipoCard 
+              key={equipo.id} 
+              equipo={equipo} 
+              onEdit={onEdit} 
+              onDelete={onDelete} 
+              onView={onView} 
+              onMove={onMove} 
+              onCreatePlan={onCreatePlan} 
+              moveCategory={moveCategory} 
+            />
           ))
         )}
       </div>
@@ -240,8 +253,8 @@ export default function EquiposPage() {
   const [familias, setFamilias] = useState([]);
   const [paises, setPaises] = useState([]);
   
-  // Toggle Switch para cambiar la vista (Propiedad vs Logística)
-  const [kanbanView, setKanbanView] = useState("propiedad"); 
+  // Toggle Switch para cambiar la vista
+  const [viewMode, setViewMode] = useState("propiedad"); 
   
   const [modalOpen, setModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -274,7 +287,8 @@ export default function EquiposPage() {
       setFamilias(familiasData || []);
       setPaises(paisesData || []);
     } catch (err) {
-      setError("Error al cargar los datos. Verifica el backend.");
+      setError("Error al cargar los datos. Verifica que el backend esté corriendo.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -283,6 +297,7 @@ export default function EquiposPage() {
   const handleSave = async (dataWithNewFamilia) => {
     try {
       let familiaId = dataWithNewFamilia.familiaId;
+
       if (dataWithNewFamilia.newFamilia && dataWithNewFamilia.newFamilia.nombre) {
         const nuevaFamilia = await equipoService.createFamilia({
           nombre: dataWithNewFamilia.newFamilia.nombre,
@@ -290,79 +305,126 @@ export default function EquiposPage() {
         });
         familiaId = nuevaFamilia.id;
       }
+
       const { newFamilia, ...equipoData } = dataWithNewFamilia;
       equipoData.familiaId = familiaId;
 
-      if (editing) await equipoService.updateEquipo(editing.id, equipoData);
-      else await equipoService.createEquipo(equipoData);
+      if (editing) {
+        await equipoService.updateEquipo(editing.id, equipoData);
+      } else {
+        await equipoService.createEquipo(equipoData);
+      }
 
-      loadData(); setModalOpen(false); setEditing(null);
-    } catch (err) { console.error(err); }
+      await loadData();
+      setModalOpen(false);
+      setEditing(null);
+    } catch (err) {
+      throw err;
+    }
   };
 
   const handleDelete = async (id) => {
     if (confirm("¿Estás seguro de eliminar este equipo?")) {
-      await equipoService.deleteEquipo(id);
-      loadData();
+      try {
+        await equipoService.deleteEquipo(id);
+        await loadData();
+      } catch (err) {
+        alert("Error al eliminar el equipo: " + err.message);
+        console.error(err);
+      }
     }
   };
 
   const handleMove = async (equipo, field, newValue) => {
     try {
-      await equipoService.updateEquipo(equipo.id, { ...equipo, [field]: newValue });
-      loadData();
-    } catch (err) { alert("Error al mover el equipo"); }
+      await equipoService.updateEquipo(equipo.id, {
+        ...equipo,
+        [field]: newValue,
+      });
+      await loadData();
+    } catch (err) {
+      alert("Error al mover el equipo: " + err.message);
+      console.error(err);
+    }
   };
 
-  const handleCreatePlan = (equipo) => { setEquipoParaPlan(equipo); setPlanModalOpen(true); };
-  const handlePlanCreated = () => { setPlanModalOpen(false); setEquipoParaPlan(null); alert("Plan de mantenimiento creado exitosamente"); };
+  const handleCreatePlan = (equipo) => {
+    setEquipoParaPlan(equipo);
+    setPlanModalOpen(true);
+  };
+
+  const handlePlanCreated = () => {
+    setPlanModalOpen(false);
+    setEquipoParaPlan(null);
+    alert("Plan de mantenimiento creado exitosamente");
+    loadData();
+  };
 
   const filteredEquipos = useMemo(() => {
     return equipos.filter((eq) => {
       const q = searchTerm.toLowerCase().trim();
-      const matchSearch = !q || eq.codigo?.toLowerCase().includes(q) || eq.nombre?.toLowerCase().includes(q) || eq.numeroOV?.toLowerCase().includes(q) || eq.cliente?.razonSocial?.toLowerCase().includes(q);
+      const matchSearch =
+        !q ||
+        eq.codigo?.toLowerCase().includes(q) ||
+        eq.numeroOV?.toLowerCase().includes(q) ||
+        eq.marca?.toLowerCase().includes(q) ||
+        eq.modelo?.toLowerCase().includes(q) ||
+        eq.serie?.toLowerCase().includes(q) ||
+        eq.nombre?.toLowerCase().includes(q) ||
+        eq.cliente?.razonSocial?.toLowerCase().includes(q);
+
       const matchEstado = filterEstado === "Todos" || eq.estado === filterEstado;
       const matchCliente = filterCliente === "Todos" || eq.clienteId === filterCliente;
+
       return matchSearch && matchEstado && matchCliente;
     });
   }, [equipos, searchTerm, filterEstado, filterCliente]);
+
+  const vendidos = filteredEquipos.filter((e) => e.tipoEquipoPropiedad === "Vendido");
+  const propios = filteredEquipos.filter((e) => e.tipoEquipoPropiedad === "Propio");
+  const atendidos = filteredEquipos.filter((e) => e.tipoEquipoPropiedad === "Atendido");
+  const almacen = filteredEquipos.filter((e) => e.status === "Almacen" || e.status === "Almacén");
+  const enCompra = filteredEquipos.filter((e) => e.status === "En compra");
+  const entregado = filteredEquipos.filter((e) => e.status === "Entregado");
+
+  // Helper para fechas en la tabla
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
 
   if (loading && equipos.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-slate-600 font-black uppercase tracking-widest text-xs">Cargando...</p>
+          <p className="text-slate-600 font-black uppercase tracking-widest text-xs">Cargando equipos...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-6 w-full font-sans">
+    <div className="min-h-screen bg-[#f8fafc] p-6 lg:p-8 w-full font-sans">
       <div className="max-w-[1800px] mx-auto w-full space-y-6">
         
-        {/* ENCABEZADO CON SWITCH (ESTILO IMAGEN 21d98a.png) */}
+        {/* ENCABEZADO CON TRES OPCIONES */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white p-5 rounded-2xl border border-slate-200 shadow-sm gap-4">
-          
-          {/* Botones Tipo Switch */}
           <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner w-max">
-            <button 
-              onClick={() => setKanbanView("propiedad")}
-              className={`px-6 py-2.5 rounded-lg text-sm font-black transition-all ${kanbanView === "propiedad" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}
-            >
+            <button onClick={() => setViewMode("propiedad")} className={`px-5 py-2.5 rounded-lg text-sm font-black transition-all ${viewMode === "propiedad" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}>
               Propiedad
             </button>
-            <button 
-              onClick={() => setKanbanView("logistica")}
-              className={`px-6 py-2.5 rounded-lg text-sm font-black transition-all ${kanbanView === "logistica" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}
-            >
+            <button onClick={() => setViewMode("logistica")} className={`px-5 py-2.5 rounded-lg text-sm font-black transition-all ${viewMode === "logistica" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}>
               Logística
+            </button>
+            <button onClick={() => setViewMode("lista")} className={`px-5 py-2.5 rounded-lg text-sm font-black transition-all flex items-center gap-2 ${viewMode === "lista" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}>
+              <List size={16} strokeWidth={2.5}/> Lista
             </button>
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <button onClick={() => {setEditing(null); setModalOpen(true);}} className="flex-1 md:flex-none px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-500/30 font-black text-sm active:scale-95">
+            <button onClick={() => { setEditing(null); setModalOpen(true); }} className="flex-1 md:flex-none px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-500/30 font-black text-sm active:scale-95">
               <Plus size={18} strokeWidth={3}/> Agregar Equipo
             </button>
           </div>
@@ -370,54 +432,51 @@ export default function EquiposPage() {
 
         {error && <div className="p-4 bg-red-50 text-red-700 rounded-xl font-bold border border-red-200 flex gap-2"><AlertCircle/> {error}</div>}
 
-        {/* ESTADÍSTICAS COMO BOTONES CLICKABLES (ESTILO IMAGEN 21e091.png) */}
+        {/* ESTADÍSTICAS */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-slate-300 transition-all text-left group">
-            <div>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total</p>
-              <p className="text-2xl font-black text-slate-800">{equipos.length}</p>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-slate-100 transition-colors"><Box className="text-slate-500" size={24}/></div>
+            <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total</p><p className="text-2xl font-black text-slate-800 mt-0.5">{equipos.length}</p></div>
+            <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-slate-100 transition-colors"><Box className="text-slate-600" size={24}/></div>
           </button>
           
-          {kanbanView === "propiedad" ? (
+          {viewMode === "propiedad" || viewMode === "lista" ? (
             <>
               <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-blue-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Vendidos</p><p className="text-2xl font-black text-blue-600">{equipos.filter(e => e.tipoEquipoPropiedad === "Vendido").length}</p></div>
+                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Vendidos</p><p className="text-2xl font-black text-blue-600 mt-0.5">{equipos.filter(e => e.tipoEquipoPropiedad === "Vendido").length}</p></div>
                 <div className="p-3 bg-blue-50 rounded-xl group-hover:bg-blue-100"><ShoppingCart className="text-blue-600" size={24}/></div>
               </button>
               <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-orange-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Propios</p><p className="text-2xl font-black text-amber-500">{equipos.filter(e => e.tipoEquipoPropiedad === "Propio").length}</p></div>
+                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Propios</p><p className="text-2xl font-black text-amber-500 mt-0.5">{equipos.filter(e => e.tipoEquipoPropiedad === "Propio").length}</p></div>
                 <div className="p-3 bg-amber-50 rounded-xl group-hover:bg-amber-100"><Building2 className="text-amber-500" size={24}/></div>
               </button>
               <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-purple-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Atendidos</p><p className="text-2xl font-black text-purple-600">{equipos.filter(e => e.tipoEquipoPropiedad === "Atendido").length}</p></div>
+                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Atendidos</p><p className="text-2xl font-black text-purple-600 mt-0.5">{equipos.filter(e => e.tipoEquipoPropiedad === "Atendido").length}</p></div>
                 <div className="p-3 bg-purple-50 rounded-xl group-hover:bg-purple-100"><Wrench className="text-purple-600" size={24}/></div>
               </button>
             </>
           ) : (
             <>
               <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Almacén</p><p className="text-2xl font-black text-indigo-600">{equipos.filter(e => e.status === "Almacen" || e.status === "Almacén").length}</p></div>
+                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Almacén</p><p className="text-2xl font-black text-indigo-600 mt-0.5">{equipos.filter(e => e.status === "Almacen" || e.status === "Almacén").length}</p></div>
                 <div className="p-3 bg-indigo-50 rounded-xl group-hover:bg-indigo-100"><Package className="text-indigo-600" size={24}/></div>
               </button>
               <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-orange-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">En Compra</p><p className="text-2xl font-black text-amber-500">{equipos.filter(e => e.status === "En compra").length}</p></div>
+                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">En Compra</p><p className="text-2xl font-black text-amber-500 mt-0.5">{equipos.filter(e => e.status === "En compra").length}</p></div>
                 <div className="p-3 bg-amber-50 rounded-xl group-hover:bg-amber-100"><CreditCard className="text-amber-500" size={24}/></div>
               </button>
               <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-green-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Entregados</p><p className="text-2xl font-black text-emerald-600">{equipos.filter(e => e.status === "Entregado").length}</p></div>
+                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Entregados</p><p className="text-2xl font-black text-emerald-600 mt-0.5">{equipos.filter(e => e.status === "Entregado").length}</p></div>
                 <div className="p-3 bg-emerald-50 rounded-xl group-hover:bg-emerald-100"><Truck className="text-emerald-600" size={24}/></div>
               </button>
             </>
           )}
-          <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all text-left group">
-            <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Operativos</p><p className="text-2xl font-black text-emerald-600">{equipos.filter(e => e.estado === "Operativo").length}</p></div>
+          <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all text-left group hidden lg:flex">
+            <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Operativos</p><p className="text-2xl font-black text-emerald-600 mt-0.5">{equipos.filter(e => e.estado === "Operativo").length}</p></div>
             <div className="p-3 bg-emerald-50 rounded-xl group-hover:bg-emerald-100"><Shield className="text-emerald-600" size={24}/></div>
           </button>
         </div>
 
-        {/* BUSCADOR Y FILTROS SECUNDARIOS */}
+        {/* BUSCADOR Y FILTROS */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
@@ -433,7 +492,7 @@ export default function EquiposPage() {
           </div>
 
           {showFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 mt-4 border-t border-slate-100 animate-in fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 mt-4 border-t border-slate-100 animate-in fade-in">
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Cliente</label>
                 <select value={filterCliente} onChange={(e) => setFilterCliente(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-slate-700">
@@ -454,28 +513,145 @@ export default function EquiposPage() {
           )}
         </div>
 
-        {/* TABLERO KANBAN DINÁMICO */}
-        <div className="flex gap-6 overflow-x-auto pb-8 pt-2 no-scrollbar animate-in fade-in duration-300">
-          {kanbanView === "propiedad" ? (
-            <>
-              <KanbanColumn title="Vendidos" icon={ShoppingCart} color="blue" equipos={filteredEquipos.filter(e => e.tipoEquipoPropiedad === "Vendido")} onView={setSelectedEquipo} onEdit={setEditing} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
-              <KanbanColumn title="Propios" icon={Building2} color="orange" equipos={filteredEquipos.filter(e => e.tipoEquipoPropiedad === "Propio")} onView={setSelectedEquipo} onEdit={setEditing} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
-              <KanbanColumn title="Atendidos" icon={Wrench} color="purple" equipos={filteredEquipos.filter(e => e.tipoEquipoPropiedad === "Atendido")} onView={setSelectedEquipo} onEdit={setEditing} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
-            </>
-          ) : (
-            <>
-              <KanbanColumn title="Almacén" icon={Package} color="indigo" equipos={filteredEquipos.filter(e => e.status === "Almacen" || e.status === "Almacén")} onView={setSelectedEquipo} onEdit={setEditing} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
-              <KanbanColumn title="En compra" icon={CreditCard} color="orange" equipos={filteredEquipos.filter(e => e.status === "En compra")} onView={setSelectedEquipo} onEdit={setEditing} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
-              <KanbanColumn title="Entregado" icon={CheckCircle} color="green" equipos={filteredEquipos.filter(e => e.status === "Entregado")} onView={setSelectedEquipo} onEdit={setEditing} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
-            </>
-          )}
-        </div>
+        {/* CONTENIDO PRINCIPAL: KANBAN O TABLA */}
+        {viewMode === "lista" ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto animate-in fade-in duration-300">
+            <table className="w-full text-left border-collapse min-w-[1200px]">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <tr>
+                  <th className="p-4 w-[15%]">Identificación</th>
+                  <th className="p-4 w-[20%]">Datos del Equipo</th>
+                  <th className="p-4 w-[20%]">Ubicación / Cliente</th>
+                  <th className="p-4 w-[15%]">Orden / Fechas</th>
+                  <th className="p-4 w-[15%]">Clasificación / Estado</th>
+                  <th className="p-4 w-[15%] text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredEquipos.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="p-10 text-center text-slate-400 font-bold">
+                      <Box className="w-12 h-12 mx-auto mb-2 opacity-30"/>
+                      No hay equipos que coincidan con la búsqueda.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredEquipos.map(equipo => (
+                    <tr key={equipo.id} className="hover:bg-slate-50 transition-colors">
+                      
+                      {/* IDENTIFICACIÓN */}
+                      <td className="p-4 align-top">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="px-2.5 py-1 bg-blue-50 text-blue-700 font-black text-xs rounded-lg border border-blue-100 w-max">
+                            {equipo.codigo}
+                          </span>
+                          <div className="text-[11px] mt-1">
+                            <span className="font-black text-slate-400 uppercase">Serie: </span>
+                            <span className="font-bold text-slate-700">{equipo.serie || "N/A"}</span>
+                          </div>
+                          <div className="text-[11px]">
+                            <span className="font-black text-slate-400 uppercase">Placa: </span>
+                            <span className="font-bold text-slate-700">{equipo.idPlaca || "N/A"}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* DATOS DEL EQUIPO */}
+                      <td className="p-4 align-top">
+                        <p className="font-black text-slate-800 text-sm mb-1.5">{equipo.nombre}</p>
+                        <div className="grid grid-cols-1 gap-1 text-[11px]">
+                          <p><span className="font-black text-slate-400 uppercase">Marca:</span> <span className="font-bold text-slate-600">{equipo.marca || "-"}</span></p>
+                          <p><span className="font-black text-slate-400 uppercase">Modelo:</span> <span className="font-bold text-slate-600">{equipo.modelo || "-"}</span></p>
+                          <p><span className="font-black text-slate-400 uppercase">Familia:</span> <span className="font-bold text-slate-600">{equipo.familia?.nombre || "-"}</span></p>
+                        </div>
+                      </td>
+
+                      {/* UBICACIÓN / CLIENTE */}
+                      <td className="p-4 align-top">
+                        <p className="font-bold text-slate-800 text-sm mb-1.5 line-clamp-1" title={equipo.cliente?.razonSocial}>
+                          {equipo.cliente?.razonSocial || "Sin Cliente"}
+                        </p>
+                        <div className="grid grid-cols-1 gap-1 text-[11px]">
+                          <p><span className="font-black text-slate-400 uppercase">Sede:</span> <span className="font-bold text-slate-600">{equipo.sede || "-"}</span></p>
+                          <p><span className="font-black text-slate-400 uppercase">Almacén:</span> <span className="font-bold text-slate-600">{equipo.almacen || "-"}</span></p>
+                          <p><span className="font-black text-slate-400 uppercase">País:</span> <span className="font-bold text-slate-600">{equipo.pais?.nombre || "-"}</span></p>
+                        </div>
+                      </td>
+
+                      {/* ORDEN / FECHAS */}
+                      <td className="p-4 align-top">
+                        <div className="grid grid-cols-1 gap-1.5 text-[11px]">
+                          <p className="flex items-center gap-1">
+                            <span className="font-black text-slate-400 uppercase">OV:</span> 
+                            <span className="font-mono font-bold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">{equipo.numeroOV || "-"}</span>
+                          </p>
+                          <p><span className="font-black text-slate-400 uppercase">Entrega:</span> <span className="font-bold text-slate-600">{formatDate(equipo.fechaEntregaPrevista)}</span></p>
+                          <p><span className="font-black text-slate-400 uppercase">Garantía:</span> <span className="font-bold text-slate-600">{formatDate(equipo.finGarantia)}</span></p>
+                        </div>
+                      </td>
+
+                      {/* CLASIFICACIÓN / ESTADO */}
+                      <td className="p-4 align-top">
+                        <div className="flex flex-col gap-2 items-start">
+                          <span className="px-2 py-1 rounded bg-blue-50 text-blue-700 font-black text-[9px] uppercase border border-blue-100/50 flex items-center gap-1">
+                            <Globe size={12}/> {equipo.tipoEquipoPropiedad}
+                          </span>
+                          <span className={`px-2 py-1 rounded text-[9px] font-black uppercase border flex items-center gap-1 ${
+                            equipo.status === "Almacen" || equipo.status === "Almacén" ? "bg-indigo-50 text-indigo-700 border-indigo-100" :
+                            equipo.status === "En compra" ? "bg-amber-50 text-amber-700 border-amber-100" :
+                            "bg-emerald-50 text-emerald-700 border-emerald-100"
+                          }`}>
+                            <Package size={12}/> {equipo.status}
+                          </span>
+                          <span className={`px-2 py-1 rounded text-[9px] font-black uppercase border flex items-center gap-1 ${
+                            equipo.estado === "Operativo" ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
+                            equipo.estado === "Inoperativo" ? "bg-red-50 text-red-700 border-red-100" :
+                            "bg-slate-100 text-slate-600 border-slate-200"
+                          }`}>
+                            <Shield size={12}/> {equipo.estado}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* ACCIONES */}
+                      <td className="p-4 align-middle">
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => { setEquipoParaPlan(equipo); setPlanModalOpen(true); }} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Crear Plan"><Wrench size={16} strokeWidth={2.5}/></button>
+                          <button onClick={() => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Ver Detalle"><Eye size={16} strokeWidth={2.5}/></button>
+                          <button onClick={() => { setEditing(equipo); setModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Editar"><Edit2 size={16} strokeWidth={2.5}/></button>
+                          <button onClick={() => handleDelete(equipo.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar"><Trash2 size={16} strokeWidth={2.5}/></button>
+                        </div>
+                      </td>
+
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex gap-6 overflow-x-auto pb-8 pt-2 no-scrollbar min-h-[600px] animate-in fade-in duration-300">
+            {viewMode === "propiedad" ? (
+              <>
+                <KanbanColumn title="Vendidos" icon={ShoppingCart} color="blue" equipos={vendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
+                <KanbanColumn title="Propios" icon={Building2} color="orange" equipos={propios} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
+                <KanbanColumn title="Atendidos" icon={Wrench} color="purple" equipos={atendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
+              </>
+            ) : (
+              <>
+                <KanbanColumn title="Almacén" icon={Package} color="indigo" equipos={almacen} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
+                <KanbanColumn title="En compra" icon={CreditCard} color="orange" equipos={enCompra} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
+                <KanbanColumn title="Entregado" icon={CheckCircle} color="green" equipos={entregado} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Modales */}
-      <EquipoModal isOpen={modalOpen} onClose={() => {setModalOpen(false); setEditing(null);}} onSave={handleSave} initialData={editing} clientes={clientes} familias={familias} paises={paises}/>
-      <EquipoDetailModal isOpen={detailModalOpen} onClose={() => {setDetailModalOpen(false); setSelectedEquipo(null);}} equipo={selectedEquipo}/>
-      {planModalOpen && <ModalCrearPlan onClose={() => {setPlanModalOpen(false); setEquipoParaPlan(null);}} onCreated={handlePlanCreated} equipoPreseleccionado={equipoParaPlan}/>}
+      <EquipoModal isOpen={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={handleSave} initialData={editing} clientes={clientes} familias={familias} paises={paises} />
+      <EquipoDetailModal isOpen={detailModalOpen} onClose={() => { setDetailModalOpen(false); setSelectedEquipo(null); }} equipo={selectedEquipo} />
+      {planModalOpen && <ModalCrearPlan onClose={() => { setPlanModalOpen(false); setEquipoParaPlan(null); }} onCreated={handlePlanCreated} equipoPreseleccionado={equipoParaPlan} />}
     </div>
   );
 }
