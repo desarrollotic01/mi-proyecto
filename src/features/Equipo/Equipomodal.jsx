@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { X, Loader2, AlertCircle, Calendar, Package, User, MapPin, Wrench, Plus, ShoppingCart, Building2, Globe,CheckCircle2  } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { X, Loader2, AlertCircle, Calendar, Package, User, MapPin, Wrench, Plus, ShoppingCart, Building2, Globe, CheckCircle2, Search } from "lucide-react";
 import { planMantenimientoService } from "../PlanMantenimiento/services/planMantenimientoService";
 export default function EquipoModal({ isOpen, onClose, onSave, initialData, clientes = [], familias = [], paises = [] }) {
 
@@ -44,7 +44,17 @@ const [form, setForm] = useState(DEFAULT_FORM);
   const [newFamilia, setNewFamilia] = useState({ nombre: "", descripcion: "" });
 const [planes, setPlanes] = useState([]);
 const [loadingPlanes, setLoadingPlanes] = useState(false);
+// 1. Agrega useMemo a tus imports de React arriba
+// import { useState, useEffect, useMemo } from "react";
 
+const [busquedaPlan, setBusquedaPlan] = useState("");
+
+const planesFiltrados = useMemo(() => {
+  return planes.filter(p => 
+    p.nombre?.toLowerCase().includes(busquedaPlan.toLowerCase()) ||
+    p.codigoPlan?.toLowerCase().includes(busquedaPlan.toLowerCase())
+  );
+}, [planes, busquedaPlan]);
 
 
 useEffect(() => {
@@ -716,23 +726,33 @@ useEffect(() => {
         Selecciona uno o varios planes. Se guardarán como relación (belongsToMany).
       </p>
     </div>
-
+{/* --- BUSCADOR --- */}
+<div className="relative mb-4">
+  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+  <input
+    type="text"
+    placeholder="Buscar plan por nombre o código..."
+    value={busquedaPlan}
+    onChange={(e) => setBusquedaPlan(e.target.value)}
+    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
+  />
+</div>
     {loadingPlanes ? (
+      
       <div className="flex items-center gap-2 text-slate-600">
         <Loader2 className="w-4 h-4 animate-spin" />
         Cargando planes...
       </div>
     ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {planes.length === 0 ? (
-          <div className="md:col-span-2 p-6 border border-dashed border-slate-300 rounded-xl text-center">
-            <p className="text-slate-700 font-medium">No hay planes activos</p>
-            <p className="text-slate-500 text-sm mt-1">
-              Crea un plan de mantenimiento para poder vincularlo.
-            </p>
-          </div>
-        ) : (
-          planes.map((p) => {
+{planesFiltrados.length === 0 ? (
+  <div className="md:col-span-2 p-10 border border-dashed border-slate-300 rounded-xl text-center">
+    <p className="text-slate-700 font-medium">
+       {planes.length === 0 ? "No hay planes activos" : "No se encontraron planes"}
+    </p>
+  </div>
+) : (
+          planesFiltrados.map((p) => {
             const checked = form.planesMantenimientoIds.includes(p.id);
 
             return (
@@ -829,4 +849,4 @@ useEffect(() => {
       </div>
     </div>
   );
-}
+} 
