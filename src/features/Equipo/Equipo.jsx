@@ -3,7 +3,7 @@ import {
   Search, Plus, Edit2, Trash2, Package, AlertCircle, 
   Loader2, Eye, Filter, X, ChevronDown, Calendar, MapPin, 
   Truck, Shield, Box, FileText, ShoppingCart, Building2, 
-  Wrench, MoveRight, Globe, CheckCircle, CreditCard, RefreshCw, List
+  Wrench, MoveRight, Globe, CheckCircle, CreditCard, RefreshCw, List, User
 } from "lucide-react";
 
 import { equipoService } from "../mantenimiento/services/equipoService";
@@ -103,7 +103,7 @@ function EquipoDetailModal({ isOpen, onClose, equipo }) {
   );
 }
 
-/* ================= TARJETA DE EQUIPO KANBAN ================= */
+/* ================= TARJETA DE EQUIPO KANBAN REDISEÑADA ================= */
 function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, moveCategory }) {
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const isPropiedad = moveCategory === "propiedad";
@@ -125,53 +125,87 @@ function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, mo
   };
 
   return (
-    <div className="bg-white rounded-[1rem] border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all group relative flex flex-col h-full">
-      <div className="flex justify-between items-start mb-3">
-        <span className="px-3 py-1 bg-blue-50 text-blue-700 font-black text-xs rounded-lg">
+    <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition-all group relative flex flex-col h-full border-l-4 border-l-blue-500">
+      
+      {/* HEADER: Código y Acciones flotantes */}
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-600 rounded uppercase tracking-tighter">
           {equipo.codigo}
         </span>
-        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onCreatePlan(equipo)} className="text-slate-400 hover:text-emerald-600 transition-colors"><Wrench size={16} strokeWidth={2.5}/></button>
-          <button onClick={() => onView(equipo)} className="text-slate-400 hover:text-blue-600 transition-colors"><Eye size={16} strokeWidth={2.5}/></button>
-          <button onClick={() => onEdit(equipo)} className="text-slate-400 hover:text-amber-600 transition-colors"><Edit2 size={16} strokeWidth={2.5}/></button>
-          <button onClick={() => onDelete(equipo.id)} className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16} strokeWidth={2.5}/></button>
+        <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg p-1 shadow-sm border">
+          <button onClick={() => onCreatePlan(equipo)} title="Plan" className="p-1 text-slate-400 hover:text-emerald-600"><Wrench size={14}/></button>
+          <button onClick={() => onView(equipo)} title="Ver" className="p-1 text-slate-400 hover:text-blue-600"><Eye size={14}/></button>
+          <button onClick={() => onEdit(equipo)} title="Editar" className="p-1 text-slate-400 hover:text-amber-600"><Edit2 size={14}/></button>
+          <button onClick={() => onDelete(equipo.id)} title="Borrar" className="p-1 text-slate-400 hover:text-red-600"><Trash2 size={14}/></button>
         </div>
       </div>
 
-      <div>
-        <h4 className="text-sm font-black text-slate-800 leading-tight">{equipo.nombre}</h4>
-        <p className="text-[11px] font-medium text-slate-500 mt-1 truncate">{equipo.cliente?.razonSocial || "Sin Cliente"}</p>
+      {/* CUERPO: Título y Cliente */}
+      <div className="mb-2">
+        <h4 className="text-[13px] font-black text-slate-800 leading-tight line-clamp-1 group-hover:line-clamp-none transition-all">
+          {equipo.nombre}
+        </h4>
+   <div className="flex items-center gap-1 mt-1 text-slate-500">
+  <User size={10} /> {/* Asegúrate de que tenga el cierre /> */}
+  <p className="text-[10px] font-bold truncate uppercase">{equipo.cliente?.razonSocial || "Sin Cliente"}</p>
+</div>
       </div>
 
-      <div className="mt-3 mb-4">
+      {/* INFO DETALLADA: Mini Grid compacta */}
+      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 py-2 border-y border-slate-50 mb-2">
+        <div className="flex flex-col">
+          <span className="text-[9px] font-black text-slate-400 uppercase">Marca</span>
+          <span className="text-[10px] font-bold text-slate-700 truncate">{equipo.marca || "-"}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[9px] font-black text-slate-400 uppercase">Modelo</span>
+          <span className="text-[10px] font-bold text-slate-700 truncate">{equipo.modelo || "-"}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[9px] font-black text-slate-400 uppercase">Serie</span>
+          <span className="text-[10px] font-mono font-bold text-blue-600 truncate">{equipo.serie || "-"}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[9px] font-black text-slate-400 uppercase">Sede</span>
+          <span className="text-[10px] font-bold text-slate-700 truncate">{equipo.sede || "-"}</span>
+        </div>
+      </div>
+
+      {/* STATUS BADGES */}
+      <div className="flex flex-wrap gap-1 mb-2">
         {isPropiedad ? (
-          <span className="px-2.5 py-1 rounded bg-amber-50 text-amber-700 font-black text-[10px] uppercase border border-amber-100/50">
-            STATUS: {equipo.status}
+          <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 font-black text-[9px] uppercase border border-amber-100 flex items-center gap-1">
+            <RefreshCw size={10}/> {equipo.status}
           </span>
         ) : (
-          <span className="px-2.5 py-1 rounded bg-blue-50 text-blue-700 font-black text-[10px] uppercase border border-blue-100/50">
-            PROP: {equipo.tipoEquipoPropiedad}
+          <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-black text-[9px] uppercase border border-blue-100 flex items-center gap-1">
+            <Globe size={10}/> {equipo.tipoEquipoPropiedad}
           </span>
         )}
+        <span className={`px-1.5 py-0.5 rounded-md font-black text-[9px] uppercase border flex items-center gap-1 ${
+          equipo.estado === 'Operativo' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'
+        }`}>
+          <Shield size={10}/> {equipo.estado}
+        </span>
       </div>
 
-      <div className="flex-1"></div>
-
-      <div className="flex items-center justify-between pt-3 mt-auto border-t border-slate-100">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-          <FileText size={14}/> OV: {equipo.numeroOV}
-        </span>
+      {/* FOOTER: OV y Botón Mover */}
+      <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-50">
+        <div className="flex items-center gap-1 text-slate-400">
+          <FileText size={10}/>
+          <span className="text-[10px] font-bold uppercase">{equipo.numeroOV}</span>
+        </div>
         
         <div className="relative">
           <button 
             onClick={() => setShowMoveMenu(!showMoveMenu)} 
-            className="flex items-center gap-1 text-[10px] font-black text-slate-600 uppercase transition-colors hover:text-blue-700"
+            className="flex items-center gap-1 text-[9px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors uppercase"
           >
-            MOVER <MoveRight size={14} strokeWidth={2.5}/>
+            Mover <ChevronDown size={10} strokeWidth={3}/>
           </button>
           
           {showMoveMenu && (
-            <div className="absolute bottom-full right-0 mb-2 bg-white shadow-2xl border border-slate-100 rounded-xl p-1 z-20 min-w-[130px] animate-in slide-in-from-bottom-2">
+            <div className="absolute bottom-full right-0 mb-2 bg-white shadow-xl border border-slate-200 rounded-lg p-1 z-50 min-w-[120px]">
               <div className="fixed inset-0" onClick={() => setShowMoveMenu(false)}></div>
               {moveOptions.map(opt => (
                 <button 
@@ -180,7 +214,7 @@ function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, mo
                     onMove(equipo, isPropiedad ? "tipoEquipoPropiedad" : "status", opt); 
                     setShowMoveMenu(false); 
                   }} 
-                  className="relative w-full text-left px-3 py-2.5 text-[11px] font-black text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-2 transition-colors uppercase"
+                  className="relative w-full text-left px-2 py-1.5 text-[9px] font-black text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded flex items-center gap-2 transition-colors uppercase"
                 >
                   {getIcon(opt)} {opt}
                 </button>
@@ -194,8 +228,7 @@ function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, mo
 }
 
 /* ================= COLUMNA KANBAN ================= */
-function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onView, onMove, onCreatePlan, moveCategory }) {
-  const colorStyles = {
+function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onView, onMove, onCreatePlan, moveCategory }) { const colorStyles = {
     blue: "bg-[#3b82f6]",
     orange: "bg-[#f59e0b]",
     purple: "bg-[#a855f7]",
@@ -221,6 +254,8 @@ function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onV
         </div>
       </div>
 
+
+
       <div className="bg-[#f8fafc] border-x border-b border-slate-200 p-3 min-h-[450px] space-y-3 rounded-b-[1rem] shadow-sm">
         {equipos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 opacity-30">
@@ -245,6 +280,8 @@ function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onV
     </div>
   );
 }
+
+
 
 /* ================= MAIN PAGE ================= */
 export default function EquiposPage() {
@@ -520,9 +557,9 @@ export default function EquiposPage() {
               <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                 <tr>
                   <th className="p-4 w-[15%]">Identificación</th>
-                  <th className="p-4 w-[20%]">Datos del Equipo</th>
-                  <th className="p-4 w-[20%]">Ubicación / Cliente</th>
-                  <th className="p-4 w-[15%]">Orden / Fechas</th>
+                  <th className="p-4 w-[20%]">Nombre</th> {/* Datos del Equipos*/}
+                  <th className="p-4 w-[20%]">Cliente</th> {/* Cliente*/}
+                  <th className="p-4 w-[15%]">Orden / Fechas</th> {/* */}
                   <th className="p-4 w-[15%]">Clasificación / Estado</th>
                   <th className="p-4 w-[15%] text-center">Acciones</th>
                 </tr>
@@ -630,19 +667,19 @@ export default function EquiposPage() {
             </table>
           </div>
         ) : (
-          <div className="flex gap-6 overflow-x-auto pb-8 pt-2 no-scrollbar min-h-[600px] animate-in fade-in duration-300">
-            {viewMode === "propiedad" ? (
-              <>
-                <KanbanColumn title="Vendidos" icon={ShoppingCart} color="blue" equipos={vendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
-                <KanbanColumn title="Propios" icon={Building2} color="orange" equipos={propios} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
-                <KanbanColumn title="Atendidos" icon={Wrench} color="purple" equipos={atendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
-              </>
-            ) : (
-              <>
-                <KanbanColumn title="Almacén" icon={Package} color="indigo" equipos={almacen} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
-                <KanbanColumn title="En compra" icon={CreditCard} color="orange" equipos={enCompra} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
-                <KanbanColumn title="Entregado" icon={CheckCircle} color="green" equipos={entregado} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
-              </>
+          <div className="flex gap-4 overflow-x-auto pb-8 pt-2 no-scrollbar min-h-[600px] animate-in fade-in duration-300 items-start">
+    {viewMode === "propiedad" ? (
+      <>
+        <KanbanColumn title="Vendidos" icon={ShoppingCart} color="blue" equipos={vendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
+        <KanbanColumn title="Propios" icon={Building2} color="orange" equipos={propios} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
+        <KanbanColumn title="Atendidos" icon={Wrench} color="purple" equipos={atendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad"/>
+      </>
+    ) : (
+      <>
+        <KanbanColumn title="Almacén" icon={Package} color="indigo" equipos={almacen} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
+        <KanbanColumn title="En compra" icon={CreditCard} color="orange" equipos={enCompra} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
+        <KanbanColumn title="Entregado" icon={CheckCircle} color="green" equipos={entregado} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica"/>
+      </>
             )}
           </div>
         )}
