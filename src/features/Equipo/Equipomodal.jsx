@@ -100,37 +100,52 @@ useEffect(() => {
 
   if (!isOpen) return null;
 
-  const handleSubmit = async () => {
-    // Validación de campos obligatorios
-    if (!form.codigo || !form.numeroOV || !form.clienteId || !form.nombre || !form.paisId || !form.tipoEquipoPropiedad) {
-      setError("Código, Nombre, Número OV, Cliente, País y Tipo de Propiedad son campos obligatorios");
-      return;
-    }
+const handleSubmit = async () => {
+  // 1. Crear una lista de campos faltantes
+  const faltantes = [];
+  if (!form.codigo) faltantes.push("Código");
+  if (!form.nombre) faltantes.push("Nombre");
+  if (!form.numeroOV) faltantes.push("Número OV");
+  if (!form.clienteId) faltantes.push("Cliente");
+  if (!form.paisId) faltantes.push("País");
+  if (!form.tipoEquipoPropiedad) faltantes.push("Tipo de Propiedad");
 
-    // Validar que si seleccionó "Otros" en línea, debe especificar
-    if (form.linea === "Otros" && !form.lineaOtroTexto) {
-      setError("Debes especificar el texto para 'Otros' en Línea");
-      return;
-    }
+  if (faltantes.length > 0) {
+    setError(`Faltan completar campos obligatorios: ${faltantes.join(", ")}`);
+    return;
+  }
 
-    setLoading(true);
-    setError(null);
+  // Validar "Otros" en línea
+  if (form.linea === "Otros" && !form.lineaOtroTexto) {
+    setError("Debes especificar el texto para 'Otros' en Línea");
+    return;
+  }
 
-    try {
-      // Si hay una nueva familia por crear, pasarla junto con el formulario
-      const dataToSave = {
-        ...form,
-        newFamilia: showNewFamilia && newFamilia.nombre ? newFamilia : null,
-      };
-      
-      await onSave(dataToSave);
-      onClose();
-    } catch (err) {
-      setError(err.message || "Error al guardar el equipo");
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  setError(null);
+
+  setLoading(true);
+  setError(null);
+
+  try {
+    // 2. Preparamos los datos básicos SIN el campo de imágenes
+    const dataToSave = {
+      ...form,
+      newFamilia: showNewFamilia && newFamilia.nombre ? newFamilia : null,
+      // imagenes: []  <-- Simplemente no lo incluimos o lo mandamos vacío
+    };
+
+    // 3. Enviamos solo la data de texto
+    await onSave(dataToSave);
+    
+    onClose();
+  } catch (err) {
+    // Si sigue saliendo 400, el error está en uno de los campos de texto arriba
+    setError(err.response?.data?.message || err.message || "Error al guardar el equipo");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const tabs = [
     { id: "general", label: "General", icon: Package },
@@ -525,7 +540,8 @@ useEffect(() => {
                         {familia.nombre}
                       </option>
                     ))}
-                    <option value="nueva">+ Crear nueva familia</option>
+                   
+             {/* <option value="nueva">+ Crear nueva familia</option> */}
                   </select>
                 </div>
                 
