@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Loader2, AlertCircle, Calendar, Package, User, MapPin, Wrench, Plus, ShoppingCart, Building2, Globe, CheckCircle2, Search } from "lucide-react";
+import { X, Loader2, AlertCircle, Calendar, Package, User, MapPin, Wrench, Plus, ShoppingCart, Building2, Globe, CheckCircle2, Search, Image as ImageIcon, UploadCloud } from "lucide-react";
 import { planMantenimientoService } from "../PlanMantenimiento/services/planMantenimientoService";
 export default function EquipoModal({ isOpen, onClose, onSave, initialData, clientes = [], familias = [], paises = [] }) {
 
@@ -138,6 +138,7 @@ useEffect(() => {
     { id: "equipo", label: "Datos del Equipo", icon: Wrench },
     { id: "fechas", label: "Fechas y Garantía", icon: Calendar },
     { id: "planes", label: "Planes", icon: Wrench },
+  { id: "archivos", label: "Archivos", icon: ImageIcon },
   ];
 
   const getTipoPropiedadIcon = (tipo) => {
@@ -712,7 +713,46 @@ useEffect(() => {
               </div>
             </div>
           )}
+{/* TAB: Archivos / Imágenes */}
+{activeTab === "archivos" && (
+  <div className="space-y-4">
+    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+      <p className="text-sm font-semibold text-blue-900">Galería del Equipo</p>
+      <p className="text-xs text-blue-700 mt-1">Sube fotos del estado físico, placas o comprobantes.</p>
+    </div>
 
+    {/* Zona de Carga */}
+    <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-2xl p-10 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group">
+      <input 
+        type="file" 
+        multiple 
+        accept="image/*" 
+        className="hidden" 
+        id="upload-img"
+        onChange={(e) => {
+          // Aquí manejarás la lógica de archivos
+          const files = Array.from(e.target.files);
+          console.log("Archivos seleccionados:", files);
+        }}
+      />
+      <label htmlFor="upload-img" className="flex flex-col items-center gap-3 cursor-pointer">
+        <div className="p-4 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
+          <UploadCloud size={32} className="text-blue-600" />
+        </div>
+        <span className="text-sm font-bold text-slate-600">Haz clic para añadir imágenes</span>
+        <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">JPG, PNG o WEBP</span>
+      </label>
+    </div>
+
+    {/* Contenedor de Vista Previa (Placeholder) */}
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+       {/* Aquí se mapearán las imágenes seleccionadas */}
+       <div className="aspect-square bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center border-dotted">
+         <ImageIcon className="text-slate-300" size={32} />
+       </div>
+    </div>
+  </div>
+)}
 
 
           {/* TAB: Planes de Mantenimiento */}
