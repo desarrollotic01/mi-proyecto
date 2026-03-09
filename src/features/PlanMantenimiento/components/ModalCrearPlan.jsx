@@ -132,6 +132,70 @@ export default function ModalCrearPlan({
   const [actividades, setActividades] = useState([]);
 
   // =========================
+  // ✅ FUNCIÓN CLAVE: handleEquipoChange
+  // =========================
+  const handleEquipoChange = (e) => {
+    const selectedId = e.target.value;
+    
+    if (!selectedId) {
+      setForm(prev => ({ 
+        ...prev, 
+        equipoId: "", 
+        familiaId: "", 
+        tipoEquipo: "", 
+        modeloEquipo: "",
+        nombre: "" 
+      }));
+      setActividades([]);
+      return;
+    }
+
+    const equipo = equipos.find(eq => String(eq.id) === String(selectedId));
+    
+    if (equipo) {
+      // 1. Actualizar datos básicos del formulario
+      setForm(prev => ({
+        ...prev,
+        equipoId: equipo.id,
+        familiaId: equipo.familiaId || "",
+        tipoEquipo: equipo.tipoEquipo || "",
+        modeloEquipo: equipo.modelo || "",
+        nombre: `Plan de Mantenimiento - ${equipo.nombre || equipo.codigo}`,
+      }));
+
+      // 2. ✅ Auto-poblar actividades si el equipo trae un plan sugerido o previo
+      if (equipo.actividades?.length > 0) {
+        const actividadesAuto = equipo.actividades.map(a => ({
+          ...DEFAULT_ACTIVIDAD(),
+          uid: uid(), 
+          sistema: a.sistema || "",
+          subsistema: a.subsistema || "",
+          componente: a.componente || "",
+          tarea: a.tarea || "",
+          tipoTrabajo: a.tipoTrabajo || "REVISION",
+          rolTecnico: a.rolTecnico || "tecnico_mecanico",
+          duracionValor: a.duracionValor || 30,
+          unidadDuracion: a.unidadDuracion || "min",
+          cantidadTecnicos: a.cantidadTecnicos || 1,
+          items: (a.items || []).map(it => ({
+            ...DEFAULT_ITEM_ACTIVIDAD(),
+            uid: uid(),
+            recurso: it.recurso,
+            item: it.item,
+            itemCode: it.itemCode,
+            unidad: it.unidad,
+            cantidad: it.cantidad
+          }))
+        }));
+        setActividades(actividadesAuto);
+      } else {
+        // Si no trae actividades, le ponemos una en blanco por defecto
+        setActividades([DEFAULT_ACTIVIDAD()]);
+      }
+    }
+  };
+
+  // =========================
   // CARGA EQUIPOS
   // =========================
   useEffect(() => {
@@ -218,14 +282,10 @@ export default function ModalCrearPlan({
     ];
   }, [equipos, form.familiaId, form.tipoEquipo]);
 
+  // ✅ CORRECCIÓN: Para que siempre se muestren todos los equipos en el select
   const equiposFiltrados = useMemo(() => {
-    return equipos.filter((e) => {
-      if (form.familiaId && e.familiaId !== form.familiaId) return false;
-      if (form.tipoEquipo && e.tipoEquipo !== form.tipoEquipo) return false;
-      if (form.modeloEquipo && e.modelo !== form.modeloEquipo) return false;
-      return true;
-    });
-  }, [equipos, form.familiaId, form.tipoEquipo, form.modeloEquipo]);
+    return equipos; 
+  }, [equipos]);
 
   // =========================
   // CRUD ITEMS PLAN
@@ -366,23 +426,17 @@ export default function ModalCrearPlan({
   // VALIDACIONES (alineadas backend)
   // =========================
   const validarAntesDeGuardar = () => {
-    // ✅ Backend: codigoPlan obligatorio
     if (!form.codigoPlan?.trim()) return "El código del plan (codigoPlan) es obligatorio";
-
     if (!form.nombre?.trim()) return "El nombre del plan es obligatorio";
     if (!form.tipo) return "El tipo de plan es obligatorio";
-
-    // ✅ Backend: frecuencia obligatoria
     if (!form.frecuencia) return "La frecuencia del plan es obligatoria";
 
-    // ✅ Solo si frecuencia = POR_HORA -> frecuenciaHoras obligatoria (>0)
     if (form.frecuencia === "POR_HORA") {
       const fh = Number(form.frecuenciaHoras);
       if (!Number.isFinite(fh) || fh <= 0) return "Si la frecuencia es POR_HORA, frecuenciaHoras debe ser > 0";
       if (!Number.isInteger(fh)) return "frecuenciaHoras debe ser un número entero";
     }
 
-    // Backend exige al menos Familia / Tipo / Modelo
     if (!form.familiaId && !form.tipoEquipo && !form.modeloEquipo) {
       return "Debe especificar al menos Familia, Tipo o Modelo para el plan";
     }
@@ -391,14 +445,12 @@ export default function ModalCrearPlan({
       return "El plan de mantenimiento debe tener al menos una actividad";
     }
 
-    // Items plan (si hay)
     const filtradosPlan = (itemsPlan || []).filter(
       (x) => (x.itemCode || "").trim() || (x.description || "").trim()
     );
     for (let i = 0; i < filtradosPlan.length; i++) {
       const it = filtradosPlan[i];
       const n = i + 1;
-
       if (!it.itemCode?.trim()) return `ItemPlan ${n}: itemCode obligatorio`;
       const q = Number(it.quantity);
       if (!Number.isFinite(q) || q <= 0) return `ItemPlan ${n}: quantity debe ser > 0`;
@@ -406,20 +458,16 @@ export default function ModalCrearPlan({
       if (!wh) return `ItemPlan ${n}: warehouseCode obligatorio`;
     }
 
-    // Actividades + items
     for (let i = 0; i < actividades.length; i++) {
       const a = actividades[i];
       const n = i + 1;
-
       if (!a.tarea?.trim()) return `Actividad ${n}: tarea obligatoria`;
       if (!a.tipoTrabajo) return `Actividad ${n}: tipoTrabajo obligatorio`;
       if (!a.rolTecnico) return `Actividad ${n}: rolTecnico obligatorio`;
-
       const valor = Number(a.duracionValor);
       if (!Number.isFinite(valor) || valor <= 0) return `Actividad ${n}: duración inválida`;
       if (!a.unidadDuracion || !["min", "h"].includes(a.unidadDuracion))
         return `Actividad ${n}: unidadDuracion inválida`;
-
       const ct = Number(a.cantidadTecnicos);
       if (!Number.isFinite(ct) || ct <= 0)
         return `Actividad ${n}: cantidadTecnicos debe ser > 0`;
@@ -428,19 +476,16 @@ export default function ModalCrearPlan({
         for (let j = 0; j < a.items.length; j++) {
           const it = a.items[j];
           const m = j + 1;
-
           if (!it.recurso) return `Actividad ${n} Item ${m}: recurso obligatorio`;
           if (!it.item?.trim()) return `Actividad ${n} Item ${m}: item obligatorio`;
           if (!it.itemCode?.trim()) return `Actividad ${n} Item ${m}: itemCode obligatorio`;
           if (!it.unidad?.trim()) return `Actividad ${n} Item ${m}: unidad obligatoria`;
-
           const cant = Number(it.cantidad);
           if (!Number.isFinite(cant) || cant <= 0)
             return `Actividad ${n} Item ${m}: cantidad debe ser > 0`;
         }
       }
     }
-
     return null;
   };
 
@@ -475,26 +520,19 @@ export default function ModalCrearPlan({
         }));
 
       const payload = {
-        // ✅ requeridos según tu modelo
         codigoPlan: form.codigoPlan?.trim(),
         nombre: form.nombre?.trim(),
         tipo: form.tipo,
         frecuencia: form.frecuencia,
         frecuenciaHoras:
           form.frecuencia === "POR_HORA" ? Number(form.frecuenciaHoras) : null,
-
         familiaId: normalize(form.familiaId),
         tipoEquipo: normalize(form.tipoEquipo),
         modeloEquipo: normalize(form.modeloEquipo),
-
         esEspecifico,
         equipoObjetivoId,
-
-        // ✅ items/adjuntos del plan
         itemsPlan: itemsPlanClean,
         adjuntosPlan: adjuntosPlan || [],
-
-        // ✅ actividades siguen con items/adjuntos
         actividades: actividades.map((a) => ({
           sistema: normalize(a.sistema),
           subsistema: normalize(a.subsistema),
@@ -502,12 +540,9 @@ export default function ModalCrearPlan({
           tarea: a.tarea?.trim(),
           tipoTrabajo: a.tipoTrabajo,
           rolTecnico: a.rolTecnico,
-
           duracionValor: Number(a.duracionValor),
           unidadDuracion: a.unidadDuracion,
-
           cantidadTecnicos: Number(a.cantidadTecnicos),
-
           items: (a.items || []).map((it) => ({
             recurso: it.recurso,
             item: it.item?.trim(),
@@ -516,7 +551,6 @@ export default function ModalCrearPlan({
             cantidad: Number(it.cantidad),
             observacion: normalize(it.observacion),
           })),
-
           adjuntos: a.adjuntos || [],
         })),
       };
@@ -576,11 +610,34 @@ export default function ModalCrearPlan({
             <div className="flex items-center gap-3 mb-6">
               <div className="w-1.5 h-8 bg-gradient-to-b from-blue-600 to-blue-400 rounded-full"></div>
               <h3 className="text-xl font-bold text-slate-800">
-                Información del Plan - Pruebas
+                Información del Plan
               </h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              
+              {/* EQUIPO SELECTOR MODIFICADO */}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  Equipo <span className="text-blue-600">(Auto-poblar plan)</span>
+                </label>
+                <select
+                  value={form.equipoId}
+                  onChange={handleEquipoChange}
+                  disabled={disabledPorEquipo}
+                  className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${
+                    disabledPorEquipo ? "bg-green-100 cursor-not-allowed" : "bg-white"
+                  }`}
+                >
+                  <option value="">Seleccione un equipo...</option>
+                  {equiposFiltrados.map((eq) => (
+                    <option key={eq.id} value={eq.id}>
+                      {eq.codigo} - {eq.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
               {/* CODIGO PLAN */}
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
@@ -596,7 +653,7 @@ export default function ModalCrearPlan({
                   placeholder="PM-0001"
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Debe ser único (según tu modelo).
+                  Debe ser único.
                 </p>
               </div>
 
@@ -740,34 +797,8 @@ export default function ModalCrearPlan({
                 </select>
               </div>
 
-              {/* EQUIPO UI */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  Equipo (solo filtro UI)
-                </label>
-                <select
-                  value={form.equipoId}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, equipoId: e.target.value }))
-                  }
-                  disabled={disabledPorEquipo}
-                  className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${
-                    disabledPorEquipo
-                      ? "bg-green-100 cursor-not-allowed"
-                      : "bg-white"
-                  }`}
-                >
-                  <option value="">Todos los equipos</option>
-                  {equiposFiltrados.map((eq) => (
-                    <option key={eq.id} value={eq.id}>
-                      {eq.codigo} - {eq.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* NOMBRE */}
-              <div>
+              <div className="lg:col-span-2">
                 <label className="block text-sm font-bold text-slate-700 mb-2">
                   Nombre del Plan <span className="text-red-500">*</span>
                 </label>
@@ -809,7 +840,7 @@ export default function ModalCrearPlan({
               <div className="flex items-center gap-3">
                 <div className="w-1.5 h-8 bg-gradient-to-b from-indigo-600 to-purple-500 rounded-full"></div>
                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  Recursos del Plan (General) - Prueba
+                  Recursos del Plan (General)
                   <Package className="w-5 h-5 text-indigo-600" />
                 </h3>
               </div>
