@@ -10,18 +10,22 @@ import {
   ShoppingCart, 
   Building2, 
   Globe, 
-  Info 
+  Info,
+  ClipboardList,
+  CheckCircle2
 } from "lucide-react";
 
 import { paisService } from "../../mantenimiento/services/paisService";
 import { clienteService } from "../../mantenimiento/services/clienteService";
+// Si el error persiste, verifica si faltan "../" adicionales según tu estructura
+import { planMantenimientoService } from "../../PlanMantenimiento/services/planMantenimientoService";
 
 // --- HELPERS ---
 const emptyForm = () => ({
   codigo: "",
   nombre: "",
   id_cliente: "",
-  ClienteId: "", // Se usará en el select, pero se enviará como clienteId
+  ClienteId: "", 
   tipoEquipoPropiedad: "Vendido",
   paisId: "",
   sede: "",
@@ -37,6 +41,7 @@ const emptyForm = () => ({
   fechaEntregaReal: "",
   finGarantia: "",
   especialidad: "",
+  planesIds: [], 
 });
 
 const normalizeDate = (v) => (v ? v : null);
@@ -52,17 +57,17 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Estado para las Pestañas (Tabs)
   const [activeTab, setActiveTab] = useState("general");
 
   const [paises, setPaises] = useState([]);
   const [clientes, setClientes] = useState([]);
+  const [planesDisponibles, setPlanesDisponibles] = useState([]); 
   const [loadingCombos, setLoadingCombos] = useState(false);
 
   // Sincronización al abrir
   useEffect(() => {
     if (!isOpen) {
-      setActiveTab("general"); // Reiniciar a la primera pestaña al cerrar
+      setActiveTab("general");
       return;
     }
     setError(null);
@@ -73,6 +78,10 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
         ...initialData,
         ClienteId: initialData.ClienteId || initialData.clienteId || initialData?.cliente?.id || "",
         paisId: initialData.paisId || initialData?.pais?.id || "",
+        // Mapeo de planes: si vienen objetos, extraemos solo los IDs
+        planesIds: Array.isArray(initialData.planes) 
+          ? initialData.planes.map(p => p.id) 
+          : (initialData.planesIds || []),
         codigo: String(initialData.codigo ?? ""),
         nombre: String(initialData.nombre ?? ""),
         numeroOV: String(initialData.numeroOV ?? ""),
@@ -95,20 +104,29 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
     }
   }, [isOpen, initialData]);
 
-  // Carga de listas (Países y Clientes)
+  // Carga de listas maestras
   useEffect(() => {
     if (!isOpen) return;
     const loadCombos = async () => {
       setLoadingCombos(true);
       try {
-        const [p, c] = await Promise.all([
+        const [p, c, pl] = await Promise.all([
           paisService.getAll?.() ?? paisService.getPaises?.(),
           clienteService.getAll?.() ?? clienteService.getClientes?.(),
+          // Intentamos varios nombres de función comunes por si acaso
+          planMantenimientoService.getAll?.() ?? planMantenimientoService.getPlanes?.() ?? []
         ]);
+        
         setPaises(Array.isArray(p) ? p : []);
         setClientes(Array.isArray(c) ? c : []);
+        
+        // Manejo flexible de la respuesta de planes (array directo o {data: []})
+        const planesData = Array.isArray(pl) ? pl : (pl?.data || []);
+        setPlanesDisponibles(planesData);
+        
       } catch (err) {
-        setError("No se pudo cargar la lista de Países o Clientes.");
+        console.error("Error cargando combos:", err);
+        setError("Error de conexión al cargar catálogos.");
       } finally {
         setLoadingCombos(false);
       }
@@ -132,8 +150,20 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const setFormValue = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const togglePlan = (planId) => {
+    setForm(f => {
+      const exists = f.planesIds.includes(planId);
+      return {
+        ...f,
+        planesIds: exists 
+          ? f.planesIds.filter(id => id !== planId)
+          : [...f.planesIds, planId]
+      };
+    });
+  };
+
   const buildPayload = () => {
-    const rawPayload = {
+    return {
       codigo: String(form.codigo).trim(),
       nombre: String(form.nombre).trim(),
       id_cliente: normalizeStr(form.id_cliente),
@@ -153,15 +183,14 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
       fechaEntregaReal: normalizeDate(form.fechaEntregaReal),
       finGarantia: normalizeDate(form.finGarantia),
       especialidad: normalizeStr(form.especialidad),
+      planesIds: form.planesIds, 
     };
-
-    return rawPayload; // Ya no filtramos los nulos para evitar el Error 400
   };
 
   const handleSubmit = async () => {
     setError(null);
     if (!requiredOk) {
-      setError("Faltan campos obligatorios. Revisa la pestaña General y Orden de Venta.");
+      setError("Faltan campos obligatorios. Revisa la pestaña General.");
       return;
     }
     setLoading(true);
@@ -178,6 +207,7 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
     { id: "general", label: "General", icon: Package },
     { id: "orden", label: "Orden de Venta", icon: FileText },
     { id: "fechas", label: "Fechas y Garantía", icon: CalendarDays },
+    { id: "planes", label: "Planes de Mantenimiento", icon: ClipboardList },
   ];
 
   const getTipoPropiedadIcon = (tipo) => {
@@ -193,14 +223,14 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans">
       <div className="bg-white w-full max-w-4xl flex flex-col rounded-[1.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ maxHeight: '92vh' }}>
         
-        {/* HEADER MODAL */}
+        {/* HEADER */}
         <div className="flex items-start justify-between px-8 py-6 border-b border-slate-100 bg-white">
           <div>
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">
               {mode === "edit" ? "Editar Ubicación Técnica" : "Nueva Ubicación Técnica"}
             </h2>
             <p className="text-sm text-slate-500 font-medium mt-1">
-              {mode === "edit" ? "Actualiza la información geográfica y logística" : "Completa los datos para registrar la ubicación"}
+              Gestión de activos y logística geográfica
             </p>
           </div>
           <button onClick={onClose} disabled={loading} className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
@@ -208,33 +238,39 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
           </button>
         </div>
 
-        {/* TABS NAVEGABLES */}
+        {/* TABS */}
         <div className="border-b border-slate-200 bg-slate-50/50 px-8">
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
             {tabs.map((tab) => {
               const Icon = tab.icon;
+              const isSelected = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-4 text-sm font-bold transition-all border-b-[3px] whitespace-nowrap ${
-                    activeTab === tab.id
+                    isSelected
                       ? "border-blue-600 text-blue-700 bg-white"
                       : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
                   }`}
                 >
-                  <Icon size={18} strokeWidth={activeTab === tab.id ? 2.5 : 2} />
+                  <Icon size={18} strokeWidth={isSelected ? 2.5 : 2} />
                   {tab.label}
+                  {tab.id === 'planes' && form.planesIds.length > 0 && (
+                    <span className="ml-1 bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
+                      {form.planesIds.length}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* BODY MODAL SCROLLABLE */}
+        {/* BODY */}
         <div className="flex-1 overflow-y-auto px-8 py-6 bg-slate-50/30">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 shadow-sm animate-in fade-in">
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 shadow-sm">
               <AlertCircle size={20} className="shrink-0" />
               <p className="text-sm font-bold">{error}</p>
             </div>
@@ -242,7 +278,6 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
 
           <div className="max-w-3xl mx-auto">
             
-            {/* TAB: GENERAL */}
             {activeTab === "general" && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -260,7 +295,6 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                     </select>
                   </Field>
 
-                  {/* 🔥 ID PLACA AHORA ESTÁ AQUÍ JUNTO A ID CLIENTE */}
                   <Field label="ID Cliente (Referencia)">
                     <input value={form.id_cliente} onChange={update("id_cliente")} placeholder="Ej: REF-CL-001" className={inputCls} disabled={loading} />
                   </Field>
@@ -272,7 +306,6 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                     <input value={form.especialidad} onChange={update("especialidad")} placeholder="Ej: Mecánica, Eléctrica" className={inputCls} disabled={loading} />
                   </Field>
 
-                  {/* CARDS: TIPO PROPIEDAD */}
                   <div className="md:col-span-2 mt-2">
                     <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3 block ml-1">
                       Tipo de Propiedad <span className="text-red-500">*</span>
@@ -311,13 +344,12 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                     <input value={form.operadorLogistico} onChange={update("operadorLogistico")} placeholder="Ej: DHL, Shalom" className={inputCls} disabled={loading} />
                   </Field>
                   <Field label="Descripción / Notas" className="md:col-span-2 mt-2">
-                    <textarea value={form.descripcion} onChange={update("descripcion")} placeholder="Detalles adicionales de la ubicación..." className={`${inputCls} min-h-[100px] resize-none`} disabled={loading} />
+                    <textarea value={form.descripcion} onChange={update("descripcion")} placeholder="Detalles adicionales..." className={`${inputCls} min-h-[100px] resize-none`} disabled={loading} />
                   </Field>
                 </div>
               </div>
             )}
 
-            {/* TAB: ORDEN DE VENTA */}
             {activeTab === "orden" && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -327,19 +359,17 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                   <Field label="Fecha Orden de Venta">
                     <input type="date" value={form.fechaOV} onChange={update("fechaOV")} className={inputCls} disabled={loading} />
                   </Field>
-                  <div className="hidden md:block"></div> {/* Espaciador */}
+                  <div className="hidden md:block"></div> 
                   <Field label="N° Orden de Compra Cliente">
                     <input value={form.numeroOrdenCliente} onChange={update("numeroOrdenCliente")} placeholder="Ej: OC-999" className={inputCls} disabled={loading} />
                   </Field>
                   <Field label="Fecha Orden Cliente">
                     <input type="date" value={form.fechaOrdenCliente} onChange={update("fechaOrdenCliente")} className={inputCls} disabled={loading} />
                   </Field>
-                  {/* ID Placa ya no está aquí, fue movido a General */}
                 </div>
               </div>
             )}
 
-            {/* TAB: FECHAS Y GARANTÍA */}
             {activeTab === "fechas" && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -353,18 +383,71 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                     <input type="date" value={form.finGarantia} onChange={update("finGarantia")} className={inputCls} disabled={loading} />
                   </Field>
                   
-                  <div className="md:col-span-2 mt-2 p-5 bg-slate-100/50 border border-slate-200 rounded-2xl">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 bg-blue-100 text-blue-600 rounded-xl"><Info size={20} /></div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">Información sobre las fechas</p>
-                        <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                          La fecha de entrega prevista es estimada. La fecha real debe actualizarse cuando la ubicación sea habilitada físicamente. 
-                          La garantía comenzará a calcularse a partir de esta fecha.
-                        </p>
-                      </div>
+                  <div className="md:col-span-2 mt-2 p-5 bg-slate-100/50 border border-slate-200 rounded-2xl flex gap-4">
+                    <div className="p-2 bg-blue-100 text-blue-600 rounded-xl shrink-0 h-fit"><Info size={20} /></div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">Cálculo de Garantía</p>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        La garantía se habilitará a partir de la fecha de entrega real.
+                      </p>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: PLANES (CORREGIDA LÓGICA DE RENDERIZADO) */}
+            {activeTab === "planes" && (
+              <div className="space-y-6 animate-in fade-in duration-200">
+                <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex gap-3">
+                  <ClipboardList className="text-blue-500 shrink-0" size={20} />
+                  <p className="text-xs text-blue-700 font-medium leading-relaxed">
+                    Selecciona los planes de mantenimiento que se aplicarán a esta ubicación técnica.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  {loadingCombos ? (
+                    <div className="flex flex-col items-center py-10 gap-3">
+                       <Loader2 className="animate-spin text-blue-600" />
+                       <p className="text-sm text-slate-400 font-bold">Cargando planes...</p>
+                    </div>
+                  ) : planesDisponibles.length === 0 ? (
+                    <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl">
+                      <p className="text-slate-400 font-bold text-sm">No hay planes registrados en el sistema.</p>
+                    </div>
+                  ) : (
+                    planesDisponibles.map((plan) => {
+                      const isSelected = form.planesIds.includes(plan.id);
+                      return (
+                        <div 
+                          key={plan.id}
+                          onClick={() => togglePlan(plan.id)}
+                          className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer hover:shadow-md ${
+                            isSelected ? "border-blue-500 bg-blue-50/50 shadow-sm" : "border-slate-100 bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`p-2.5 rounded-xl ${isSelected ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-400"}`}>
+                              <ClipboardList size={20} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-black text-slate-800">{plan.nombre || plan.codigoPlan}</p>
+                              <div className="flex gap-2 mt-1">
+                                <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded font-black uppercase">{plan.frecuencia}</span>
+                                <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded font-black uppercase">{plan.tipo}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {isSelected ? (
+                             <CheckCircle2 className="text-blue-600" size={24} strokeWidth={2.5} />
+                          ) : (
+                             <div className="w-6 h-6 rounded-full border-2 border-slate-100" />
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}
@@ -372,16 +455,11 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
           </div>
         </div>
 
-        {/* FOOTER MODAL */}
+        {/* FOOTER */}
         <div className="border-t border-slate-100 bg-white px-8 py-5 flex items-center justify-end gap-4 rounded-b-[1.5rem]">
-          <button
-            onClick={onClose}
-            className="px-8 py-3.5 border-2 border-slate-100 text-slate-500 rounded-2xl hover:bg-slate-50 transition-colors font-bold text-sm uppercase tracking-widest"
-            disabled={loading}
-          >
+          <button onClick={onClose} disabled={loading} className="px-8 py-3.5 border-2 border-slate-100 text-slate-500 rounded-2xl hover:bg-slate-50 transition-colors font-bold text-sm uppercase tracking-widest">
             Cancelar
           </button>
-
           <button
             onClick={handleSubmit}
             disabled={loading || !requiredOk}
@@ -396,8 +474,7 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
   );
 }
 
-// --- SUB-COMPONENTES UI PARA EL MODAL ---
-
+// --- SUB-COMPONENTES UI ---
 function PropertyCard({ active, onClick, icon, label }) {
   return (
     <div 

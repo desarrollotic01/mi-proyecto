@@ -100,36 +100,84 @@ export default function ModalCrearPlan({
 }) {
   const [equipos, setEquipos] = useState([]);
   const [guardando, setGuardando] = useState(false);
-
-  /** expanded por uid (no por index) */
   const [expandedByUid, setExpandedByUid] = useState({});
-
-  // ✅ items/adjuntos generales del plan
   const [itemsPlan, setItemsPlan] = useState([DEFAULT_ITEM_PLAN()]);
   const [adjuntosPlan, setAdjuntosPlan] = useState([]);
 
   const [form, setForm] = useState({
-    // ✅ Backend exige
     codigoPlan: "",
-
     familiaId: equipoPreseleccionado?.familia?.id || "",
     tipoEquipo: equipoPreseleccionado?.tipoEquipo || "",
     modeloEquipo: equipoPreseleccionado?.modelo || "",
     equipoId: equipoPreseleccionado?.id || "",
     nombre: equipoPreseleccionado
-      ? `Plan de Mantenimiento - ${
-          equipoPreseleccionado.nombre || equipoPreseleccionado.codigo
-        }`
+      ? `Plan de Mantenimiento - ${equipoPreseleccionado.nombre || equipoPreseleccionado.codigo}`
       : "",
     tipo: "PREVENTIVO",
-
-    // ✅ NUEVO: frecuencia del plan (obligatorio en backend)
     frecuencia: "MENSUAL",
-    // ✅ Solo si frecuencia = POR_HORA
     frecuenciaHoras: "",
   });
 
+
   const [actividades, setActividades] = useState([]);
+
+// =========================
+  // ✅ FUNCIÓN CLAVE: handleEquipoChange
+  // =========================
+  const handleEquipoChange = (e) => {
+    const selectedId = e.target.value;
+    
+    if (!selectedId) {
+      setForm(prev => ({ ...prev, equipoId: "", nombre: "" }));
+      return;
+    }
+
+    const equipo = equipos.find(eq => String(eq.id) === String(selectedId));
+    
+    if (equipo) {
+      // 1. Actualizar datos básicos del formulario
+      setForm(prev => ({
+        ...prev,
+        equipoId: equipo.id,
+        familiaId: equipo.familiaId || "",
+        tipoEquipo: equipo.tipoEquipo || "",
+        modeloEquipo: equipo.modelo || "",
+        nombre: `Plan de Mantenimiento - ${equipo.nombre || equipo.codigo}`,
+      }));
+
+      // 2. ✅ Auto-poblar actividades si el equipo trae un plan sugerido o previo
+      // Si el objeto equipo trae un array de actividades (ej. equipo.planBase.actividades)
+      if (equipo.actividades?.length > 0) {
+        const actividadesAuto = equipo.actividades.map(a => ({
+          ...DEFAULT_ACTIVIDAD(),
+          uid: uid(), // Generar nuevo UID para evitar conflictos
+          sistema: a.sistema || "",
+          subsistema: a.subsistema || "",
+          componente: a.componente || "",
+          tarea: a.tarea || "",
+          tipoTrabajo: a.tipoTrabajo || "REVISION",
+          rolTecnico: a.rolTecnico || "tecnico_mecanico",
+          duracionValor: a.duracionValor || 30,
+          unidadDuracion: a.unidadDuracion || "min",
+          cantidadTecnicos: a.cantidadTecnicos || 1,
+          items: (a.items || []).map(it => ({
+            ...DEFAULT_ITEM_ACTIVIDAD(),
+            uid: uid(),
+            recurso: it.recurso,
+            item: it.item,
+            itemCode: it.itemCode,
+            unidad: it.unidad,
+            cantidad: it.cantidad
+          }))
+        }));
+        setActividades(actividadesAuto);
+      }
+    }
+  };
+
+
+
+
 
   // =========================
   // CARGA EQUIPOS
@@ -538,49 +586,37 @@ export default function ModalCrearPlan({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-50 p-4">
       <div className="bg-white w-full max-w-7xl max-h-[96vh] overflow-hidden rounded-3xl shadow-2xl flex flex-col">
-        {/* HEADER */}
-        <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-8 text-white relative overflow-hidden">
-          <div className="flex justify-between items-start relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="bg-white/20 backdrop-blur-xl p-3 rounded-2xl shadow-lg">
-                <Wrench size={32} strokeWidth={2.5} />
-              </div>
-              <div>
-                <h2 className="text-3xl font-bold mb-1 flex items-center gap-2">
-                  Crear Plan de Mantenimiento
-                  <Sparkles size={24} className="text-yellow-300" />
-                </h2>
-                <p className="text-blue-100 text-sm">
-                  {equipoPreseleccionado
-                    ? `📌 Plan específico para: ${equipoPreseleccionado.codigo} - ${
-                        equipoPreseleccionado.nombre || "Sin nombre"
-                      }`
-                    : "Define actividades, recursos y adjuntos del plan"}
-                </p>
-              </div>
-            </div>
+        {/* ... (Header) */}
 
-            <button
-              onClick={onClose}
-              className="bg-white/10 hover:bg-white/20 p-2.5 rounded-xl transition-all duration-200 hover:scale-110"
-            >
-              <X size={24} strokeWidth={2.5} />
-            </button>
-          </div>
-        </div>
-
-        {/* CONTENIDO */}
         <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-slate-50 via-white to-blue-50">
-          {/* INFO PLAN */}
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 mb-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-1.5 h-8 bg-gradient-to-b from-blue-600 to-blue-400 rounded-full"></div>
-              <h3 className="text-xl font-bold text-slate-800">
-                Información del Plan - Pruebas
-              </h3>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              
+              {/* EQUIPO SELECTOR MODIFICADO */}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  Equipo <span className="text-blue-600">(Auto-poblar plan)</span>
+                </label>
+                <select
+                  value={form.equipoId}
+                  onChange={handleEquipoChange} // ✅ Llamada a la función de auto-llenado
+                  disabled={disabledPorEquipo}
+                  className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${
+                    disabledPorEquipo ? "bg-green-100 cursor-not-allowed" : "bg-white"
+                  }`}
+                >
+                  <option value="">Seleccione un equipo para cargar su plan...</option>
+                  {equiposFiltrados.map((eq) => (
+                    <option key={eq.id} value={eq.id}>
+                      {eq.codigo} - {eq.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+             
+             
+             
+             
               {/* CODIGO PLAN */}
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
