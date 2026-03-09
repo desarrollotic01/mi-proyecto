@@ -13,7 +13,8 @@ import PlanesMantenimiento from "./features/PlanMantenimiento/pages/planesManten
 import TrabajadoresPage from "./features/Trabajores/pages/TrabajadorPage";
 import MaintenanceGuides from "./features/GuiaMantenimiento/GuiaMantenimiento";
 import GuiasKanban from "./pages/GuiaMantenimientoKanban";
-
+// 1. Importa tu nuevo componente (ajusta la ruta según donde crees el archivo)
+import ListaLink from "./features/Equipo/ListaLink";
 function AppLayout() {
   return (
     <ProtectedRoute>
@@ -29,7 +30,7 @@ export default function App() {
     <Routes>
       {/* PUBLICO */}
       <Route path="/login" element={<Login />} />
-
+<Route path="/visor-cliente" element={<ListaLink />} />
       {/* PRIVADO CON LAYOUT */}
       <Route path="/" element={<AppLayout />}>
   <Route index element={<Navigate to="Avisos" replace />} />
@@ -43,6 +44,11 @@ export default function App() {
   <Route path="trabajadores" element={<TrabajadoresPage />} />
   <Route path="guiaMantenimiento" element={<MaintenanceGuides />} />
   <Route path="GuiasKanban" element={<GuiasKanban/>} />
+
+{/* NUEVO ROUTE PARA LA LISTA DE ENLACES DE EQUIPOS */}
+
+
+
 
 </Route>
 

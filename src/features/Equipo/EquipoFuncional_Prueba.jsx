@@ -29,7 +29,7 @@
   import { clienteService } from "../mantenimiento/services/clienteService";
   import { familiaService } from "./service/familiaService";
   import { paisService } from "../mantenimiento/services/paisService";
-  import EquipoModal from "./EquipoModal";
+  //import EquipoModal from "./EquipoModal";
   import ModalCrearPlan from "../PlanMantenimiento/components/ModalCrearPlan";
 
   /* ================= MODAL DE DETALLE ================= */
