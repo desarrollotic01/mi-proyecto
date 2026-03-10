@@ -1,50 +1,48 @@
 import { useState, useEffect } from "react";
-import { Search, Plus, Edit2, Trash2, Download, Package, AlertCircle, X, Loader2 } from "lucide-react";
-
+import { Search, Plus, Edit2, Trash2, Download, Package, AlertCircle, X, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { clienteService } from '../features/mantenimiento/services/clienteService.js';
 
 /* ================= MODAL ================= */
 function ClienteModal({ isOpen, onClose, onSave, initialData }) {
   const [form, setForm] = useState({
-  razonSocial: "",
-  ruc: "",
-  direccion: "",
-  contacto: "",
-  telefono: "",
-  correo: "",
-  tipoCliente: "",
-  estado: "Activo",
-});
+    razonSocial: "",
+    ruc: "",
+    direccion: "",
+    contacto: "",
+    telefono: "",
+    correo: "",
+    tipoCliente: "",
+    estado: "Activo",
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-useEffect(() => {
-  if (initialData) {
-    setForm(initialData);
-  } else {
-    setForm({
-      razonSocial: "",
-      ruc: "",
-      direccion: "",
-      contacto: "",
-      telefono: "",
-      correo: "",
-      tipoCliente: "",
-      estado: "Activo",
-    });
-  }
-  setError(null);
-}, [initialData, isOpen]);
-
+  useEffect(() => {
+    if (initialData) {
+      setForm(initialData);
+    } else {
+      setForm({
+        razonSocial: "",
+        ruc: "",
+        direccion: "",
+        contacto: "",
+        telefono: "",
+        correo: "",
+        tipoCliente: "",
+        estado: "Activo",
+      });
+    }
+    setError(null);
+  }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
     if (!form.razonSocial || !form.ruc) {
-  setError("Razón Social y RUC son obligatorios");
-  return;
-}
+      setError("Razón Social y RUC son obligatorios");
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -90,96 +88,95 @@ useEffect(() => {
           )}
 
           <div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    Razón Social <span className="text-red-500">*</span>
-  </label>
-  <input
-    value={form.razonSocial}
-    onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
-    className="w-full px-4 py-3 border rounded-xl"
-  />
-</div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Razón Social <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={form.razonSocial}
+              onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
 
-<div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    RUC <span className="text-red-500">*</span>
-  </label>
-  <input
-    value={form.ruc}
-    onChange={(e) => setForm({ ...form, ruc: e.target.value })}
-    className="w-full px-4 py-3 border rounded-xl"
-  />
-</div>
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              RUC <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={form.ruc}
+              onChange={(e) => setForm({ ...form, ruc: e.target.value })}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
 
-<div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    Dirección
-  </label>
-  <input
-    value={form.direccion || ""}
-    onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-    className="w-full px-4 py-3 border rounded-xl"
-  />
-</div>
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Dirección
+            </label>
+            <input
+              value={form.direccion || ""}
+              onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
 
-<div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    Contacto
-  </label>
-  <input
-    value={form.contacto || ""}
-    onChange={(e) => setForm({ ...form, contacto: e.target.value })}
-    className="w-full px-4 py-3 border rounded-xl"
-  />
-</div>
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Contacto
+            </label>
+            <input
+              value={form.contacto || ""}
+              onChange={(e) => setForm({ ...form, contacto: e.target.value })}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
 
-<div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    Teléfono
-  </label>
-  <input
-    value={form.telefono || ""}
-    onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-    className="w-full px-4 py-3 border rounded-xl"
-  />
-</div>
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Teléfono
+            </label>
+            <input
+              value={form.telefono || ""}
+              onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
 
-<div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    Correo
-  </label>
-  <input
-    value={form.correo || ""}
-    onChange={(e) => setForm({ ...form, correo: e.target.value })}
-    className="w-full px-4 py-3 border rounded-xl"
-  />
-</div>
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Correo
+            </label>
+            <input
+              value={form.correo || ""}
+              onChange={(e) => setForm({ ...form, correo: e.target.value })}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
 
-<div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    Tipo de Cliente
-  </label>
-  <input
-    value={form.tipoCliente || ""}
-    onChange={(e) => setForm({ ...form, tipoCliente: e.target.value })}
-    className="w-full px-4 py-3 border rounded-xl"
-  />
-</div>
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Tipo de Cliente
+            </label>
+            <input
+              value={form.tipoCliente || ""}
+              onChange={(e) => setForm({ ...form, tipoCliente: e.target.value })}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
 
-<div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    Estado
-  </label>
-  <select
-    value={form.estado}
-    onChange={(e) => setForm({ ...form, estado: e.target.value })}
-    className="w-full px-4 py-3 border rounded-xl"
-  >
-    <option value="Activo">Activo</option>
-    <option value="Inactivo">Inactivo</option>
-  </select>
-</div>
-
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Estado
+            </label>
+            <select
+              value={form.estado}
+              onChange={(e) => setForm({ ...form, estado: e.target.value })}
+              className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+            >
+              <option value="Activo">Activo</option>
+              <option value="Inactivo">Inactivo</option>
+            </select>
+          </div>
 
           {/* Actions */}
           <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
@@ -206,18 +203,30 @@ useEffect(() => {
 }
 
 /* ================= MAIN PAGE ================= */
-export default function clientesPage() {
+export default function ClientesPage() {
   const [clientes, setclientes] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  
+  // Filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filterEstado, setFilterEstado] = useState("Todos");
+  
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     loadclientes();
   }, []);
+
+  // Reiniciar a la página 1 cuando se cambia la búsqueda o el filtro
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterEstado, itemsPerPage]);
 
   const loadclientes = async () => {
     setLoading(true);
@@ -261,17 +270,29 @@ export default function clientesPage() {
     }
   };
 
-const filteredclientes = clientes.filter((c) => {
-  const matchesSearch =
-    c.razonSocial?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.ruc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.contacto?.toLowerCase().includes(searchTerm.toLowerCase());
+  // 1. Aplicar Filtros
+  const filteredclientes = clientes.filter((c) => {
+    const matchesSearch =
+      c.razonSocial?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.ruc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.contacto?.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const matchesEstado =
-    filterEstado === "Todos" || c.estado === filterEstado;
+    const matchesEstado = filterEstado === "Todos" || c.estado === filterEstado;
 
-  return matchesSearch && matchesEstado;
-});
+    return matchesSearch && matchesEstado;
+  });
+
+  // 2. Lógica de Paginación
+  const totalPages = Math.ceil(filteredclientes.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredclientes.slice(indexOfFirstItem, indexOfLastItem);
+
+  const paginate = (pageNumber) => {
+    if (pageNumber > 0 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+    }
+  };
 
   const getEstadoBadge = (estado) => {
     const styles = {
@@ -365,14 +386,12 @@ const filteredclientes = clientes.filter((c) => {
               <select
                 value={filterEstado}
                 onChange={(e) => setFilterEstado(e.target.value)}
-                className="px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                className="px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none bg-white"
               >
                 <option value="Todos">Todos los estados</option>
                 <option value="Activo">Activo</option>
                 <option value="Inactivo">Inactivo</option>
               </select>
-
-  
 
               <button 
                 onClick={loadclientes}
@@ -405,68 +424,136 @@ const filteredclientes = clientes.filter((c) => {
                 </tr>
               </thead>
               <tbody>
-  {filteredclientes.length === 0 ? (
-    <tr>
-      <td colSpan="6" className="text-center py-12 text-gray-500">
-        <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-        <p className="font-medium">No se encontraron clientes</p>
-        <p className="text-sm mt-1">
-          {clientes.length === 0
-            ? "Agrega tu primer cliente para comenzar"
-            : "Intenta con otros filtros"}
-        </p>
-      </td>
-    </tr>
-  ) : (
-    filteredclientes.map((c) => (
-      <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
-        <td className="py-4 px-6">{c.razonSocial}</td>
-        <td className="py-4 px-6">{c.ruc}</td>
-        <td className="py-4 px-6">{c.contacto || "-"}</td>
-        <td className="py-4 px-6">{c.telefono || "-"}</td>
-        <td className="py-4 px-6">
-          <span className={`px-3 py-1 rounded-full text-xs ${getEstadoBadge(c.estado)}`}>
-            {c.estado}
-          </span>
-        </td>
-        <td className="py-4 px-6">
-          <button
-            onClick={() => {
-              setEditing(c);
-              setModalOpen(true);
-            }}
-            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-          >
-            <Edit2 size={16} />
-          </button>
-          <button
-            onClick={() => handleDelete(c.id)}
-            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-          >
-            <Trash2 size={16} />
-          </button>
-        </td>
-      </tr>
-    ))
-  )}
-</tbody>
-
+                {currentItems.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center py-12 text-gray-500">
+                      <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p className="font-medium">No se encontraron clientes</p>
+                      <p className="text-sm mt-1">
+                        {clientes.length === 0
+                          ? "Agrega tu primer cliente para comenzar"
+                          : "Intenta con otros filtros"}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  currentItems.map((c) => (
+                    <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-4 px-6">{c.razonSocial}</td>
+                      <td className="py-4 px-6">{c.ruc}</td>
+                      <td className="py-4 px-6">{c.contacto || "-"}</td>
+                      <td className="py-4 px-6">{c.telefono || "-"}</td>
+                      <td className="py-4 px-6">
+                        <span className={`px-3 py-1 rounded-full text-xs border ${getEstadoBadge(c.estado)}`}>
+                          {c.estado}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <button
+                          onClick={() => {
+                            setEditing(c);
+                            setModalOpen(true);
+                          }}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                          title="Editar"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(c.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg ml-1"
+                          title="Eliminar"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
             </table>
           </div>
 
-          {/* Footer */}
+          {/* Footer - Paginación */}
           {filteredclientes.length > 0 && (
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
-              <p className="text-sm text-gray-600">
-                Mostrando <span className="font-semibold text-gray-900">{filteredclientes.length}</span> de{" "}
-                <span className="font-semibold text-gray-900">{clientes.length}</span> clientes
-              </p>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <p className="text-sm text-gray-600">
+                  Mostrando <span className="font-semibold text-gray-900">{indexOfFirstItem + 1}</span> a <span className="font-semibold text-gray-900">{Math.min(indexOfLastItem, filteredclientes.length)}</span> de <span className="font-semibold text-gray-900">{filteredclientes.length}</span> resultados
+                </p>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Mostrar:</span>
+                  <select 
+                    value={itemsPerPage} 
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="border border-gray-200 rounded-md text-sm p-1 outline-none focus:border-blue-500 bg-white"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Controles de navegación */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => paginate(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  
+                  {/* Números de página */}
+                  <div className="flex gap-1">
+                    {[...Array(totalPages)].map((_, i) => {
+                      const page = i + 1;
+                      // Lógica simple para mostrar solo algunas páginas alrededor de la actual
+                      if (
+                        page === 1 || 
+                        page === totalPages || 
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+                      ) {
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => paginate(page)}
+                            className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                              currentPage === page 
+                                ? "bg-blue-600 text-white border border-blue-600" 
+                                : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      } else if (
+                        page === currentPage - 2 || 
+                        page === currentPage + 2
+                      ) {
+                        return <span key={page} className="px-1 text-gray-400">...</span>;
+                      }
+                      return null;
+                    })}
+                  </div>
+
+                  <button 
+                    onClick={() => paginate(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
-
-
 
       <ClienteModal
         isOpen={modalOpen}
