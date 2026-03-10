@@ -24,38 +24,31 @@ function AppLayout() {
     </ProtectedRoute>
   );
 }
-
 export default function App() {
   return (
     <Routes>
-      {/* PUBLICO */}
+      {/* --- RUTAS PÚBLICAS --- */}
       <Route path="/login" element={<Login />} />
-<Route path="/visor-cliente" element={<ListaLink />} />
-      {/* PRIVADO CON LAYOUT */}
+
+      {/* CORRECCIÓN: Se agrega la barra '/' antes de los ':' */}
+      <Route path="/visor-cliente/:token" element={<ListaLink />} />
+
+      {/* --- RUTAS PRIVADAS --- */}
       <Route path="/" element={<AppLayout />}>
-  <Route index element={<Navigate to="Avisos" replace />} />
-
-  <Route path="Avisos" element={<Mantenimiento />} />
-  <Route path="orden-trabajo" element={<OrdenTrabajo />} />
-  <Route path="equipos" element={<EquiposPage />} />
-  <Route path="ubicaciones-tecnicas" element={<UbicacionesTecnicasPage />} />
-  <Route path="clientes" element={<ClientesPage />} />
-  <Route path="planes-mantenimiento" element={<PlanesMantenimiento />} />
-  <Route path="trabajadores" element={<TrabajadoresPage />} />
-  <Route path="guiaMantenimiento" element={<MaintenanceGuides />} />
-  <Route path="GuiasKanban" element={<GuiasKanban/>} />
-
-{/* NUEVO ROUTE PARA LA LISTA DE ENLACES DE EQUIPOS */}
-
-
-
-
-</Route>
-
+        <Route index element={<Navigate to="Avisos" replace />} />
+        <Route path="Avisos" element={<Mantenimiento />} />
+        <Route path="orden-trabajo" element={<OrdenTrabajo />} />
+        <Route path="equipos" element={<EquiposPage />} />
+        <Route path="ubicaciones-tecnicas" element={<UbicacionesTecnicasPage />} />
+        <Route path="clientes" element={<ClientesPage />} />
+        <Route path="planes-mantenimiento" element={<PlanesMantenimiento />} />
+        <Route path="trabajadores" element={<TrabajadoresPage />} />
+        <Route path="guiaMantenimiento" element={<MaintenanceGuides />} />
+        <Route path="GuiasKanban" element={<GuiasKanban/>} />
+      </Route>
 
       {/* DEFAULT */}
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   );
 }
-
