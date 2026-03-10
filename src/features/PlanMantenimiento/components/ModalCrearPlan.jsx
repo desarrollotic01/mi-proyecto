@@ -40,6 +40,9 @@ const fromMinutes = (minutos, unidad) => {
   return unidad === "h" ? m / 60 : m;
 };
 
+
+
+
 const FRECUENCIAS = [
   { value: "POR_HORA", label: "Por hora" },
   { value: "DIARIA", label: "Diaria" },
@@ -67,6 +70,16 @@ const DEFAULT_ACTIVIDAD = () => ({
   items: [],
   adjuntos: [],
 });
+
+
+const Prueba = () => ({
+
+ 
+});
+
+
+
+
 
 const DEFAULT_ITEM_ACTIVIDAD = () => ({
   uid: uid(),
