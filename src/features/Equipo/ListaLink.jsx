@@ -17,12 +17,26 @@ export default function InventarioPaginacionPro() {
   useEffect(() => {
     const fetchProductos = async () => {
       try {
-        // Asegúrate que tu servidor Node.js esté corriendo en el puerto 5000
-        const response = await fetch('http://localhost:5000/api/productos');
+        // Asegúrate que esta URL sea la correcta de tu router (ej: /equipos en vez de /api/equipo)
+        const response = await fetch('http://localhost:4000/api/equipo');
+        
+        // 1. Validamos que la respuesta sea exitosa (Status 200-299)
+        if (!response.ok) {
+          throw new Error(`Error del servidor: ${response.status}`);
+        }
+
+        // 2. Validamos que el backend realmente nos esté mandando un JSON y no un HTML
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new TypeError("La ruta devuelta no es un JSON. Revisa la URL en el fetch.");
+        }
+
         const data = await response.json();
         setProductos(data);
       } catch (error) {
-        console.error("Error al obtener equipos del cliente:", error);
+        console.error("Fallo la conexión:", error.message);
+        // Si falla, evitamos que la tabla se quede cargando infinitamente
+        setProductos([]); 
       } finally {
         setCargando(false);
       }
@@ -30,21 +44,39 @@ export default function InventarioPaginacionPro() {
     fetchProductos();
   }, []);
 
-  // Lógica de Filtrado y Ordenamiento (Búsqueda multizona: Nombre, Código o Cliente)
+  // Lógica de Filtrado y Ordenamiento
   const datosProcesados = useMemo(() => {
-    let items = [...productos].filter(p => 
-      (
+    let items = [...productos].filter(p => {
+      // Extraemos el string de forma segura porque p.cliente viene como objeto desde PostgreSQL
+      const nombreCliente = typeof p.cliente === 'object' ? p.cliente?.razonSocial : (p.cliente || "");
+      
+      const coincideBusqueda = (
         p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) || 
         p.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        p.cliente?.toLowerCase().includes(busqueda.toLowerCase())
-      ) &&
-      (filtro === "TODOS" || p.estado === filtro)
-    );
+        nombreCliente?.toLowerCase().includes(busqueda.toLowerCase())
+      );
+
+      // Estandarizamos a mayúsculas para evitar problemas de "Operativo" vs "OPERATIVO"
+      const estadoMayusculas = p.estado?.toUpperCase() || "";
+      const coincideFiltro = filtro === "TODOS" || estadoMayusculas === filtro;
+
+      return coincideBusqueda && coincideFiltro;
+    });
     
     if (sortConfig.key) {
       items.sort((a, b) => {
-        const valA = a[sortConfig.key]?.toString().toLowerCase() || "";
-        const valB = b[sortConfig.key]?.toString().toLowerCase() || "";
+        let valA = a[sortConfig.key];
+        let valB = b[sortConfig.key];
+
+        // Si estamos ordenando por cliente, necesitamos comparar por la razón social
+        if (sortConfig.key === 'cliente') {
+           valA = typeof valA === 'object' ? valA?.razonSocial : valA;
+           valB = typeof valB === 'object' ? valB?.razonSocial : valB;
+        }
+
+        valA = valA?.toString().toLowerCase() || "";
+        valB = valB?.toString().toLowerCase() || "";
+        
         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
         if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
@@ -150,25 +182,25 @@ export default function InventarioPaginacionPro() {
                     <td className="px-6 py-3 font-black text-[11px] text-blue-600">{item.codigo}</td>
                     <td className="px-6 py-3 font-black text-slate-700 text-sm uppercase leading-tight">{item.nombre}</td>
                     
-                    {/* COLUMNA DE CLIENTE */}
+                    {/* COLUMNA DE CLIENTE SEGURA */}
                     <td className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-tight">
                       <div className="flex items-center gap-2">
                         <User size={12} className="text-slate-300" />
-                        {item.cliente || "Sin asignar"}
+                        {typeof item.cliente === 'object' ? item.cliente?.razonSocial : (item.cliente || "Sin asignar")}
                       </div>
                     </td>
 
                     <td className="px-6 py-3">
                       <span className={`px-3 py-1 rounded-full text-[9px] font-black border ${
-                        item.estado === 'OPERATIVO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                        item.estado === 'FALLA' ? 'bg-red-50 text-red-600 border-red-100' : 
+                        item.estado?.toUpperCase() === 'OPERATIVO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                        item.estado?.toUpperCase() === 'FALLA' ? 'bg-red-50 text-red-600 border-red-100' : 
                         'bg-orange-50 text-orange-600 border-orange-100'
                       }`}>
-                        {item.estado}
+                        {item.estado || "SIN ESTADO"}
                       </span>
                     </td>
-                    <td className="px-6 py-3 font-mono text-[10px] font-bold text-slate-400">{item.serie}</td>
-                    <td className="px-6 py-3 text-[10px] font-bold uppercase">{item.sede}</td>
+                    <td className="px-6 py-3 font-mono text-[10px] font-bold text-slate-400">{item.serie || "-"}</td>
+                    <td className="px-6 py-3 text-[10px] font-bold uppercase">{item.sede || "-"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -182,17 +214,17 @@ export default function InventarioPaginacionPro() {
             </p>
 
             <div className="flex items-center gap-2">
-              <button onClick={() => setPaginaActual(1)} disabled={paginaActual === 1} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 disabled:opacity-30 shadow-sm"><ChevronsLeft size={16} /></button>
-              <button onClick={() => setPaginaActual(p => Math.max(1, p - 1))} disabled={paginaActual === 1} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 disabled:opacity-30 shadow-sm"><ChevronLeft size={16} /></button>
+              <button onClick={() => setPaginaActual(1)} disabled={paginaActual === 1 || totalPaginas === 0} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 disabled:opacity-30 shadow-sm"><ChevronsLeft size={16} /></button>
+              <button onClick={() => setPaginaActual(p => Math.max(1, p - 1))} disabled={paginaActual === 1 || totalPaginas === 0} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 disabled:opacity-30 shadow-sm"><ChevronLeft size={16} /></button>
               <div className="flex items-center gap-1.5 px-2">
                 {obtenerPaginasVisibles().map((p, i) => (
                   p === '...' ? <span key={`sep-${i}`} className="px-2 text-slate-300 font-black">...</span> : (
-                    <button key={p} onClick={() => setPaginaActual(p)} className={`w-9 h-9 rounded-xl text-[11px] font-black transition-all ${paginaActual === p ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-400'}`}>{p}</button>
+                    <button key={p} onClick={() => setPaginaActual(p)} className={`w-9 h-9 rounded-xl text-[11px] font-black transition-all ${paginaActual === p ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-400 hover:text-blue-600'}`}>{p}</button>
                   )
                 ))}
               </div>
-              <button onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))} disabled={paginaActual === totalPaginas} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 disabled:opacity-30 shadow-sm"><ChevronRight size={16} /></button>
-              <button onClick={() => setPaginaActual(totalPaginas)} disabled={paginaActual === totalPaginas} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 disabled:opacity-30 shadow-sm"><ChevronsRight size={16} /></button>
+              <button onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))} disabled={paginaActual === totalPaginas || totalPaginas === 0} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 disabled:opacity-30 shadow-sm"><ChevronRight size={16} /></button>
+              <button onClick={() => setPaginaActual(totalPaginas)} disabled={paginaActual === totalPaginas || totalPaginas === 0} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 disabled:opacity-30 shadow-sm"><ChevronsRight size={16} /></button>
             </div>
           </div>
         </div>
