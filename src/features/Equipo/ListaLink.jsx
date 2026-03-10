@@ -17,6 +17,9 @@ export default function InventarioPaginacionPro() {
   useEffect(() => {
     const fetchProductos = async () => {
       try {
+
+
+        //CORREGIR 404
         // Asegúrate que esta URL sea la correcta de tu router (ej: /equipos en vez de /api/equipo)
         const response = await fetch('http://localhost:4000/api/equipo');
         
