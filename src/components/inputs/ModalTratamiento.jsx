@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   X,
   Save,
   ShoppingCart,
   CheckCircle,
-  Briefcase,
-  Wrench,
   FileText,
   Package,
   Plus,
@@ -15,12 +13,13 @@ import {
   ChevronUp,
   Clock,
   Layers,
-  Tag,
+  MapPinned,
 } from "lucide-react";
 
 import {
   createTratamiento,
   saveTratamientoDraft,
+  getTratamientoByAviso,
 } from "../../features/mantenimiento/services/tratamientoService";
 import { equipoService } from "../../features/mantenimiento/services/equipoService";
 import ModalSolicitudCompra from "./ModalSolicitudCompra";
@@ -29,13 +28,11 @@ import { CAMPOS_AVISO } from "./camposAviso";
 import { planMantenimientoService } from "../../features/PlanMantenimiento/services/planMantenimientoService";
 
 /* ══════════════════════════════════════════════
-   CONSTANTES / TEMPLATES
+   CONSTANTES
 ══════════════════════════════════════════════ */
 
-// ✅ Correctivo: solo REPARACION o CAMBIO
 const TIPOS_TRABAJO_CORRECTIVO = ["REPARACION", "CAMBIO"];
 
-// ✅ Roles técnicos (igual a tu ENUM backend)
 const ROLES_TECNICOS = [
   { value: "tecnico_electrico", label: "Técnico Eléctrico" },
   { value: "operario_de_mantenimiento", label: "Operario Mantenimiento" },
@@ -43,7 +40,6 @@ const ROLES_TECNICOS = [
   { value: "supervisor", label: "Supervisor" },
 ];
 
-// ✅ Actividad manual (Correctivo) — incluye rol + cantidad
 const ACTIVIDAD_VACIA = {
   sistema: "",
   subsistema: "",
@@ -54,83 +50,163 @@ const ACTIVIDAD_VACIA = {
   rolTecnico: "tecnico_mecanico",
   cantidadTecnicos: 1,
   duracionEstimadaValor: 0,
-  unidadDuracion: "min", // "min" | "h"
+  unidadDuracion: "min",
   observaciones: "",
+};
+
+const TARGET_TYPES = {
+  EQUIPO: "EQUIPO",
+  UBICACION: "UBICACION_TECNICA",
+};
+
+const ensureId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+const getRelUbicacionId = (rel) =>
+  rel?.ubicacionId ||
+  rel?.ubicacionTecnicaId ||
+  rel?.ubicacion?.id ||
+  rel?.ubicacionTecnica?.id ||
+  null;
+
+const getRelEquipoId = (rel) => rel?.equipoId || rel?.equipo?.id || null;
+
+const normalizeLinea = (l = {}) => ({
+  id: l.id || ensureId(),
+  itemCode: l.itemCode || "",
+  description: l.description || "",
+  quantity:
+    Number.isFinite(Number(l.quantity)) && Number(l.quantity) > 0
+      ? Number(l.quantity)
+      : 1,
+  warehouseCode: l.warehouseCode || "01",
+  costCenter: l.costCenter || l.costingCode || "",
+  projectCode: l.projectCode || "",
+  rubro: l.rubro || "",
+  paqueteTrabajo: l.paqueteTrabajo || "",
+  origen: l.origen || undefined,
+});
+
+const emptySolicitudForm = () => ({
+  department: "",
+  email: "",
+  requiredDate: "",
+  comments: "",
+  lineas: [normalizeLinea()],
+});
+
+const normalizeSolicitudForm = (form) => {
+  const f = form || emptySolicitudForm();
+  const lineas = Array.isArray(f.lineas) ? f.lineas : [];
+
+  return {
+    ...emptySolicitudForm(),
+    ...f,
+    lineas: lineas.length > 0 ? lineas.map(normalizeLinea) : [normalizeLinea()],
+  };
 };
 
 export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) {
   const [equipos, setEquipos] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingPlanes, setLoadingPlanes] = useState(false);
 
   const [showSolicitud, setShowSolicitud] = useState(false);
   const [showConfigCampos, setShowConfigCampos] = useState(false);
 
-  // ✅ valor que se manda al backend (solicitudGeneral + solicitudesPorEquipo)
   const [solicitudes, setSolicitudes] = useState(null);
-
   const [collapsed, setCollapsed] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
+  const [tratamientoExistente, setTratamientoExistente] = useState(null);
 
-  // ✅ data alineada a tu backend
+  const [planesPorTarget, setPlanesPorTarget] = useState({});
+
   const [data, setData] = useState({
-    actividadesManuales: {}, // { [equipoId]: ActividadManual[] }
-    planesSeleccionados: {}, // { [equipoId]: planId }
-    // ✅ preventivo editable por equipo
-    preventivoPorEquipo: {}, // { [equipoId]: { planId, nombrePlan, codigoPlan, actividades: [] } }
+    actividadesManuales: {},
+    planesSeleccionados: {},
+    preventivoPorEquipo: {},
   });
 
-  /* ─────────────────────────────
-     Flags
-  ───────────────────────────── */
   const esCorrectivo = aviso?.tipoMantenimiento === "Correctivo";
   const esPreventivo =
     aviso?.tipoAviso === "mantenimiento" &&
     aviso?.tipoMantenimiento === "Preventivo";
 
-  const tieneEquipos = (aviso?.equiposRelacion?.length || 0) > 0;
-  const tieneUbicaciones = (aviso?.ubicacionesRelacion?.length || 0) > 0;
-
   const cantSolicitudesIndividuales = Object.keys(
     solicitudes?.solicitudesPorEquipo || {}
   ).length;
 
-  /* ─────────────────────────────
-     Carga inicial + RESET (bug de estados pegados)
-  ───────────────────────────── */
-  useEffect(() => {
-    if (!isOpen || !aviso) return;
+  const equiposMap = useMemo(() => {
+    const map = new Map();
+    for (const e of equipos || []) {
+      map.set(String(e.id), e);
+    }
+    return map;
+  }, [equipos]);
 
-    setErrorMsg("");
+  const targets = useMemo(() => {
+    const equiposTargets = (aviso?.equiposRelacion || []).map((rel) => {
+      const id = getRelEquipoId(rel);
+      const equipoFull = id ? equiposMap.get(String(id)) : null;
+      const equipoInfo = equipoFull || rel?.equipo || {};
 
-    // ✅ limpiar estado cuando abres otro aviso
-    setSolicitudes(null);
-    setCollapsed({});
-    setData({
-      actividadesManuales: {},
-      planesSeleccionados: {},
-      preventivoPorEquipo: {},
+      return {
+        id: String(id),
+        type: TARGET_TYPES.EQUIPO,
+        rel,
+        raw: equipoInfo,
+        nombre:
+          equipoInfo?.nombre ||
+          equipoInfo?.descripcion ||
+          equipoInfo?.tag ||
+          `Equipo ${id}`,
+        tag: equipoInfo?.tag || equipoInfo?.codigo || id,
+        ubicacion:
+          equipoInfo?.ubicacion ||
+          equipoInfo?.ubicacionTexto ||
+          equipoInfo?.area ||
+          "",
+      };
     });
 
-    equipoService
-      .getEquipos()
-      .then((eData) => {
-        setEquipos(eData || []);
-      })
-      .catch(() => {
-        setEquipos([]);
-      });
-  }, [isOpen, aviso?.id]);
+    const ubicacionesTargets = (aviso?.ubicacionesRelacion || []).map((rel) => {
+      const id = getRelUbicacionId(rel);
+      const ut = rel?.ubicacionTecnica || rel?.ubicacion || {};
 
-  /* ─────────────────────────────
-     Helpers
-  ───────────────────────────── */
-  const getEquipoInfo = (id) =>
-    equipos.find((e) => e.id === id) || { nombre: id, tag: id };
+      return {
+        id: String(id),
+        type: TARGET_TYPES.UBICACION,
+        rel,
+        raw: ut,
+        nombre:
+          ut?.nombre ||
+          ut?.descripcion ||
+          ut?.codigo ||
+          `Ubicación técnica ${id}`,
+        tag: ut?.codigo || id,
+        ubicacion: ut?.ubicacion || ut?.area || "",
+      };
+    });
 
-  const getEquipoFull = (id) => equipos.find((e) => e.id === id);
+    return [...equiposTargets, ...ubicacionesTargets].filter((t) => !!t.id);
+  }, [aviso, equiposMap]);
 
-  const getUbicacionInfo = (id) => {
-    return { nombre: `Ubicación técnica`, tag: id };
+  const getTargetInfo = (targetId) => {
+    return (
+      targets.find((t) => String(t.id) === String(targetId)) || {
+        id: String(targetId),
+        nombre: `Objetivo ${targetId}`,
+        tag: String(targetId),
+        ubicacion: "",
+        type: TARGET_TYPES.EQUIPO,
+      }
+    );
+  };
+
+  const getPlanesDisponibles = (targetId) => {
+    return planesPorTarget[String(targetId)] || [];
   };
 
   const toggleCollapse = (key) =>
@@ -139,8 +215,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
   const toMinutes = (valor, unidad) => {
     const v = Number(valor);
     if (!Number.isFinite(v) || v <= 0) return 0;
-    if (unidad === "h") return Math.round(v * 60);
-    return Math.round(v);
+    return unidad === "h" ? Math.round(v * 60) : Math.round(v);
   };
 
   const minutesToEditableValue = (min, unidad) => {
@@ -148,9 +223,6 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     return unidad === "h" ? Number(min) / 60 : Number(min);
   };
 
-  /* ─────────────────────────────
-     AUTO-CARGA: PlanActividadItem -> lineas solicitud
-  ───────────────────────────── */
   const getActividadesFromPlan = (planSel) => {
     return (
       planSel?.actividades ||
@@ -180,7 +252,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
       for (const it of items) {
         lineas.push({
-          id: crypto.randomUUID(),
+          id: ensureId(),
           itemCode: it.itemCode || "",
           description: it.item || act.tarea || "Recurso de plan",
           quantity: Number(it.cantidad) || 1,
@@ -189,12 +261,11 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
           projectCode: "",
           rubro: it.recurso || "",
           paqueteTrabajo: "",
-          origen: "PLAN", // ✅ CLAVE PARA BORRAR/REEMPLAZAR
+          origen: "PLAN",
         });
       }
     }
 
-    // dedupe (sumar cantidades)
     const keyOf = (l) =>
       `${(l.itemCode || "").trim()}__${(l.description || "").trim()}__${(
         l.rubro || ""
@@ -210,18 +281,250 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     return Array.from(map.values()).filter((l) => l.itemCode || l.description);
   };
 
-  /* ─────────────────────────────
-     PREVENTIVO: seleccionar plan (FIX items pegados)
-     - REEMPLAZA items PLAN previos por equipo
-     - mantiene lineas manuales
-  ───────────────────────────── */
-  const seleccionarPlan = async (equipoId, planId) => {
+  const hydrateFromTratamiento = async (tratamiento) => {
+    if (!tratamiento) return;
+
+    setTratamientoExistente(tratamiento);
+
+    const solicitudesCompra = tratamiento?.solicitudesCompra || [];
+
+    const solicitudGeneralDb =
+      solicitudesCompra.find((s) => s.esGeneral) || null;
+
+    const solicitudesPorTargetDb = {};
+    for (const s of solicitudesCompra.filter((x) => !x.esGeneral)) {
+      const key = String(s.equipo_id || s.ubicacion_tecnica_id);
+      solicitudesPorTargetDb[key] = normalizeSolicitudForm({
+        department: s.department || "",
+        email: s.requester || "",
+        requiredDate: s.requiredDate
+          ? String(s.requiredDate).slice(0, 10)
+          : "",
+        comments: s.comments || "",
+        lineas: (s.lineas || []).map((l) =>
+          normalizeLinea({
+            itemCode: l.itemCode,
+            description: l.description,
+            quantity: l.quantity,
+            warehouseCode: l.warehouseCode,
+            costCenter: l.costingCode,
+            projectCode: l.projectCode,
+            rubro: l.rubro,
+            paqueteTrabajo: l.paqueteTrabajo,
+          })
+        ),
+      });
+    }
+
+    setSolicitudes({
+      solicitudGeneral: normalizeSolicitudForm(
+        solicitudGeneralDb
+          ? {
+              department: solicitudGeneralDb.department || "",
+              email: solicitudGeneralDb.requester || "",
+              requiredDate: solicitudGeneralDb.requiredDate
+                ? String(solicitudGeneralDb.requiredDate).slice(0, 10)
+                : "",
+              comments: solicitudGeneralDb.comments || "",
+              lineas: (solicitudGeneralDb.lineas || []).map((l) =>
+                normalizeLinea({
+                  itemCode: l.itemCode,
+                  description: l.description,
+                  quantity: l.quantity,
+                  warehouseCode: l.warehouseCode,
+                  costCenter: l.costingCode,
+                  projectCode: l.projectCode,
+                  rubro: l.rubro,
+                  paqueteTrabajo: l.paqueteTrabajo,
+                })
+              ),
+            }
+          : emptySolicitudForm()
+      ),
+      solicitudesPorEquipo: solicitudesPorTargetDb,
+    });
+
+    const planesSeleccionados = {};
+    const preventivoPorEquipo = {};
+    const actividadesManuales = {};
+
+    for (const te of tratamiento?.equipos || []) {
+      const targetId = String(te.equipoId || te.ubicacionTecnicaId);
+      const acts = te.actividades || [];
+
+      if (te.planMantenimientoId) {
+        planesSeleccionados[targetId] = te.planMantenimientoId;
+        preventivoPorEquipo[targetId] = {
+          planId: te.planMantenimientoId,
+          nombrePlan: te.planMantenimiento?.nombre || "",
+          codigoPlan: te.planMantenimiento?.codigoPlan || "",
+          actividades: acts.map((a) => ({
+            planMantenimientoActividadId: a.planMantenimientoActividadId || null,
+            codigoActividad: a.codigoActividad || null,
+            sistema: a.sistema || "",
+            subsistema: a.subsistema || "",
+            componente: a.componente || "",
+            tarea: a.tarea || "",
+            tipoTrabajo: a.tipoTrabajo || "",
+            rolTecnico: a.rolTecnico || null,
+            duracionEstimadaValor: minutesToEditableValue(
+              a.duracionEstimadaMin || 0,
+              a.unidadDuracion || "min"
+            ),
+            unidadDuracion: a.unidadDuracion || "min",
+            cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
+            observaciones: a.observaciones || "",
+          })),
+        };
+      } else {
+        actividadesManuales[targetId] = acts.map((a) => ({
+          sistema: a.sistema || "",
+          subsistema: a.subsistema || "",
+          componente: a.componente || "",
+          tarea: a.tarea || "",
+          descripcion: a.descripcion || "",
+          tipoTrabajo: a.tipoTrabajo || "REPARACION",
+          rolTecnico: a.rolTecnico || "tecnico_mecanico",
+          cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
+          duracionEstimadaValor: minutesToEditableValue(
+            a.duracionEstimadaMin || 0,
+            a.unidadDuracion || "min"
+          ),
+          unidadDuracion: a.unidadDuracion || "min",
+          observaciones: a.observaciones || "",
+        }));
+      }
+    }
+
+    setData({
+      actividadesManuales,
+      planesSeleccionados,
+      preventivoPorEquipo,
+    });
+  };
+
+  useEffect(() => {
+    if (!isOpen || !aviso) return;
+
+    let active = true;
+
+    const load = async () => {
+      setErrorMsg("");
+      setSolicitudes(null);
+      setCollapsed({});
+      setTratamientoExistente(null);
+      setPlanesPorTarget({});
+      setData({
+        actividadesManuales: {},
+        planesSeleccionados: {},
+        preventivoPorEquipo: {},
+      });
+
+      try {
+        const eData = await equipoService.getEquipos();
+        if (!active) return;
+        setEquipos(eData || []);
+      } catch {
+        if (!active) return;
+        setEquipos([]);
+      }
+    };
+
+    load();
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, aviso?.id]);
+
+  useEffect(() => {
+    if (!isOpen || !aviso || !targets.length) return;
+
+    let active = true;
+
+    const cargarPlanesPorTarget = async () => {
+      setLoadingPlanes(true);
+
+      try {
+        const resultados = await Promise.all(
+          targets.map(async (target) => {
+            try {
+              let planes = [];
+
+              if (target.type === TARGET_TYPES.EQUIPO) {
+                planes = await planMantenimientoService.getPlanesByEquipo(
+                  target.id
+                );
+              } else {
+                planes =
+                  await planMantenimientoService.getPlanesByUbicacionTecnica(
+                    target.id
+                  );
+              }
+
+              return [String(target.id), Array.isArray(planes) ? planes : []];
+            } catch (error) {
+              console.error(
+                `Error cargando planes para ${target.type} ${target.id}:`,
+                error
+              );
+              return [String(target.id), []];
+            }
+          })
+        );
+
+        if (!active) return;
+
+        const mapa = Object.fromEntries(resultados);
+        setPlanesPorTarget(mapa);
+      } catch (error) {
+        console.error("Error cargando planes por target:", error);
+        if (active) setPlanesPorTarget({});
+      } finally {
+        if (active) setLoadingPlanes(false);
+      }
+    };
+
+    cargarPlanesPorTarget();
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, aviso?.id, targets]);
+
+  useEffect(() => {
+    if (!isOpen || !aviso || targets.length === 0) return;
+
+    let active = true;
+
+    const loadTratamiento = async () => {
+      try {
+        const tratamiento = await getTratamientoByAviso(aviso.id);
+        if (!active) return;
+        if (tratamiento?.id) {
+          await hydrateFromTratamiento(tratamiento);
+        } else {
+          setTratamientoExistente(null);
+        }
+      } catch {
+        if (!active) return;
+        setTratamientoExistente(null);
+      }
+    };
+
+    loadTratamiento();
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, aviso?.id, targets.length]);
+
+  const seleccionarPlan = async (targetId, planId) => {
     setData((prev) => ({
       ...prev,
-      planesSeleccionados: { ...prev.planesSeleccionados, [equipoId]: planId },
+      planesSeleccionados: { ...prev.planesSeleccionados, [targetId]: planId },
     }));
 
-    // ✅ si quitan el plan: borrar items origen PLAN y limpiar actividades cargadas
     if (!planId) {
       setSolicitudes((prev) => {
         if (!prev) return prev;
@@ -229,14 +532,14 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
           ...prev,
           solicitudesPorEquipo: { ...(prev.solicitudesPorEquipo || {}) },
         };
-        const actual = base.solicitudesPorEquipo?.[equipoId];
+        const actual = base.solicitudesPorEquipo?.[targetId];
         if (!actual) return prev;
 
         return {
           ...base,
           solicitudesPorEquipo: {
             ...base.solicitudesPorEquipo,
-            [equipoId]: {
+            [targetId]: {
               ...actual,
               lineas: (actual.lineas || []).filter((l) => l.origen !== "PLAN"),
             },
@@ -245,9 +548,17 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
       });
 
       setData((prev) => {
-        const copy = { ...(prev.preventivoPorEquipo || {}) };
-        delete copy[equipoId];
-        return { ...prev, preventivoPorEquipo: copy };
+        const copyPrev = { ...(prev.preventivoPorEquipo || {}) };
+        delete copyPrev[targetId];
+
+        const copySel = { ...(prev.planesSeleccionados || {}) };
+        delete copySel[targetId];
+
+        return {
+          ...prev,
+          planesSeleccionados: copySel,
+          preventivoPorEquipo: copyPrev,
+        };
       });
 
       return;
@@ -255,14 +566,15 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
     try {
       const planSel = await planMantenimientoService.getPlanById(planId);
-
-      // 1) ✅ auto-carga items: reemplazar PLAN anterior
       const lineasAuto = planItemsToLineas(planSel);
 
       setSolicitudes((prev) => {
-        const base = prev || { solicitudGeneral: null, solicitudesPorEquipo: {} };
+        const base = prev || {
+          solicitudGeneral: null,
+          solicitudesPorEquipo: {},
+        };
 
-        const actual = base.solicitudesPorEquipo?.[equipoId] || {
+        const actual = base.solicitudesPorEquipo?.[targetId] || {
           department: base.solicitudGeneral?.department || "",
           email: base.solicitudGeneral?.email || "",
           requiredDate:
@@ -274,7 +586,6 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
         const manuales = (actual.lineas || []).filter((l) => l.origen !== "PLAN");
 
-        // dedupe global
         const keyOf = (l) =>
           `${(l.itemCode || "").trim()}__${(l.description || "").trim()}__${(
             l.rubro || ""
@@ -291,7 +602,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
           ...base,
           solicitudesPorEquipo: {
             ...(base.solicitudesPorEquipo || {}),
-            [equipoId]: {
+            [targetId]: {
               ...actual,
               lineas: Array.from(map.values()),
             },
@@ -299,7 +610,6 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         };
       });
 
-      // 2) actividades editables por equipo (desde plan)
       const actividades = getActividadesFromPlan(planSel);
 
       const editable = (actividades || []).map((a) => {
@@ -309,18 +619,15 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         return {
           planMantenimientoActividadId: a.id,
           codigoActividad: a.codigoActividad || null,
-
           sistema: a.sistema || "",
           subsistema: a.subsistema || "",
           componente: a.componente || "",
           tarea: a.tarea || "",
           tipoTrabajo: a.tipoTrabajo || "",
           rolTecnico: a.rolTecnico || null,
-
           duracionEstimadaValor: minutesToEditableValue(min, unidad),
           unidadDuracion: unidad,
           cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
-
           observaciones: "",
         };
       });
@@ -329,7 +636,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         ...prev,
         preventivoPorEquipo: {
           ...prev.preventivoPorEquipo,
-          [equipoId]: {
+          [targetId]: {
             planId,
             nombrePlan: planSel?.nombre || "",
             codigoPlan: planSel?.codigoPlan || "",
@@ -338,13 +645,13 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         },
       }));
     } catch (e) {
-      console.error("Error cargando plan para autocarga:", e);
+      console.error("Error cargando plan:", e);
     }
   };
 
-  const updatePreventivoActividad = (equipoId, idx, campo, valor) => {
+  const updatePreventivoActividad = (targetId, idx, campo, valor) => {
     setData((prev) => {
-      const prevEq = prev.preventivoPorEquipo?.[equipoId];
+      const prevEq = prev.preventivoPorEquipo?.[targetId];
       if (!prevEq) return prev;
 
       const acts = [...(prevEq.actividades || [])];
@@ -356,6 +663,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
           ? Math.max(1, Math.floor(n))
           : 1;
       }
+
       if (campo === "duracionEstimadaValor") {
         const n = Number(valor);
         acts[idx].duracionEstimadaValor = Number.isFinite(n) ? n : 0;
@@ -365,30 +673,27 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         ...prev,
         preventivoPorEquipo: {
           ...prev.preventivoPorEquipo,
-          [equipoId]: { ...prevEq, actividades: acts },
+          [targetId]: { ...prevEq, actividades: acts },
         },
       };
     });
   };
 
-  /* ─────────────────────────────
-     Correctivo: actividades manuales
-  ───────────────────────────── */
-  const agregarActividad = (equipoId) =>
+  const agregarActividad = (targetId) =>
     setData((prev) => ({
       ...prev,
       actividadesManuales: {
         ...prev.actividadesManuales,
-        [equipoId]: [
-          ...(prev.actividadesManuales[equipoId] || []),
+        [targetId]: [
+          ...(prev.actividadesManuales[targetId] || []),
           { ...ACTIVIDAD_VACIA },
         ],
       },
     }));
 
-  const actualizarActividad = (equipoId, idx, campo, valor) =>
+  const actualizarActividad = (targetId, idx, campo, valor) =>
     setData((prev) => {
-      const lista = [...(prev.actividadesManuales[equipoId] || [])];
+      const lista = [...(prev.actividadesManuales[targetId] || [])];
       lista[idx] = { ...lista[idx], [campo]: valor };
 
       if (campo === "cantidadTecnicos") {
@@ -397,6 +702,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
           ? Math.max(1, Math.floor(n))
           : 1;
       }
+
       if (campo === "duracionEstimadaValor") {
         const n = Number(valor);
         lista[idx].duracionEstimadaValor = Number.isFinite(n) ? n : 0;
@@ -404,87 +710,72 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
       return {
         ...prev,
-        actividadesManuales: { ...prev.actividadesManuales, [equipoId]: lista },
+        actividadesManuales: { ...prev.actividadesManuales, [targetId]: lista },
       };
     });
 
-  const eliminarActividad = (equipoId, idx) =>
+  const eliminarActividad = (targetId, idx) =>
     setData((prev) => ({
       ...prev,
       actividadesManuales: {
         ...prev.actividadesManuales,
-        [equipoId]: (prev.actividadesManuales[equipoId] || []).filter(
+        [targetId]: (prev.actividadesManuales[targetId] || []).filter(
           (_, i) => i !== idx
         ),
       },
     }));
 
-  /* ─────────────────────────────
-     Validaciones antes de guardar
-  ───────────────────────────── */
   const validateBeforeSave = () => {
-    const targets = [
-      ...(aviso?.equiposRelacion || []).map((e) => e.equipoId),
-      ...(aviso?.ubicacionesRelacion || []).map((u) => u.ubicacionTecnicaId),
-    ];
+    if (!targets.length) {
+      return "El aviso no tiene equipos ni ubicaciones asociadas.";
+    }
 
-    if (!targets.length) return "El aviso no tiene equipos ni ubicaciones asociadas.";
-
-    // preventivo: plan por equipo
-    if (esPreventivo && tieneEquipos) {
-      for (const rel of aviso.equiposRelacion) {
-        const planId = data.planesSeleccionados?.[rel.equipoId];
+    if (esPreventivo) {
+      for (const target of targets) {
+        const planId = data.planesSeleccionados?.[target.id];
         if (!planId) {
-          const info = getEquipoInfo(rel.equipoId);
-          return `Seleccioná un plan para el equipo: ${info.nombre || info.tag || rel.equipoId}`;
+          return `Selecciona un plan para ${
+            target.type === TARGET_TYPES.EQUIPO ? "el equipo" : "la ubicación técnica"
+          }: ${target.nombre}`;
         }
 
-        const acts = data.preventivoPorEquipo?.[rel.equipoId]?.actividades || [];
+        const acts = data.preventivoPorEquipo?.[target.id]?.actividades || [];
         if (!acts.length) {
-          const info = getEquipoInfo(rel.equipoId);
-          return `No se cargaron actividades del plan para el equipo: ${info.nombre || info.tag || rel.equipoId}`;
+          return `No se cargaron actividades del plan para ${target.nombre}.`;
         }
 
         for (const [i, a] of acts.entries()) {
           if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0) {
-            const info = getEquipoInfo(rel.equipoId);
-            return `Equipo ${info.nombre || info.tag || rel.equipoId}: actividad #${i + 1} cantidadTecnicos inválida.`;
+            return `${target.nombre}: actividad #${i + 1} cantidadTecnicos inválida.`;
           }
         }
       }
     }
 
-    // correctivo: actividades manuales
-    if (esCorrectivo && tieneEquipos) {
-      for (const rel of aviso.equiposRelacion) {
-        const acts = data.actividadesManuales?.[rel.equipoId] || [];
+    if (esCorrectivo) {
+      for (const target of targets) {
+        const acts = data.actividadesManuales?.[target.id] || [];
         if (acts.length === 0) {
-          const info = getEquipoInfo(rel.equipoId);
-          return `Equipo ${info.nombre || info.tag || rel.equipoId}: agregá al menos 1 actividad.`;
+          return `${target.nombre}: agrega al menos 1 actividad.`;
         }
 
         for (const [idx, a] of acts.entries()) {
           if (!a.tarea || !String(a.tarea).trim()) {
-            const info = getEquipoInfo(rel.equipoId);
-            return `Equipo ${info.nombre || info.tag || rel.equipoId}: actividad #${idx + 1} sin tarea.`;
+            return `${target.nombre}: actividad #${idx + 1} sin tarea.`;
           }
           if (a.tipoTrabajo && !TIPOS_TRABAJO_CORRECTIVO.includes(a.tipoTrabajo)) {
-            const info = getEquipoInfo(rel.equipoId);
-            return `Equipo ${info.nombre || info.tag || rel.equipoId}: tipoTrabajo inválido (solo REPARACION/CAMBIO).`;
+            return `${target.nombre}: tipoTrabajo inválido (solo REPARACION/CAMBIO).`;
           }
           if (!a.rolTecnico) {
-            const info = getEquipoInfo(rel.equipoId);
-            return `Equipo ${info.nombre || info.tag || rel.equipoId}: actividad #${idx + 1} sin rolTecnico.`;
+            return `${target.nombre}: actividad #${idx + 1} sin rolTecnico.`;
           }
           if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0) {
-            const info = getEquipoInfo(rel.equipoId);
-            return `Equipo ${info.nombre || info.tag || rel.equipoId}: actividad #${idx + 1} cantidadTecnicos inválida.`;
+            return `${target.nombre}: actividad #${idx + 1} cantidadTecnicos inválida.`;
           }
         }
       }
     }
 
-    // backend exige solicitudGeneral
     if (!solicitudes?.solicitudGeneral) {
       return "Falta completar la Solicitud de Compra (General).";
     }
@@ -492,14 +783,11 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     return "";
   };
 
-  /* ─────────────────────────────
-     Construir payload (reusable)
-  ───────────────────────────── */
   const buildPayload = () => {
-    // 1) manuales normalizados
     const actividadesManualesNormalizadas = {};
-    for (const [equipoId, acts] of Object.entries(data.actividadesManuales || {})) {
-      actividadesManualesNormalizadas[equipoId] = (acts || []).map((a) => {
+
+    for (const [targetId, acts] of Object.entries(data.actividadesManuales || {})) {
+      actividadesManualesNormalizadas[targetId] = (acts || []).map((a) => {
         const unidad = a.unidadDuracion || "min";
         const valor = Number(a.duracionEstimadaValor) || 0;
 
@@ -520,18 +808,18 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
       });
     }
 
-    // 2) preventivo overrides
     const actividadesPlanEditadas = {};
-    for (const rel of aviso.equiposRelacion || []) {
-      const equipoId = rel.equipoId;
-      const pack = data.preventivoPorEquipo?.[equipoId];
+
+    for (const target of targets) {
+      const pack = data.preventivoPorEquipo?.[target.id];
       if (!pack?.actividades?.length) continue;
 
-      actividadesPlanEditadas[equipoId] = pack.actividades.map((a) => ({
+      actividadesPlanEditadas[target.id] = pack.actividades.map((a) => ({
         planMantenimientoActividadId: a.planMantenimientoActividadId,
         duracionEstimadaValor: Number(a.duracionEstimadaValor) || 0,
         unidadDuracion: a.unidadDuracion || "min",
-        duracionEstimadaMin: toMinutes(a.duracionEstimadaValor, a.unidadDuracion) || 0,
+        duracionEstimadaMin:
+          toMinutes(a.duracionEstimadaValor, a.unidadDuracion) || 0,
         cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
         observaciones: a.observaciones || null,
       }));
@@ -548,9 +836,6 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     };
   };
 
-  /* ─────────────────────────────
-     Guardar FINAL
-  ───────────────────────────── */
   const handleGuardar = async () => {
     setErrorMsg("");
     const msg = validateBeforeSave();
@@ -561,7 +846,14 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
     setLoading(true);
     try {
-      await createTratamiento(aviso.id, buildPayload());
+      const payload = buildPayload();
+
+      if (tratamientoExistente?.id) {
+        await saveTratamientoDraft(tratamientoExistente.id, payload);
+      } else {
+        await createTratamiento(aviso.id, payload);
+      }
+
       onSuccess?.();
       onClose?.();
     } catch (err) {
@@ -574,9 +866,6 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     }
   };
 
-  /* ─────────────────────────────
-     Guardar CAMBIOS (PENDIENTE)
-  ───────────────────────────── */
   const handleGuardarCambios = async () => {
     setErrorMsg("");
     const msg = validateBeforeSave();
@@ -585,9 +874,16 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
       return;
     }
 
+    if (!tratamientoExistente?.id) {
+      setErrorMsg(
+        "Todavía no existe un tratamiento creado para este aviso. Primero debes guardar el tratamiento."
+      );
+      return;
+    }
+
     setLoading(true);
     try {
-      await saveTratamientoDraft(aviso.id, buildPayload());
+      await saveTratamientoDraft(tratamientoExistente.id, buildPayload());
       alert("✅ Cambios guardados como PENDIENTE.");
     } catch (err) {
       console.log("BACKEND ERROR:", err?.response?.data);
@@ -607,7 +903,6 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     <>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex justify-center items-center p-4">
         <div className="bg-white w-full max-w-[92rem] h-[94vh] rounded-2xl shadow-2xl flex flex-col border border-slate-200">
-          {/* ── HEADER ── */}
           <div className="p-6 border-b bg-slate-50 flex justify-between items-center shrink-0">
             <div className="flex gap-4 items-center">
               <div className="p-3 bg-slate-900 rounded-xl">
@@ -624,6 +919,11 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                       {aviso.tipoMantenimiento}
                     </span>
                   )}
+                  {tratamientoExistente?.id && (
+                    <span className="text-xs px-2.5 py-1 rounded-full font-semibold border border-emerald-200 bg-emerald-50 text-emerald-700">
+                      Tratamiento cargado
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -636,16 +936,13 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
             </button>
           </div>
 
-          {/* ── BODY ── */}
           <div className="flex-1 overflow-y-auto p-8 space-y-8">
-            {/* ERROR */}
             {errorMsg && (
               <div className="border border-rose-200 bg-rose-50 text-rose-700 rounded-2xl p-4 text-sm font-medium">
                 ⚠️ {errorMsg}
               </div>
             )}
 
-            {/* INFORMACIÓN DEL AVISO */}
             <Section title="Información del Aviso">
               <Grid>
                 {Object.entries(CAMPOS_AVISO).map(([key, label]) =>
@@ -662,90 +959,62 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                 </div>
               )}
 
-              {tieneEquipos && (
+              {targets.length > 0 && (
                 <div className="mt-5">
                   <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
-                    Equipos Asociados
+                    Objetivos Asociados
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {aviso.equiposRelacion.map((e) => {
-                      const info = getEquipoInfo(e.equipoId);
-                      return (
-                        <div
-                          key={e.id}
-                          className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl"
-                        >
-                          <div className="p-2 bg-slate-900 rounded-lg shrink-0">
-                            <Package className="w-5 h-5 text-white" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-900 truncate">
-                              {info.nombre || info.tag || "Sin nombre"}
-                            </p>
-                            {info.tag && info.nombre && (
-                              <p className="text-xs text-slate-500 font-medium">
-                                TAG: {info.tag}
-                              </p>
-                            )}
-                            {info.ubicacion && (
-                              <p className="text-xs text-slate-500">📍 {info.ubicacion}</p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
-              {tieneUbicaciones && (
-                <div className="mt-5">
-                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
-                    Ubicaciones Técnicas Asociadas
-                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {aviso.ubicacionesRelacion.map((u) => {
-                      const info = getUbicacionInfo(u.ubicacionTecnicaId);
-                      return (
-                        <div
-                          key={u.id || u.ubicacionTecnicaId}
-                          className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl"
-                        >
-                          <div className="p-2 bg-slate-900 rounded-lg shrink-0">
-                            <Tag className="w-5 h-5 text-white" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-900 truncate">{info.nombre}</p>
-                            <p className="text-xs text-slate-500 font-medium truncate">{info.tag}</p>
-                          </div>
+                    {targets.map((t) => (
+                      <div
+                        key={`${t.type}-${t.id}`}
+                        className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl"
+                      >
+                        <div className="p-2 bg-slate-900 rounded-lg shrink-0">
+                          {t.type === TARGET_TYPES.EQUIPO ? (
+                            <Package className="w-5 h-5 text-white" />
+                          ) : (
+                            <MapPinned className="w-5 h-5 text-white" />
+                          )}
                         </div>
-                      );
-                    })}
+
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-slate-900 truncate">
+                            {t.nombre}
+                          </p>
+                          <p className="text-xs text-slate-500 font-medium truncate">
+                            {t.type === TARGET_TYPES.EQUIPO ? "Equipo" : "Ubicación técnica"} ·{" "}
+                            {t.tag}
+                          </p>
+                          {t.ubicacion && (
+                            <p className="text-xs text-slate-500">📍 {t.ubicacion}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
             </Section>
 
-            {/* ══ CORRECTIVO (VISTA SOBRIA) ══ */}
-            {esCorrectivo && tieneEquipos && (
-              <Section title="Actividades por Equipo (Correctivo)">
+            {esCorrectivo && (
+              <Section title="Actividades por objetivo (Correctivo)">
                 <p className="text-sm text-slate-600">
                   Crea actividades manuales. Campos obligatorios: <b>Tarea</b>.
                 </p>
 
                 <div className="space-y-4">
-                  {aviso.equiposRelacion.map((e) => {
-                    const info = getEquipoInfo(e.equipoId);
-                    const actividades = data.actividadesManuales[e.equipoId] || [];
-                    const key = `corr-${e.equipoId}`;
+                  {targets.map((target) => {
+                    const actividades = data.actividadesManuales[target.id] || [];
+                    const key = `corr-${target.type}-${target.id}`;
                     const abierto = !collapsed[key];
 
                     return (
                       <div
-                        key={e.equipoId}
+                        key={key}
                         className="border border-slate-200 rounded-xl bg-white overflow-hidden"
                       >
-                        {/* Header equipo */}
                         <button
                           type="button"
                           onClick={() => toggleCollapse(key)}
@@ -753,11 +1022,14 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                         >
                           <div className="min-w-0 text-left">
                             <p className="font-semibold text-slate-900 truncate">
-                              {info.nombre || info.tag || "Equipo"}
+                              {target.nombre}
                             </p>
-                            {info.tag && (
-                              <p className="text-xs text-slate-500 truncate">TAG: {info.tag}</p>
-                            )}
+                            <p className="text-xs text-slate-500 truncate">
+                              {target.type === TARGET_TYPES.EQUIPO
+                                ? "Equipo"
+                                : "Ubicación técnica"}{" "}
+                              · {target.tag}
+                            </p>
                           </div>
 
                           <div className="flex items-center gap-2">
@@ -782,7 +1054,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                               </div>
                               <button
                                 type="button"
-                                onClick={() => agregarActividad(e.equipoId)}
+                                onClick={() => agregarActividad(target.id)}
                                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm hover:bg-slate-800 transition"
                               >
                                 <Plus className="w-4 h-4" />
@@ -799,13 +1071,13 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
                             {actividades.map((act, idx) => (
                               <ActividadCorrectivaForm
-                                key={idx}
+                                key={`${target.id}-${idx}`}
                                 idx={idx}
                                 act={act}
                                 onChange={(campo, valor) =>
-                                  actualizarActividad(e.equipoId, idx, campo, valor)
+                                  actualizarActividad(target.id, idx, campo, valor)
                                 }
-                                onDelete={() => eliminarActividad(e.equipoId, idx)}
+                                onDelete={() => eliminarActividad(target.id, idx)}
                                 toMinutes={toMinutes}
                               />
                             ))}
@@ -818,25 +1090,21 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               </Section>
             )}
 
-            {/* ══ PREVENTIVO (VISTA SOBRIA) ══ */}
-            {esPreventivo && tieneEquipos && (
-              <Section title="Plan por Equipo + Edición de Actividades">
+            {esPreventivo && (
+              <Section title="Plan por objetivo + edición de actividades">
                 <p className="text-sm text-slate-600">
-                  Selecciona un plan por equipo. Luego puedes ajustar: duración, unidad, técnicos y
-                  observaciones.
+                  Selecciona un plan por objetivo. Luego puedes ajustar duración, unidad,
+                  técnicos y observaciones.
                 </p>
 
                 <div className="space-y-4">
-                  {aviso.equiposRelacion.map((rel) => {
-                    const info = getEquipoInfo(rel.equipoId);
-                    const equipoFull = getEquipoFull(rel.equipoId);
-
-                    const planes = equipoFull?.planesMantenimiento || [];
-                    const planIdSel = data.planesSeleccionados[rel.equipoId] || "";
-                    const pack = data.preventivoPorEquipo?.[rel.equipoId];
+                  {targets.map((target) => {
+                    const planes = getPlanesDisponibles(target.id);
+                    const planIdSel = data.planesSeleccionados[target.id] || "";
+                    const pack = data.preventivoPorEquipo?.[target.id];
                     const actividades = pack?.actividades || [];
 
-                    const key = `prev-${rel.equipoId}`;
+                    const key = `prev-${target.type}-${target.id}`;
                     const abierto = !collapsed[key];
 
                     const totalMin = actividades.reduce(
@@ -851,31 +1119,30 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
                     return (
                       <div
-                        key={rel.equipoId}
+                        key={key}
                         className="border border-slate-200 rounded-xl bg-white overflow-hidden"
                       >
-                        {/* Header + Plan selector */}
                         <div className="p-4 border-b border-slate-200 bg-white">
                           <div className="flex items-start justify-between gap-4 flex-wrap">
                             <div className="min-w-0">
                               <p className="font-semibold text-slate-900 truncate">
-                                {info.nombre || info.tag || "Equipo"}
+                                {target.nombre}
                               </p>
-                              {info.tag && (
-                                <p className="text-xs text-slate-500 truncate">TAG: {info.tag}</p>
-                              )}
-                              {info.ubicacion && (
-                                <p className="text-xs text-slate-500">📍 {info.ubicacion}</p>
+                              <p className="text-xs text-slate-500 truncate">
+                                {target.type === TARGET_TYPES.EQUIPO
+                                  ? "Equipo"
+                                  : "Ubicación técnica"}{" "}
+                                · {target.tag}
+                              </p>
+                              {target.ubicacion && (
+                                <p className="text-xs text-slate-500">📍 {target.ubicacion}</p>
                               )}
                             </div>
 
                             <div className="flex items-center gap-2 flex-wrap">
                               {planIdSel && (
                                 <>
-                                  <MiniStat
-                                    icon={ClipboardList}
-                                    label={`${actividades.length} act.`}
-                                  />
+                                  <MiniStat icon={ClipboardList} label={`${actividades.length} act.`} />
                                   {totalMin > 0 && (
                                     <MiniStat
                                       icon={Clock}
@@ -905,7 +1172,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                             <SelectField
                               label="Plan de mantenimiento *"
                               value={planIdSel}
-                              onChange={(v) => seleccionarPlan(rel.equipoId, v)}
+                              onChange={(v) => seleccionarPlan(target.id, v)}
                             >
                               <option value="">Seleccionar plan...</option>
                               {planes.map((plan) => (
@@ -915,9 +1182,15 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                               ))}
                             </SelectField>
 
-                            {planes.length === 0 && (
+                            {loadingPlanes && (
+                              <p className="text-xs text-slate-500 mt-2">
+                                Cargando planes...
+                              </p>
+                            )}
+
+                            {!loadingPlanes && planes.length === 0 && (
                               <p className="text-xs text-amber-700 mt-2">
-                                Este equipo no tiene planes asociados.
+                                Este objetivo no tiene planes asociados.
                               </p>
                             )}
 
@@ -952,7 +1225,6 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                           </div>
                         </div>
 
-                        {/* Actividades */}
                         {planIdSel && actividades.length > 0 && abierto && (
                           <div className="p-4 space-y-3 bg-slate-50">
                             {actividades.map((act, idx) => (
@@ -961,7 +1233,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                                 act={act}
                                 idx={idx}
                                 onChange={(campo, valor) =>
-                                  updatePreventivoActividad(rel.equipoId, idx, campo, valor)
+                                  updatePreventivoActividad(target.id, idx, campo, valor)
                                 }
                                 toMinutes={toMinutes}
                               />
@@ -985,7 +1257,6 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
             )}
           </div>
 
-          {/* ── FOOTER ── */}
           <div className="p-6 border-t bg-white flex justify-between items-center shrink-0">
             <button
               onClick={onClose}
@@ -1007,7 +1278,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                 {solicitudes
                   ? `Solicitud cargada ✓${
                       cantSolicitudesIndividuales > 0
-                        ? ` (+${cantSolicitudesIndividuales} equipo${
+                        ? ` (+${cantSolicitudesIndividuales} objetivo${
                             cantSolicitudesIndividuales > 1 ? "s" : ""
                           })`
                         : ""
@@ -1030,14 +1301,17 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                 className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition-colors"
               >
                 <Save className="w-4 h-4" />
-                {loading ? "Guardando..." : "Cambio de estado a Tratado"}
+                {loading
+                  ? "Guardando..."
+                  : tratamientoExistente?.id
+                  ? "Actualizar Tratamiento"
+                  : "Cambio de estado a Tratado"}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* MODAL SOLICITUD */}
       <ModalSolicitudCompra
         isOpen={showSolicitud}
         onClose={() => setShowSolicitud(false)}
@@ -1046,7 +1320,9 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
           setShowSolicitud(false);
           setErrorMsg("");
         }}
+        targets={targets}
         equiposRelacion={aviso?.equiposRelacion || []}
+        ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
         equiposInfo={equipos}
         initialValue={solicitudes}
       />
@@ -1060,7 +1336,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 }
 
 /* ══════════════════════════════════════════════
-   CORRECTIVO: Form sobrio (3 columnas)
+   CORRECTIVO
 ══════════════════════════════════════════════ */
 
 function ActividadCorrectivaForm({ idx, act, onChange, onDelete, toMinutes }) {
@@ -1093,39 +1369,14 @@ function ActividadCorrectivaForm({ idx, act, onChange, onDelete, toMinutes }) {
         </button>
       </div>
 
-      {/* Grid 3 columnas */}
       <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <TextField
-          label="Sistema"
-          value={act.sistema}
-          onChange={(v) => onChange("sistema", v)}
-        />
-        <TextField
-          label="Subsistema"
-          value={act.subsistema}
-          onChange={(v) => onChange("subsistema", v)}
-        />
-        <TextField
-          label="Componente"
-          value={act.componente}
-          onChange={(v) => onChange("componente", v)}
-        />
+        <TextField label="Sistema" value={act.sistema} onChange={(v) => onChange("sistema", v)} />
+        <TextField label="Subsistema" value={act.subsistema} onChange={(v) => onChange("subsistema", v)} />
+        <TextField label="Componente" value={act.componente} onChange={(v) => onChange("componente", v)} />
 
-        <TextField
-          label="Tarea *"
-          value={act.tarea}
-          onChange={(v) => onChange("tarea", v)}
-        />
-        <TextField
-          label="Descripción"
-          value={act.descripcion}
-          onChange={(v) => onChange("descripcion", v)}
-        />
-        <SelectField
-          label="Tipo de trabajo"
-          value={act.tipoTrabajo}
-          onChange={(v) => onChange("tipoTrabajo", v)}
-        >
+        <TextField label="Tarea *" value={act.tarea} onChange={(v) => onChange("tarea", v)} />
+        <TextField label="Descripción" value={act.descripcion} onChange={(v) => onChange("descripcion", v)} />
+        <SelectField label="Tipo de trabajo" value={act.tipoTrabajo} onChange={(v) => onChange("tipoTrabajo", v)}>
           {TIPOS_TRABAJO_CORRECTIVO.map((t) => (
             <option key={t} value={t}>
               {t.replace(/_/g, " ")}
@@ -1133,11 +1384,7 @@ function ActividadCorrectivaForm({ idx, act, onChange, onDelete, toMinutes }) {
           ))}
         </SelectField>
 
-        <SelectField
-          label="Rol técnico"
-          value={act.rolTecnico}
-          onChange={(v) => onChange("rolTecnico", v)}
-        >
+        <SelectField label="Rol técnico" value={act.rolTecnico} onChange={(v) => onChange("rolTecnico", v)}>
           {ROLES_TECNICOS.map((r) => (
             <option key={r.value} value={r.value}>
               {r.label}
@@ -1185,10 +1432,6 @@ function ActividadCorrectivaForm({ idx, act, onChange, onDelete, toMinutes }) {
   );
 }
 
-/* ══════════════════════════════════════════════
-   PREVENTIVO: Actividad editable (sobria)
-══════════════════════════════════════════════ */
-
 function ActividadPreventivaEditable({ act, idx, onChange, toMinutes }) {
   const normalizado = toMinutes(act.duracionEstimadaValor, act.unidadDuracion);
 
@@ -1203,7 +1446,6 @@ function ActividadPreventivaEditable({ act, idx, onChange, toMinutes }) {
 
   return (
     <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
-      {/* HEADER RESUMEN */}
       <div className="px-4 py-3 border-b border-slate-200 bg-white">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
@@ -1230,9 +1472,7 @@ function ActividadPreventivaEditable({ act, idx, onChange, toMinutes }) {
         </div>
       </div>
 
-      {/* BODY: Detalle + Edición */}
       <div className="p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 bg-slate-50">
-        {/* DETALLES (tipo ficha) */}
         <div className="lg:col-span-7">
           <p className="text-xs font-semibold text-slate-500 mb-2 uppercase">
             Detalles de la actividad
@@ -1259,7 +1499,6 @@ function ActividadPreventivaEditable({ act, idx, onChange, toMinutes }) {
           </div>
         </div>
 
-        {/* EDICIÓN (claro y 3 por fila) */}
         <div className="lg:col-span-5">
           <p className="text-xs font-semibold text-slate-500 mb-2 uppercase">
             Ajustes (editables)
@@ -1305,8 +1544,9 @@ function ActividadPreventivaEditable({ act, idx, onChange, toMinutes }) {
     </div>
   );
 }
+
 /* ══════════════════════════════════════════════
-   UI HELPERS (sobrios)
+   UI HELPERS
 ══════════════════════════════════════════════ */
 
 function Section({ title, children }) {

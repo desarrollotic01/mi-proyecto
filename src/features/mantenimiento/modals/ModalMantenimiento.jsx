@@ -10,7 +10,7 @@ import { crearAviso } from "../services/avisoServices";
 import { clienteService } from "../services/clienteService";
 import { equipoService } from "../services/equipoService";
 import { UbicacionTecnicaService } from "../services/ubicacionService";
-import { getContactosPorCliente } from "../services/contactoService";
+import { getContactosPorCliente } from "../services/ContactoService";
 import { paisService } from "../services/paisService";
 
 

@@ -8,22 +8,29 @@ import {
   Calendar,
   Mail,
   CheckCircle,
+  MapPinned,
+  ClipboardList,
 } from "lucide-react";
 
 /* ══════════════════════════════════════════
    HELPERS
 ══════════════════════════════════════════ */
 
+const ensureId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
 const emptyLinea = () => ({
-  id: crypto.randomUUID(),
+  id: ensureId(),
   itemCode: "",
   description: "",
   quantity: 1,
   warehouseCode: "01",
   costCenter: "",
   projectCode: "",
-  rubro: "",          // ✅ NUEVO
-  paqueteTrabajo: "", // ✅ NUEVO
+  rubro: "",
+  paqueteTrabajo: "",
 });
 
 const emptyForm = () => ({
@@ -33,6 +40,54 @@ const emptyForm = () => ({
   comments: "",
   lineas: [emptyLinea()],
 });
+
+const normalizeForm = (form) => {
+  const f = form || emptyForm();
+  const lineas = Array.isArray(f.lineas) ? f.lineas : [];
+
+  const normalizedLineas =
+    lineas.length > 0
+      ? lineas.map((l) => ({
+          ...emptyLinea(),
+          ...l,
+          id: l.id || ensureId(),
+          quantity:
+            Number.isFinite(Number(l.quantity)) && Number(l.quantity) > 0
+              ? Number(l.quantity)
+              : 1,
+        }))
+      : [emptyLinea()];
+
+  return {
+    ...emptyForm(),
+    ...f,
+    lineas: normalizedLineas,
+  };
+};
+
+const isSolicitudVacia = (s) => {
+  if (!s) return true;
+
+  const hasHeader = Boolean(
+    s.department?.trim() ||
+      s.email?.trim() ||
+      s.requiredDate ||
+      s.comments?.trim()
+  );
+
+  const hasLineas =
+    Array.isArray(s.lineas) &&
+    s.lineas.some((l) => {
+      const hasBasics =
+        (l.itemCode?.trim() || l.description?.trim()) && Number(l.quantity) > 0;
+      return hasBasics;
+    });
+
+  return !(hasHeader || hasLineas);
+};
+
+const getTargetTypeLabel = (type) =>
+  type === "UBICACION_TECNICA" ? "Ubicación técnica" : "Equipo";
 
 /* ══════════════════════════════════════════
    SUB-COMPONENTE: FORMULARIO DE SOLICITUD
@@ -57,7 +112,6 @@ function FormSolicitud({ data, onChange }) {
 
   return (
     <div className="space-y-5">
-      {/* Datos generales */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">
@@ -113,7 +167,6 @@ function FormSolicitud({ data, onChange }) {
         </div>
       </div>
 
-      {/* Líneas */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
@@ -131,7 +184,6 @@ function FormSolicitud({ data, onChange }) {
               key={l.id}
               className="grid grid-cols-12 gap-2 items-end bg-gray-50 border rounded-xl p-3"
             >
-              {/* Código */}
               <div className="col-span-2">
                 <p className="text-xs text-gray-500 mb-1">Código *</p>
                 <input
@@ -143,7 +195,6 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              {/* Descripción */}
               <div className="col-span-3">
                 <p className="text-xs text-gray-500 mb-1">Descripción *</p>
                 <input
@@ -157,7 +208,6 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              {/* Cantidad */}
               <div className="col-span-1">
                 <p className="text-xs text-gray-500 mb-1">Cant.</p>
                 <input
@@ -171,7 +221,6 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              {/* Almacén */}
               <div className="col-span-1">
                 <p className="text-xs text-gray-500 mb-1">Almacén</p>
                 <input
@@ -185,7 +234,6 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              {/* Centro Costo */}
               <div className="col-span-1">
                 <p className="text-xs text-gray-500 mb-1">C. Costo</p>
                 <input
@@ -199,7 +247,6 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              {/* Proyecto */}
               <div className="col-span-1">
                 <p className="text-xs text-gray-500 mb-1">Proyecto</p>
                 <input
@@ -213,7 +260,6 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              {/* Rubro */}
               <div className="col-span-1">
                 <p className="text-xs text-gray-500 mb-1">Rubro</p>
                 <input
@@ -225,7 +271,6 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              {/* Paquete de Trabajo */}
               <div className="col-span-1">
                 <p className="text-xs text-gray-500 mb-1">Paquete</p>
                 <input
@@ -239,7 +284,6 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              {/* Acciones */}
               <div className="col-span-1 flex gap-1">
                 {data.lineas.length > 1 && (
                   <button
@@ -278,121 +322,103 @@ export default function ModalSolicitudCompra({
   isOpen,
   onClose,
   onConfirm,
-  equiposRelacion = [], // aviso.equiposRelacion (array con {equipoId})
-  equiposInfo = [], 
-    initialValue = null,
+  targets = [],
+  equiposRelacion = [],
+  ubicacionesRelacion = [],
+  equiposInfo = [],
+  initialValue = null,
 }) {
-  // Tab activo: "general" | equipoId
   const [tab, setTab] = useState("general");
-
-  // Solicitud general (siempre se envía)
   const [general, setGeneral] = useState(emptyForm());
+  const [porTarget, setPorTarget] = useState({});
 
-  // Solicitudes por equipo (si está vacía no se envía)
-  const [porEquipo, setPorEquipo] = useState(() => {
-    const init = {};
-    equiposRelacion.forEach((rel) => {
-      init[rel.equipoId] = emptyForm();
-    });
-    return init;
-  });
-
-
-// helper: asegura ids en lineas
-const normalizeForm = (form) => {
-  const f = form || emptyForm();
-  const lineas = Array.isArray(f.lineas) ? f.lineas : [];
-  const normalizedLineas =
-    lineas.length > 0
-      ? lineas.map((l) => ({ ...l, id: l.id || crypto.randomUUID() }))
-      : [emptyLinea()];
-
-  return {
-    ...emptyForm(),
-    ...f,
-    lineas: normalizedLineas,
-  };
-};
-
-useEffect(() => {
-  if (!isOpen) return;
-
-  // 1) General
-  setGeneral((prev) =>
-    initialValue?.solicitudGeneral
-      ? normalizeForm(initialValue.solicitudGeneral)
-      : prev
-  );
-
-  // 2) Por equipo (siempre crear keys por equiposRelacion)
-  setPorEquipo((prev) => {
-    const next = {};
-    for (const rel of equiposRelacion) {
-      const k = rel.equipoId;
-
-      const fromInitial = initialValue?.solicitudesPorEquipo?.[k];
-      const fromPrev = prev?.[k];
-
-      next[k] = normalizeForm(fromInitial || fromPrev || emptyForm());
+  const normalizedTargets = useMemo(() => {
+    if (Array.isArray(targets) && targets.length > 0) {
+      return targets.map((t) => ({
+        id: String(t.id),
+        type: t.type || "EQUIPO",
+        nombre: t.nombre || t.tag || t.id,
+        tag: t.tag || t.id,
+      }));
     }
-    return next;
-  });
 
-  // Si abres el modal en "general" siempre
-  setTab("general");
-}, [isOpen, equiposRelacion, initialValue]);
+    const fallbackEquipos = (equiposRelacion || []).map((rel) => {
+      const equipoId = String(rel.equipoId);
+      const eq = (equiposInfo || []).find((e) => String(e.id) === equipoId);
 
+      return {
+        id: equipoId,
+        type: "EQUIPO",
+        nombre: eq?.nombre || eq?.tag || equipoId,
+        tag: eq?.tag || equipoId,
+      };
+    });
 
+    const fallbackUbicaciones = (ubicacionesRelacion || []).map((rel) => {
+      const id = String(
+        rel.ubicacionId || rel.ubicacionTecnicaId || rel?.ubicacion?.id || rel?.ubicacionTecnica?.id
+      );
 
-  const getEquipoNombre = (equipoId) => {
-    const eq = equiposInfo.find((e) => e.id === equipoId);
-    return eq ? eq.nombre || eq.tag || equipoId : equipoId;
-  };
+      return {
+        id,
+        type: "UBICACION_TECNICA",
+        nombre:
+          rel?.ubicacionTecnica?.nombre ||
+          rel?.ubicacion?.nombre ||
+          rel?.ubicacionTecnica?.codigo ||
+          rel?.ubicacion?.codigo ||
+          `Ubicación técnica ${id}`,
+        tag:
+          rel?.ubicacionTecnica?.codigo ||
+          rel?.ubicacion?.codigo ||
+          id,
+      };
+    });
 
-  const getEquipoTag = (equipoId) => {
-    const eq = equiposInfo.find((e) => e.id === equipoId);
-    return eq?.tag || null;
-  };
+    return [...fallbackEquipos, ...fallbackUbicaciones];
+  }, [targets, equiposRelacion, ubicacionesRelacion, equiposInfo]);
 
-  const updateEquipoForm = (equipoId, form) => {
-    setPorEquipo((prev) => ({ ...prev, [equipoId]: form }));
-  };
+  useEffect(() => {
+    if (!isOpen) return;
 
-  const isSolicitudVacia = (s) => {
-    if (!s) return true;
-
-    const hasHeader = Boolean(
-      s.department?.trim() ||
-        s.email?.trim() ||
-        s.requiredDate ||
-        s.comments?.trim()
+    setGeneral(
+      initialValue?.solicitudGeneral
+        ? normalizeForm(initialValue.solicitudGeneral)
+        : normalizeForm(emptyForm())
     );
 
-    const hasLineas = Array.isArray(s.lineas) &&
-      s.lineas.some((l) => {
-        const hasBasics =
-          (l.itemCode?.trim() || l.description?.trim()) && Number(l.quantity) > 0;
-        // rubro/paquete NO hacen “no vacía” solos, pero sí viajan si hay línea
-        return hasBasics;
-      });
+    setPorTarget(() => {
+      const next = {};
+      for (const target of normalizedTargets) {
+        const key = String(target.id);
+        const fromInitial = initialValue?.solicitudesPorEquipo?.[key];
+        next[key] = normalizeForm(fromInitial || emptyForm());
+      }
+      return next;
+    });
 
-    return !(hasHeader || hasLineas);
+    setTab("general");
+  }, [isOpen, normalizedTargets, initialValue]);
+
+  const updateTargetForm = (targetId, form) => {
+    setPorTarget((prev) => ({ ...prev, [targetId]: form }));
   };
 
   const solicitudesNoVaciasCount = useMemo(() => {
-    return equiposRelacion.reduce((acc, rel) => {
-      const f = porEquipo[rel.equipoId];
+    return normalizedTargets.reduce((acc, target) => {
+      const f = porTarget[String(target.id)];
       return acc + (!isSolicitudVacia(f) ? 1 : 0);
     }, 0);
-  }, [equiposRelacion, porEquipo]);
+  }, [normalizedTargets, porTarget]);
 
   const handleConfirm = () => {
     const solicitudesPorEquipo = {};
 
-    equiposRelacion.forEach((rel) => {
-      const f = porEquipo[rel.equipoId];
+    normalizedTargets.forEach((target) => {
+      const key = String(target.id);
+      const f = porTarget[key];
       if (!isSolicitudVacia(f)) {
-        solicitudesPorEquipo[rel.equipoId] = f;
+        solicitudesPorEquipo[key] = f;
       }
     });
 
@@ -401,30 +427,30 @@ useEffect(() => {
 
   const tabs = [
     { id: "general", label: "General", isGeneral: true },
-    ...equiposRelacion.map((rel) => ({
-      id: rel.equipoId,
-      label: getEquipoNombre(rel.equipoId),
-      tag: getEquipoTag(rel.equipoId),
+    ...normalizedTargets.map((target) => ({
+      id: String(target.id),
+      label: target.nombre,
+      tag: target.tag,
+      type: target.type,
       isGeneral: false,
     })),
   ];
 
   const currentData =
-    tab === "general" ? general : porEquipo[tab] || emptyForm();
+    tab === "general" ? general : porTarget[String(tab)] || normalizeForm(emptyForm());
 
   const currentSetFn =
-    tab === "general" ? setGeneral : (form) => updateEquipoForm(tab, form);
+    tab === "general" ? setGeneral : (form) => updateTargetForm(String(tab), form);
 
-  // Marcar si el tab actual de equipo tiene datos
-  const currentEquipoHasData =
-    tab !== "general" ? !isSolicitudVacia(porEquipo[tab]) : false;
+  const currentTarget = normalizedTargets.find((t) => String(t.id) === String(tab));
+  const currentTargetHasData =
+    tab !== "general" ? !isSolicitudVacia(porTarget[String(tab)]) : false;
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white w-full max-w-5xl rounded-2xl flex flex-col max-h-[92vh] shadow-2xl">
-        {/* ── HEADER ── */}
         <div className="p-6 border-b bg-gradient-to-r from-green-50 to-emerald-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-green-600 rounded-xl">
@@ -435,12 +461,12 @@ useEffect(() => {
                 Solicitudes de Compra
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                General obligatoria · {solicitudesNoVaciasCount} equipo
-                {solicitudesNoVaciasCount !== 1 ? "s" : ""} con solicitud
-                individual
+                General obligatoria · {solicitudesNoVaciasCount} objetivo
+                {solicitudesNoVaciasCount !== 1 ? "s" : ""} con solicitud individual
               </p>
             </div>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -451,10 +477,8 @@ useEffect(() => {
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* ── SIDEBAR DE TABS ── */}
-          <div className="w-56 border-r bg-gray-50 flex flex-col shrink-0">
+          <div className="w-64 border-r bg-gray-50 flex flex-col shrink-0">
             <div className="p-3 space-y-1 flex-1 overflow-y-auto">
-              {/* Tab General */}
               <button
                 type="button"
                 onClick={() => setTab("general")}
@@ -469,29 +493,24 @@ useEffect(() => {
                 <CheckCircle className="w-4 h-4 shrink-0 opacity-60" />
               </button>
 
-              {/* Separador equipos */}
-              {equiposRelacion.length > 0 && (
+              {normalizedTargets.length > 0 && (
                 <div className="pt-2 pb-1">
                   <p className="text-xs text-gray-400 uppercase font-semibold px-3">
-                    Por Equipo
+                    Por objetivo
                   </p>
                 </div>
               )}
 
-              {/* Tabs por equipo (sin activar/desactivar) */}
-              {equiposRelacion.map((rel) => {
-                const nombre = getEquipoNombre(rel.equipoId);
-                const tag = getEquipoTag(rel.equipoId);
-                const isActive = tab === rel.equipoId;
-
-                const f = porEquipo[rel.equipoId];
+              {normalizedTargets.map((target) => {
+                const isActive = String(tab) === String(target.id);
+                const f = porTarget[String(target.id)];
                 const filled = f && !isSolicitudVacia(f);
 
                 return (
                   <button
                     type="button"
-                    key={rel.equipoId}
-                    onClick={() => setTab(rel.equipoId)}
+                    key={`${target.type}-${target.id}`}
+                    onClick={() => setTab(String(target.id))}
                     className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-left transition-colors ${
                       isActive
                         ? "bg-indigo-600 text-white shadow-sm"
@@ -500,18 +519,21 @@ useEffect(() => {
                         : "hover:bg-gray-100 text-gray-500"
                     }`}
                   >
-                    <Package className="w-4 h-4 shrink-0" />
+                    {target.type === "UBICACION_TECNICA" ? (
+                      <MapPinned className="w-4 h-4 shrink-0" />
+                    ) : (
+                      <Package className="w-4 h-4 shrink-0" />
+                    )}
+
                     <div className="flex-1 min-w-0">
-                      <p className="truncate font-medium text-xs">{nombre}</p>
-                      {tag && (
-                        <p
-                          className={`text-xs truncate ${
-                            isActive ? "text-indigo-200" : "text-gray-400"
-                          }`}
-                        >
-                          TAG: {tag}
-                        </p>
-                      )}
+                      <p className="truncate font-medium text-xs">{target.nombre}</p>
+                      <p
+                        className={`text-xs truncate ${
+                          isActive ? "text-indigo-200" : "text-gray-400"
+                        }`}
+                      >
+                        {getTargetTypeLabel(target.type)} · {target.tag}
+                      </p>
                     </div>
 
                     {filled ? (
@@ -524,7 +546,6 @@ useEffect(() => {
               })}
             </div>
 
-            {/* Resumen sidebar */}
             <div className="p-3 border-t bg-white">
               <div className="text-xs text-gray-500 space-y-1">
                 <div className="flex justify-between">
@@ -547,15 +568,13 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* ── CONTENIDO PRINCIPAL ── */}
           <div className="flex-1 overflow-y-auto">
-            {/* Banner tab actual */}
             <div
               className={`px-6 py-4 border-b flex items-center justify-between shrink-0 ${
                 tab === "general" ? "bg-green-50" : "bg-indigo-50"
               }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 {tab === "general" ? (
                   <>
                     <ShoppingCart className="w-5 h-5 text-green-600" />
@@ -570,18 +589,22 @@ useEffect(() => {
                   </>
                 ) : (
                   <>
-                    <Package className="w-5 h-5 text-indigo-600" />
-                    <div>
-                      <p className="font-semibold text-gray-800">
-                        {getEquipoNombre(tab)}
+                    {currentTarget?.type === "UBICACION_TECNICA" ? (
+                      <MapPinned className="w-5 h-5 text-indigo-600" />
+                    ) : (
+                      <Package className="w-5 h-5 text-indigo-600" />
+                    )}
+
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-800 truncate">
+                        {currentTarget?.nombre || tab}
                       </p>
-                      {getEquipoTag(tab) && (
-                        <p className="text-xs text-indigo-500">
-                          TAG: {getEquipoTag(tab)}
-                        </p>
-                      )}
+                      <p className="text-xs text-indigo-500 truncate">
+                        {getTargetTypeLabel(currentTarget?.type)} · {currentTarget?.tag}
+                      </p>
                     </div>
-                    {currentEquipoHasData && (
+
+                    {currentTargetHasData && (
                       <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-semibold border bg-green-100 border-green-300 text-green-700">
                         Con datos
                       </span>
@@ -590,27 +613,24 @@ useEffect(() => {
                 )}
               </div>
 
-              {/* Botón limpiar solo para equipos */}
               {tab !== "general" && (
                 <button
                   type="button"
-                  onClick={() => updateEquipoForm(tab, emptyForm())}
+                  onClick={() => updateTargetForm(String(tab), normalizeForm(emptyForm()))}
                   className="text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-lg hover:bg-white/60 transition"
-                  title="Dejar vacío este equipo (no se enviará)"
+                  title="Dejar vacío este objetivo (no se enviará)"
                 >
-                  Limpiar este equipo
+                  Limpiar este objetivo
                 </button>
               )}
             </div>
 
-            {/* Formulario */}
             <div className="p-6">
               <FormSolicitud data={currentData} onChange={currentSetFn} />
             </div>
           </div>
         </div>
 
-        {/* ── FOOTER ── */}
         <div className="p-5 border-t bg-gray-50 flex items-center justify-between shrink-0">
           <div className="text-sm text-gray-500 flex items-center gap-4">
             <span>
@@ -619,10 +639,10 @@ useEffect(() => {
 
             {solicitudesNoVaciasCount > 0 && (
               <span className="flex items-center gap-1 text-indigo-600 font-medium">
-                <Package className="w-4 h-4" />
+                <ClipboardList className="w-4 h-4" />
                 {solicitudesNoVaciasCount} solicitud
-                {solicitudesNoVaciasCount !== 1 ? "es" : ""} por equipo incluida
-                {solicitudesNoVaciasCount !== 1 ? "s" : ""}
+                {solicitudesNoVaciasCount !== 1 ? "es" : ""} individual
+                {solicitudesNoVaciasCount !== 1 ? "es" : ""}
               </span>
             )}
           </div>

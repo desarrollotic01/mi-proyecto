@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { guiaMantenimientoService } from "../services/guiaMantenimientoService";
 import { equipoService } from "../../mantenimiento/services/equipoService";
-import { planMantenimientoService } from "../../planMantenimiento/services/planMantenimientoService";
+import { planMantenimientoService } from "../../PlanMantenimiento/services/planMantenimientoService";
 import { useAuth } from "../../../auth/context/AuthContext";
 
 const PERIODOS = [

@@ -6,12 +6,12 @@ import {
   Wrench, MoveRight, Globe, CheckCircle, CreditCard, RefreshCw, List, User
 } from "lucide-react";
 
-import { equipoService } from "../mantenimiento/services/equipoService";
-import { clienteService } from "../mantenimiento/services/clienteService";
-import { familiaService } from "./service/familiaService";
-import { paisService } from "../mantenimiento/services/paisService";
-import EquipoModal from "./Equipomodal";
-import ModalCrearPlan from "../PlanMantenimiento/components/ModalCrearPlan";
+  import { equipoService } from "../mantenimiento/services/equipoService";
+  import { clienteService } from "../mantenimiento/services/clienteService";
+  import { familiaService } from "./service/familiaService";
+  import { paisService } from "../mantenimiento/services/paisService";
+  import EquipoModal from "./Equipomodal";
+  import ModalCrearPlan from "../PlanMantenimiento/components/ModalCrearPlan";
 
 /* ================= MODAL DE DETALLE ================= */
 function EquipoDetailModal({ isOpen, onClose, equipo }) {
