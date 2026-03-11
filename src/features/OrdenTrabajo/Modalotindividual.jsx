@@ -14,12 +14,13 @@ import {
   CheckCircle2,
   Clock,
   Eye,
+  MapPin,
+  Package,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getTratamientoByAviso } from "../mantenimiento/services/tratamientoService";
 import { getTrabajadores } from "../mantenimiento/services/trabajadoresService";
-import { equipoService } from "../mantenimiento/services/equipoService";
 import { planMantenimientoService } from "../PlanMantenimiento/services/planMantenimientoService";
 import { adjuntosService } from "../OrdenTrabajo/services/adjuntosService";
 
@@ -27,7 +28,7 @@ import ModalInfoAviso from "./modals/ModalInfoAviso";
 import ModalDetallesEquipo from "../OrdenTrabajo/modals/ModalDetalleEquipo";
 
 /* ─────────────────────────────────────────────
-   ENUMS / HELPERS (IGUAL QUE GRUPAL)
+   ENUMS / HELPERS
 ───────────────────────────────────────────── */
 
 const TIPOS_TRABAJO_ENUM = [
@@ -67,6 +68,9 @@ const mkActOT = (base = {}, opts = {}) => {
     id: base.id || crypto.randomUUID(),
     selected: opts.forceSelected ?? true,
 
+    planMantenimientoActividadId: base.planMantenimientoActividadId || null,
+    codigoActividad: base.codigoActividad || null,
+
     sistema: base.sistema || "",
     subsistema: base.subsistema || "",
     componente: base.componente || "",
@@ -74,13 +78,16 @@ const mkActOT = (base = {}, opts = {}) => {
     descripcion: base.descripcion || "",
 
     tipoTrabajo: base.tipoTrabajo || "REVISION",
+    rolTecnico: base.rolTecnico || "",
+    cantidadTecnicos: Number(base.cantidadTecnicos) || 1,
 
     duracionEstimadaValor: Number(durVal) || 0,
-    unidadDuracion: unidad, // min | h
+    unidadDuracion: unidad,
     duracionEstimadaMin: durMin ?? null,
 
     observaciones: base.observaciones || "",
     estado: base.estado || "PENDIENTE",
+    origen: base.origen || "OT",
   };
 };
 
@@ -90,6 +97,9 @@ const normalizeActOTForPayload = (a) => {
   const durMin = toMinutes(valor, unidad);
 
   return {
+    planMantenimientoActividadId: a.planMantenimientoActividadId || null,
+    codigoActividad: a.codigoActividad || null,
+
     sistema: a.sistema?.trim() || null,
     subsistema: a.subsistema?.trim() || null,
     componente: a.componente?.trim() || null,
@@ -97,6 +107,8 @@ const normalizeActOTForPayload = (a) => {
     descripcion: a.descripcion?.trim() || null,
 
     tipoTrabajo: a.tipoTrabajo || "REVISION",
+    rolTecnico: a.rolTecnico || null,
+    cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
 
     duracionEstimadaValor: valor,
     unidadDuracion: unidad,
@@ -104,6 +116,7 @@ const normalizeActOTForPayload = (a) => {
 
     observaciones: a.observaciones?.trim() || null,
     estado: a.estado || "PENDIENTE",
+    origen: a.origen || "OT",
   };
 };
 
@@ -114,6 +127,54 @@ const getEstadoBadgeColor = (estado) => {
     FINALIZADO: "bg-green-100 text-green-700 border-green-300",
   };
   return colores[estado] || "bg-gray-100 text-gray-700 border-gray-300";
+};
+
+const isUbicacionTarget = (target) =>
+  !!target?.ubicacionTecnicaId || target?.tipo === "UBICACION_TECNICA";
+
+const isEquipoTarget = (target) =>
+  !!target?.equipoId || !!target?.id;
+
+const getTargetId = (target) =>
+  target?.equipoId ||
+  target?.ubicacionTecnicaId ||
+  target?.id ||
+  null;
+
+const getTargetNombre = (target) => {
+  if (!target) return "Registro";
+  if (isUbicacionTarget(target)) {
+    return (
+      target.nombre ||
+      target.ubicacionTecnicaNombre ||
+      target.descripcion ||
+      `Ubicación técnica ${getTargetId(target)}`
+    );
+  }
+  return (
+    target.nombre ||
+    target.equipoNombre ||
+    target.codigo ||
+    `Equipo ${getTargetId(target)}`
+  );
+};
+
+const getTargetCodigo = (target) => {
+  if (!target) return "—";
+  if (isUbicacionTarget(target)) {
+    return (
+      target.codigo ||
+      target.ubicacionTecnicaCodigo ||
+      String(getTargetId(target) || "—")
+    );
+  }
+  return target.codigo || target.tag || String(getTargetId(target) || "—");
+};
+
+const getTargetTipoTexto = (target) => {
+  if (!target) return "Registro";
+  if (isUbicacionTarget(target)) return "Ubicación Técnica";
+  return target.tipo || target.equipoTipo || "Equipo";
 };
 
 export default function ModalOTIndividual({
@@ -158,6 +219,9 @@ export default function ModalOTIndividual({
 
   const tratamiento = tratamientoData?.tratamiento || tratamientoData || null;
 
+  const targetEsUbicacion = isUbicacionTarget(equipoActual);
+  const targetEsEquipo = !targetEsUbicacion;
+
   const [formData, setFormData] = useState({
     descripcionGeneral: "",
     descripcionDetallada: "",
@@ -166,8 +230,8 @@ export default function ModalOTIndividual({
     fechaProgramadaFin: "",
     observaciones: "",
 
-    // Equipo
     descripcionEquipo: "",
+    descripcionUbicacion: "",
     prioridad: "MEDIA",
 
     planMantenimientoId: null,
@@ -181,7 +245,6 @@ export default function ModalOTIndividual({
     fechaInicioProgramada: "",
     fechaFinProgramada: "",
 
-    // adjuntos por equipo
     adjuntosEquipo: [],
     subiendoAdjuntosEquipo: false,
 
@@ -213,6 +276,7 @@ export default function ModalOTIndividual({
         observaciones: "",
 
         descripcionEquipo: "",
+        descripcionUbicacion: "",
         prioridad: "MEDIA",
         planMantenimientoId: null,
         planMantenimiento: null,
@@ -266,7 +330,7 @@ export default function ModalOTIndividual({
   }, [isOpen, aviso, onGenerarNumeroOT]);
 
   /* ─────────────────────────────────────────────
-     CARGA TRATAMIENTO (SIEMPRE)
+     CARGA TRATAMIENTO
   ───────────────────────────────────────────── */
   useEffect(() => {
     if (!isOpen || !aviso?.id) return;
@@ -280,19 +344,24 @@ export default function ModalOTIndividual({
   }, [isOpen, aviso?.id]);
 
   /* ─────────────────────────────────────────────
-     AUTO-CARGA PLANES POR EQUIPO (preventivo)
+     CARGA PLANES SI ES EQUIPO Y PREVENTIVO
   ───────────────────────────────────────────── */
   useEffect(() => {
     if (!isOpen) return;
     if (!esPreventivo) return;
-    if (!equipoActual?.id) return;
+    if (!equipoActual) return;
+    if (targetEsUbicacion) {
+      setPlanesDisponibles([]);
+      return;
+    }
 
     let cancelled = false;
 
     const run = async () => {
       setCargandoPlanes(true);
       try {
-        const planes = await planMantenimientoService.getPlanesByEquipo(equipoActual.id);
+        const equipoId = equipoActual?.equipoId || equipoActual?.id;
+        const planes = await planMantenimientoService.getPlanesByEquipo(equipoId);
         if (cancelled) return;
         setPlanesDisponibles(Array.isArray(planes) ? planes : []);
       } catch (e) {
@@ -307,16 +376,15 @@ export default function ModalOTIndividual({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, esPreventivo, equipoActual?.id]);
+  }, [isOpen, esPreventivo, equipoActual, targetEsUbicacion]);
 
   /* ─────────────────────────────────────────────
-     ✅ APLICAR TRATAMIENTO AL EQUIPO (una sola vez)
-     tratamientoData.equipos[i] = { equipoId, planMantenimientoId, planMantenimiento, actividades:[...] }
+     APLICAR TRATAMIENTO AL TARGET ACTUAL
   ───────────────────────────────────────────── */
   useEffect(() => {
     if (!isOpen) return;
     if (!tratamientoData) return;
-    if (!equipoActual?.id) return;
+    if (!equipoActual) return;
     if (tratamientoAplicadoRef.current) return;
 
     const tratEquipos = Array.isArray(tratamientoData.equipos)
@@ -325,11 +393,18 @@ export default function ModalOTIndividual({
 
     if (!tratEquipos.length) return;
 
-    const te = tratEquipos.find(
-      (t) => t.equipoId === equipoActual.id || t.equipo?.id === equipoActual.id
-    );
+    const currentTargetId = getTargetId(equipoActual);
 
-    // Si no existe match, igual marcamos aplicado para no reintentar infinitamente
+    const te = tratEquipos.find((t) => {
+      if (targetEsUbicacion) {
+        return (
+          t.ubicacionTecnicaId === currentTargetId ||
+          t.ubicacionTecnica?.id === currentTargetId
+        );
+      }
+      return t.equipoId === currentTargetId || t.equipo?.id === currentTargetId;
+    });
+
     tratamientoAplicadoRef.current = true;
 
     if (!te) return;
@@ -339,17 +414,22 @@ export default function ModalOTIndividual({
       mkActOT(
         {
           id: a.id,
+          planMantenimientoActividadId: a.planMantenimientoActividadId,
+          codigoActividad: a.codigoActividad,
           sistema: a.sistema,
           subsistema: a.subsistema,
           componente: a.componente,
           tarea: a.tarea,
           descripcion: a.descripcion,
           tipoTrabajo: a.tipoTrabajo,
+          rolTecnico: a.rolTecnico,
+          cantidadTecnicos: a.cantidadTecnicos,
           duracionEstimadaValor: a.duracionEstimadaValor,
           unidadDuracion: a.unidadDuracion,
           duracionEstimadaMin: a.duracionEstimadaMin,
           observaciones: a.observaciones,
           estado: "PENDIENTE",
+          origen: a.origen || "TRATAMIENTO",
         },
         { forceSelected: true }
       )
@@ -360,8 +440,14 @@ export default function ModalOTIndividual({
       planMantenimientoId: te.planMantenimientoId || null,
       planMantenimiento: te.planMantenimiento || null,
       actividadesOT,
+      descripcionEquipo: targetEsEquipo
+        ? te.descripcionEquipo || prev.descripcionEquipo || ""
+        : prev.descripcionEquipo,
+      descripcionUbicacion: targetEsUbicacion
+        ? te.descripcionEquipo || prev.descripcionUbicacion || ""
+        : prev.descripcionUbicacion,
     }));
-  }, [isOpen, tratamientoData, equipoActual?.id]);
+  }, [isOpen, tratamientoData, equipoActual, targetEsUbicacion, targetEsEquipo]);
 
   /* ─────────────────────────────────────────────
      INPUT HANDLERS
@@ -373,7 +459,7 @@ export default function ModalOTIndividual({
   };
 
   /* ─────────────────────────────────────────────
-     PLAN (preventivo): seleccionar si no vino del tratamiento
+     PLAN (preventivo)
   ───────────────────────────────────────────── */
   const seleccionarPlan = async (planId) => {
     if (!planId) {
@@ -393,17 +479,22 @@ export default function ModalOTIndividual({
       const acts = actsRaw.map((a) =>
         mkActOT(
           {
+            planMantenimientoActividadId: a.id,
+            codigoActividad: a.codigoActividad,
             sistema: a.sistema,
             subsistema: a.subsistema,
             componente: a.componente,
             tarea: a.tarea,
             descripcion: a.descripcion || "",
             tipoTrabajo: a.tipoTrabajo,
+            rolTecnico: a.rolTecnico,
+            cantidadTecnicos: a.cantidadTecnicos,
             duracionEstimadaValor: a.duracionMinutos || 0,
             unidadDuracion: a.unidadDuracion || "min",
             duracionEstimadaMin: a.duracionMinutos || null,
             observaciones: a.observaciones || "",
             estado: "PENDIENTE",
+            origen: "PLAN",
           },
           { forceSelected: true }
         )
@@ -437,6 +528,7 @@ export default function ModalOTIndividual({
             tipoTrabajo: "REPARACION",
             unidadDuracion: "min",
             duracionEstimadaValor: 0,
+            origen: "OT",
           },
           { forceSelected: true }
         ),
@@ -474,7 +566,7 @@ export default function ModalOTIndividual({
   };
 
   /* ─────────────────────────────────────────────
-     ADJUNTOS GENERALES / EQUIPO
+     ADJUNTOS
   ───────────────────────────────────────────── */
   const handleUploadAdjuntos = async (files) => {
     try {
@@ -504,13 +596,13 @@ export default function ModalOTIndividual({
       }));
     } catch (err) {
       console.error("Error subiendo adjuntos equipo", err);
-      alert("Error subiendo archivos del equipo");
+      alert("Error subiendo archivos del registro");
       setFormData((prev) => ({ ...prev, subiendoAdjuntosEquipo: false }));
     }
   };
 
   /* ─────────────────────────────────────────────
-     VALIDACIONES (MISMA IDEA QUE GRUPAL)
+     VALIDACIONES
   ───────────────────────────────────────────── */
   const validateForm = () => {
     const newErrors = {};
@@ -529,15 +621,14 @@ export default function ModalOTIndividual({
         newErrors.fechaProgramadaFin = "La fecha de fin debe ser posterior a la de inicio";
     }
 
-    // Equipo
-    if (!formData.descripcionEquipo.trim())
-      newErrors.descripcionEquipo = "La descripción del trabajo es obligatoria";
+    const descripcionTarget = targetEsUbicacion
+      ? formData.descripcionUbicacion
+      : formData.descripcionEquipo;
 
-    // preventivo: si no vino plan del tratamiento, obligar a seleccionar uno
-    const planLockedByTratamiento = Boolean(
-      formData.planMantenimientoId && formData.planMantenimiento
-    );
-    if (esPreventivo && !planLockedByTratamiento && !formData.planMantenimientoId)
+    if (!descripcionTarget.trim())
+      newErrors.descripcionTarget = "La descripción del trabajo es obligatoria";
+
+    if (esPreventivo && !formData.planMantenimientoId)
       newErrors.plan = "En preventivo debe seleccionar un plan";
 
     if (!formData.trabajadoresAsignados || formData.trabajadoresAsignados.length === 0)
@@ -557,7 +648,6 @@ export default function ModalOTIndividual({
         newErrors.fechaFinProgramada = "La fecha fin debe ser posterior a inicio";
     }
 
-    // Actividades
     const acts = formData.actividadesOT || [];
 
     if (esCorrectivo) {
@@ -576,7 +666,6 @@ export default function ModalOTIndividual({
         }
       }
     } else {
-      // preventivo
       if (formData.planMantenimientoId && acts.length === 0)
         newErrors.acts = "El plan seleccionado no tiene actividades";
     }
@@ -598,12 +687,39 @@ export default function ModalOTIndividual({
       alert("Este aviso no tiene tratamiento.");
       return;
     }
-    if (!equipoActual?.id) {
-      alert("No hay equipo actual.");
+    if (!equipoActual) {
+      alert("No hay target actual.");
       return;
     }
 
     const tratamientoId = aviso.tratamientos[0].id;
+
+    const targetPayload = {
+      equipoId: targetEsEquipo ? getTargetId(equipoActual) : null,
+      ubicacionTecnicaId: targetEsUbicacion ? getTargetId(equipoActual) : null,
+
+      descripcionEquipo: targetEsEquipo ? formData.descripcionEquipo.trim() : null,
+      descripcionUbicacion: targetEsUbicacion
+        ? formData.descripcionUbicacion.trim()
+        : null,
+
+      prioridad: formData.prioridad,
+      planMantenimientoId: formData.planMantenimientoId || null,
+
+      fechaInicioProgramada: new Date(formData.fechaInicioProgramada).toISOString(),
+      fechaFinProgramada: new Date(formData.fechaFinProgramada).toISOString(),
+
+      actividades: (formData.actividadesOT || [])
+        .filter((a) => (esPreventivo ? true : a.selected))
+        .map(normalizeActOTForPayload),
+
+      trabajadores: (formData.trabajadoresAsignados || []).map((id) => ({
+        trabajadorId: id,
+        esEncargado: id === formData.encargadoId,
+      })),
+
+      adjuntos: formData.adjuntosEquipo || [],
+    };
 
     const payload = {
       numeroOT: numeroOTGenerado,
@@ -618,29 +734,8 @@ export default function ModalOTIndividual({
 
       observaciones: formData.observaciones || null,
 
-      equipos: [
-        {
-          equipoId: equipoActual.id,
-          descripcionEquipo: formData.descripcionEquipo.trim(),
-          prioridad: formData.prioridad,
-
-          planMantenimientoId: formData.planMantenimientoId || null,
-
-          fechaInicioProgramada: new Date(formData.fechaInicioProgramada).toISOString(),
-          fechaFinProgramada: new Date(formData.fechaFinProgramada).toISOString(),
-
-          actividades: (formData.actividadesOT || [])
-            .filter((a) => (esPreventivo ? true : a.selected))
-            .map(normalizeActOTForPayload),
-
-          trabajadores: (formData.trabajadoresAsignados || []).map((id) => ({
-            trabajadorId: id,
-            esEncargado: id === formData.encargadoId,
-          })),
-
-          adjuntos: formData.adjuntosEquipo || [],
-        },
-      ],
+      modo: "INDIVIDUAL",
+      targets: [targetPayload],
 
       adjuntos: archivosAdjuntos || [],
     };
@@ -650,7 +745,7 @@ export default function ModalOTIndividual({
   };
 
   /* ─────────────────────────────────────────────
-     CERRAR (si hay pendientes)
+     CERRAR
   ───────────────────────────────────────────── */
   const handleCerrar = () => {
     if (hayEquiposPendientes) setMostrarConfirmacionSalida(true);
@@ -665,7 +760,6 @@ export default function ModalOTIndividual({
   if (!isOpen) return null;
 
   const isReadOnlyActividades = esPreventivo;
-  const planLockedByTratamiento = Boolean(formData.planMantenimientoId && formData.planMantenimiento);
 
   return (
     <>
@@ -673,8 +767,6 @@ export default function ModalOTIndividual({
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[95vh] flex flex-col border border-slate-200">
           {/* HEADER */}
           <div className="relative bg-gradient-to-r from-violet-600 via-purple-700 to-violet-600 p-8 rounded-t-3xl overflow-hidden">
-            <div className="absolute inset-0 opacity-20" />
-
             <div className="relative">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-5">
@@ -738,12 +830,11 @@ export default function ModalOTIndividual({
                 </div>
               </div>
 
-              {/* PROGRESO */}
               {progresoEquipos && (
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-white font-bold text-sm">
-                      Equipo {progresoEquipos.actual} de {progresoEquipos.total}
+                      Registro {progresoEquipos.actual} de {progresoEquipos.total}
                     </span>
                     <span className="text-violet-200 text-xs font-semibold">
                       {Math.round(
@@ -766,13 +857,17 @@ export default function ModalOTIndividual({
 
                   {equipoActual && (
                     <div className="mt-3 flex items-center gap-3 bg-white/10 rounded-lg p-3 border border-white/20">
-                      <Settings className="w-5 h-5 text-violet-200" />
+                      {targetEsUbicacion ? (
+                        <MapPin className="w-5 h-5 text-violet-200" />
+                      ) : (
+                        <Settings className="w-5 h-5 text-violet-200" />
+                      )}
                       <div>
                         <p className="text-white font-bold text-sm">
-                          {equipoActual.nombre}
+                          {getTargetNombre(equipoActual)}
                         </p>
                         <p className="text-violet-200 text-xs">
-                          {equipoActual.tipo} • {equipoActual.codigo}
+                          {getTargetTipoTexto(equipoActual)} • {getTargetCodigo(equipoActual)}
                         </p>
                       </div>
                     </div>
@@ -785,7 +880,6 @@ export default function ModalOTIndividual({
           {/* BODY */}
           <div className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 to-violet-50">
             <div className="p-8 space-y-6">
-              {/* ALERTA TIPO MANTENIMIENTO */}
               {tipoMantenimiento && (
                 <div
                   className={`p-5 rounded-2xl border-l-4 ${
@@ -814,7 +908,7 @@ export default function ModalOTIndividual({
                         }`}
                       >
                         {esPreventivo
-                          ? "En preventivo se muestran el plan y actividades (solo lectura)."
+                          ? "En preventivo puedes cambiar el plan y cargar sus actividades."
                           : "En correctivo puedes editar/agregar/eliminar actividades antes de crear la OT."}
                       </p>
                     </div>
@@ -822,18 +916,17 @@ export default function ModalOTIndividual({
                 </div>
               )}
 
-              {/* ALERTA PROGRESO */}
               {hayEquiposPendientes && (
                 <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-5">
                   <div className="flex items-start gap-3">
                     <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-bold text-blue-900 mb-1">
-                        Creando OT Individual - Equipo {progresoEquipos.actual} de{" "}
+                        Creando OT Individual - Registro {progresoEquipos.actual} de{" "}
                         {progresoEquipos.total}
                       </p>
                       <p className="text-xs text-blue-700">
-                        Complete los datos para generar la OT de este equipo.
+                        Complete los datos para generar la OT de este registro.
                         <span className="block mt-1 font-bold">
                           ⚠️ Luego continuarás con los{" "}
                           {progresoEquipos.total - progresoEquipos.actual} restantes.
@@ -1004,32 +1097,38 @@ export default function ModalOTIndividual({
                 </div>
               </div>
 
-              {/* CONFIG EQUIPO */}
+              {/* CONFIG TARGET */}
               {equipoActual && (
                 <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-200">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl">
-                        <Settings className="w-5 h-5 text-white" />
+                        {targetEsUbicacion ? (
+                          <MapPin className="w-5 h-5 text-white" />
+                        ) : (
+                          <Settings className="w-5 h-5 text-white" />
+                        )}
                       </div>
                       <div>
                         <h4 className="text-xl font-bold text-slate-900">
-                          {equipoActual.nombre}
+                          {getTargetNombre(equipoActual)}
                         </h4>
                         <p className="text-sm text-slate-600">
-                          {equipoActual.tipo} • {equipoActual.codigo}
+                          {getTargetTipoTexto(equipoActual)} • {getTargetCodigo(equipoActual)}
                         </p>
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => setEquipoDetalleModalId(equipoActual.id)}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-md"
-                      type="button"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Ver Detalles
-                    </button>
+                    {targetEsEquipo && (
+                      <button
+                        onClick={() => setEquipoDetalleModalId(getTargetId(equipoActual))}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-md"
+                        type="button"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Ver Detalles
+                      </button>
+                    )}
                   </div>
 
                   <div className="space-y-4">
@@ -1040,21 +1139,21 @@ export default function ModalOTIndividual({
                         Descripción del Trabajo <span className="text-red-500">*</span>
                       </label>
                       <textarea
-                        name="descripcionEquipo"
-                        value={formData.descripcionEquipo}
+                        name={targetEsUbicacion ? "descripcionUbicacion" : "descripcionEquipo"}
+                        value={targetEsUbicacion ? formData.descripcionUbicacion : formData.descripcionEquipo}
                         onChange={handleChange}
                         rows={3}
-                        placeholder={`Detalla el trabajo en ${equipoActual.nombre}...`}
+                        placeholder={`Detalla el trabajo en ${getTargetNombre(equipoActual)}...`}
                         className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium resize-none ${
-                          errors.descripcionEquipo
+                          errors.descripcionTarget
                             ? "border-red-400 bg-red-50"
                             : "border-amber-300 bg-white"
                         }`}
                       />
-                      {errors.descripcionEquipo && (
+                      {errors.descripcionTarget && (
                         <p className="mt-2 text-xs text-red-600 flex items-center gap-1 font-medium">
                           <AlertCircle className="w-3 h-3" />
-                          {errors.descripcionEquipo}
+                          {errors.descripcionTarget}
                         </p>
                       )}
                     </div>
@@ -1077,7 +1176,7 @@ export default function ModalOTIndividual({
                       </select>
                     </div>
 
-                    {/* PLAN (solo preventivo) */}
+                    {/* PLAN */}
                     {esPreventivo && (
                       <div className="border-2 rounded-xl p-4 bg-green-50 border-green-200">
                         <label className="text-sm font-bold flex items-center gap-2 text-green-900 mb-3">
@@ -1085,32 +1184,36 @@ export default function ModalOTIndividual({
                           Plan de Mantenimiento <span className="text-red-500">*</span>
                         </label>
 
-                        {cargandoPlanes && planesDisponibles.length === 0 && !formData.planMantenimientoId ? (
-                          <div className="flex items-center gap-2 text-slate-500 text-sm mb-3">
-                            <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                            Cargando planes del equipo...
-                          </div>
-                        ) : null}
-
-                        {planLockedByTratamiento ? (
-                          <div className="bg-white border border-green-200 rounded-xl p-4">
-                            <p className="text-xs font-semibold text-green-800">
-                              Plan (del tratamiento)
-                            </p>
-                            <p className="font-bold text-slate-900">
-                              {formData.planMantenimiento?.codigoPlan
-                                ? `${formData.planMantenimiento.codigoPlan} — `
-                                : ""}
-                              {formData.planMantenimiento?.nombre || "—"}
-                            </p>
-                            {formData.planMantenimiento?.descripcion && (
-                              <p className="text-sm text-slate-600 mt-1">
-                                {formData.planMantenimiento.descripcion}
-                              </p>
+                        {targetEsUbicacion ? (
+                          <>
+                            {formData.planMantenimiento ? (
+                              <div className="bg-white border border-green-200 rounded-xl p-4">
+                                <p className="text-xs font-semibold text-green-800">
+                                  Plan asociado
+                                </p>
+                                <p className="font-bold text-slate-900">
+                                  {formData.planMantenimiento?.codigoPlan
+                                    ? `${formData.planMantenimiento.codigoPlan} — `
+                                    : ""}
+                                  {formData.planMantenimiento?.nombre || "—"}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="bg-white border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+                                Esta ubicación técnica no tiene selector de plan por equipo en este modal.
+                                Si el tratamiento ya trae plan, se usará ese.
+                              </div>
                             )}
-                          </div>
+                          </>
                         ) : (
                           <>
+                            {cargandoPlanes && planesDisponibles.length === 0 && !formData.planMantenimientoId ? (
+                              <div className="flex items-center gap-2 text-slate-500 text-sm mb-3">
+                                <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                Cargando planes del equipo...
+                              </div>
+                            ) : null}
+
                             <select
                               className={`w-full px-4 py-2.5 border-2 rounded-lg bg-white focus:ring-4 transition-all font-medium
                                 border-green-300 focus:ring-green-500/20 focus:border-green-500
@@ -1266,11 +1369,11 @@ export default function ModalOTIndividual({
                       </div>
                     </div>
 
-                    {/* FECHAS EQUIPO */}
+                    {/* FECHAS */}
                     <div className="bg-white border-2 border-slate-200 rounded-xl p-4">
                       <p className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-slate-600" />
-                        Programación del equipo
+                        Programación del {targetEsUbicacion ? "registro" : "equipo"}
                       </p>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1320,11 +1423,11 @@ export default function ModalOTIndividual({
                       </div>
                     </div>
 
-                    {/* ADJUNTOS EQUIPO */}
+                    {/* ADJUNTOS */}
                     <div className="bg-white border-2 border-slate-200 rounded-xl p-4">
                       <p className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
                         <Upload className="w-4 h-4 text-slate-600" />
-                        Adjuntos del equipo
+                        Adjuntos del {targetEsUbicacion ? "registro" : "equipo"}
                       </p>
 
                       <input
@@ -1337,7 +1440,7 @@ export default function ModalOTIndividual({
                       {formData.subiendoAdjuntosEquipo && (
                         <div className="mt-3 flex items-center gap-2 text-violet-600 bg-violet-50 p-3 rounded-xl border border-violet-200">
                           <div className="w-4 h-4 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-                          <p className="text-sm font-semibold">Subiendo adjuntos del equipo...</p>
+                          <p className="text-sm font-semibold">Subiendo adjuntos...</p>
                         </div>
                       )}
 
@@ -1594,6 +1697,36 @@ export default function ModalOTIndividual({
                                   </p>
                                 </div>
 
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                    Rol técnico
+                                  </label>
+                                  <input
+                                    value={act.rolTecnico}
+                                    onChange={(e) =>
+                                      updateActividadOT(actIdx, "rolTecnico", e.target.value)
+                                    }
+                                    disabled={isReadOnlyActividades}
+                                    className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                    Cantidad técnicos
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={act.cantidadTecnicos}
+                                    onChange={(e) =>
+                                      updateActividadOT(actIdx, "cantidadTecnicos", e.target.value)
+                                    }
+                                    disabled={isReadOnlyActividades}
+                                    className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
+                                  />
+                                </div>
+
                                 <div className="md:col-span-2">
                                   <label className="block text-xs font-semibold text-slate-600 mb-1">
                                     Observaciones
@@ -1732,17 +1865,17 @@ export default function ModalOTIndividual({
               </p>
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-sm font-bold text-amber-900 mb-1">
-                  ⚠️ Equipos pendientes:
+                  ⚠️ Registros pendientes:
                 </p>
                 <p className="text-sm text-amber-800">
                   <span className="font-bold text-lg">
                     {progresoEquipos?.total - progresoEquipos?.actual}
                   </span>{" "}
-                  de {progresoEquipos?.total} equipos aún sin OT
+                  de {progresoEquipos?.total} aún sin OT
                 </p>
               </div>
               <p className="text-sm text-slate-600">
-                Si sales ahora, tendrás que reiniciar el proceso para los equipos restantes.
+                Si sales ahora, tendrás que reiniciar el proceso para los registros restantes.
               </p>
             </div>
 
@@ -1782,7 +1915,7 @@ export default function ModalOTIndividual({
                 <strong>OT:</strong> {numeroOTGenerado}
               </p>
               <p>
-                <strong>Equipo:</strong> {equipoActual?.nombre}
+                <strong>Registro:</strong> {getTargetNombre(equipoActual)}
               </p>
               <p>
                 <strong>Supervisor:</strong>{" "}
@@ -1822,7 +1955,6 @@ export default function ModalOTIndividual({
         aviso={aviso}
       />
 
-      {/* Si quieres usar el modal de detalle existente (recomendado) */}
       <ModalDetallesEquipo
         equipoId={equipoDetalleModalId}
         isOpen={!!equipoDetalleModalId}

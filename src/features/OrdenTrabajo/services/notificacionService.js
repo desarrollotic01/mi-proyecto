@@ -32,7 +32,7 @@ export const abrirPdfNotificacion = async (id) => {
     try {
       const blob = err?.response?.data;
       if (blob instanceof Blob) {
-        const text = await blob.text(); // <-- aquí está el error real
+        const text = await blob.text(); 
         console.error("PDF error body:", text);
 
         // intenta parsear JSON

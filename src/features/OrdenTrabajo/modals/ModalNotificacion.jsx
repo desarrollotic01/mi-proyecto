@@ -6,15 +6,111 @@ import {
   AlertCircle,
   Loader2,
   Lock,
+  Package,
+  MapPinned,
+  Clock3,
+  UserCog,
 } from "lucide-react";
 
-import { crearNotificacionService, getNotificacionesByOT, abrirPdfNotificacion } from "../services/notificacionService";
+import {
+  crearNotificacionService,
+  getNotificacionesByOT,
+  abrirPdfNotificacion,
+} from "../services/notificacionService";
 import { getTrabajadores } from "../../mantenimiento/services/trabajadoresService";
 import { getOrdenTrabajoById } from "../../mantenimiento/services/ordenTrabajoService";
 
-/** =========================
- * Modal: Elegir equipo (con estado + PDF + bloqueo)
- * ========================= */
+/* =========================================================
+   HELPERS GENERALES
+========================================================= */
+
+const formatearRol = (rol = "") =>
+  String(rol)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+
+const getRegistroOTLabel = (registro) => {
+  if (!registro) return "No seleccionado";
+
+  if (registro?.equipoId) {
+    return (
+      registro?.numeroEquipo ||
+      registro?.equipo?.codigo ||
+      registro?.equipo?.nombre ||
+      registro?.descripcionEquipo ||
+      `Equipo ${registro.id}`
+    );
+  }
+
+  if (registro?.ubicacionTecnicaId) {
+    return (
+      registro?.ubicacionTecnica?.codigo ||
+      registro?.ubicacionTecnica?.nombre ||
+      registro?.descripcionUbicacion ||
+      `Ubicación técnica ${registro.id}`
+    );
+  }
+
+  return `Registro ${registro.id}`;
+};
+
+const getRegistroOTSubLabel = (registro) => {
+  if (!registro) return "";
+
+  if (registro?.equipoId) {
+    if (registro?.equipo?.nombre) {
+      return `${registro.equipo.nombre}${
+        registro.equipo.codigo ? ` • ${registro.equipo.codigo}` : ""
+      }`;
+    }
+    return registro?.descripcionEquipo || "";
+  }
+
+  if (registro?.ubicacionTecnicaId) {
+    if (registro?.ubicacionTecnica?.nombre) {
+      return `${registro.ubicacionTecnica.nombre}${
+        registro.ubicacionTecnica.codigo
+          ? ` • ${registro.ubicacionTecnica.codigo}`
+          : ""
+      }`;
+    }
+    return registro?.descripcionUbicacion || "";
+  }
+
+  return "";
+};
+
+const getRegistroOTTipo = (registro) => {
+  if (registro?.equipoId) return "EQUIPO";
+  if (registro?.ubicacionTecnicaId) return "UBICACION_TECNICA";
+  return "REGISTRO";
+};
+
+const getRegistroOTIcon = (registro) => {
+  if (registro?.equipoId) return Package;
+  if (registro?.ubicacionTecnicaId) return MapPinned;
+  return Package;
+};
+
+const buildDefaultPlanItem = (actividad) => ({
+  ordenTrabajoActividadId: actividad.id,
+  planMantenimientoId: actividad.planMantenimientoId || null,
+  estado: null,
+  comentario: "",
+  trabajadorId: null,
+  duracionPlan: null,
+  unidadDuracionPlan: "min",
+  fechaInicioPlan: null,
+  fechaFinPlan: null,
+  observaciones: "",
+});
+
+const safeArray = (value) => (Array.isArray(value) ? value : []);
+
+/* =========================================================
+   MODAL ELEGIR REGISTRO OT
+========================================================= */
+
 function ModalElegirEquipo({
   open,
   equipos = [],
@@ -24,24 +120,25 @@ function ModalElegirEquipo({
 }) {
   if (!open) return null;
 
-  const handleCardKeyDown = (e, eq, creado) => {
+  const handleCardKeyDown = (e, item, creado) => {
     if (creado) return;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      onSelect(eq);
+      onSelect(item);
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden">
         <div className="p-5 bg-gradient-to-r from-slate-700 to-slate-900 text-white flex items-center justify-between">
           <div>
-            <h3 className="font-bold text-lg">Seleccionar equipo para Notificación</h3>
+            <h3 className="font-bold text-lg">Seleccionar registro para Notificación</h3>
             <p className="text-white/80 text-xs mt-0.5">
-              Equipos con notificación creada están bloqueados y con botón PDF.
+              Los registros que ya tienen notificación están bloqueados y muestran botón PDF.
             </p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -54,24 +151,18 @@ function ModalElegirEquipo({
 
         <div className="p-5">
           {equipos.length === 0 ? (
-            <div className="text-center py-10 text-slate-500">No hay equipos en la OT.</div>
+            <div className="text-center py-10 text-slate-500">
+              No hay registros en la OT.
+            </div>
           ) : (
             <div className="max-h-[60vh] overflow-y-auto space-y-2">
               {equipos.map((eq) => {
-                const label =
-                  eq?.numeroEquipo ||
-                  eq?.equipo?.codigo ||
-                  eq?.equipo?.nombre ||
-                  eq?.descripcionEquipo ||
-                  `Equipo ${eq.id}`;
-
-                const sub =
-                  eq?.equipo?.nombre
-                    ? `${eq.equipo.nombre}${eq.equipo.codigo ? ` • ${eq.equipo.codigo}` : ""}`
-                    : eq?.descripcionEquipo || "";
+                const label = getRegistroOTLabel(eq);
+                const sub = getRegistroOTSubLabel(eq);
+                const tipo = getRegistroOTTipo(eq);
+                const Icon = getRegistroOTIcon(eq);
 
                 const acts = Array.isArray(eq.actividades) ? eq.actividades.length : 0;
-
                 const noti = notiByEquipoOTId?.get(eq.id);
                 const creado = !!noti;
 
@@ -91,24 +182,39 @@ function ModalElegirEquipo({
                       !creado ? "focus:outline-none focus:ring-2 focus:ring-amber-500" : "",
                     ].join(" ")}
                   >
-                    <div className="min-w-0">
-                      <div className="font-bold text-slate-800 truncate">{label}</div>
-                      {sub ? (
-                        <div className="text-xs text-slate-500 mt-0.5 truncate">{sub}</div>
-                      ) : null}
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="p-2 rounded-xl bg-slate-900 shrink-0">
+                        <Icon className="w-5 h-5 text-white" />
+                      </div>
 
-                      {creado ? (
-                        <div className="mt-2 inline-flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
-                          <CheckCircle2 className="w-4 h-4" />
-                          Notificación creada{" "}
-                          <span className="text-emerald-800/70 font-semibold">#{noti?.id}</span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-800 truncate">{label}</div>
+
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                            {tipo === "EQUIPO" ? "Equipo" : "Ubicación técnica"}
+                          </span>
+
+                          {sub ? (
+                            <div className="text-xs text-slate-500 truncate">{sub}</div>
+                          ) : null}
                         </div>
-                      ) : (
-                        <div className="mt-2 inline-flex items-center gap-2 text-xs font-bold text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
-                          <AlertCircle className="w-4 h-4" />
-                          Pendiente
-                        </div>
-                      )}
+
+                        {creado ? (
+                          <div className="mt-2 inline-flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+                            <CheckCircle2 className="w-4 h-4" />
+                            Notificación creada{" "}
+                            <span className="text-emerald-800/70 font-semibold">
+                              #{noti?.id}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="mt-2 inline-flex items-center gap-2 text-xs font-bold text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
+                            <AlertCircle className="w-4 h-4" />
+                            Pendiente
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex flex-col items-end gap-2 shrink-0">
@@ -120,7 +226,7 @@ function ModalElegirEquipo({
                         <button
                           type="button"
                           onClick={(e) => {
-                            e.stopPropagation(); // ✅ no dispara selección del card
+                            e.stopPropagation();
                             abrirPdfNotificacion(noti.id);
                           }}
                           className="inline-flex items-center gap-2 text-xs font-bold px-3 py-1 rounded-full bg-red-600 text-white hover:bg-red-700"
@@ -157,32 +263,24 @@ function ModalElegirEquipo({
   );
 }
 
-/** =========================
- * Modal: Crear Notificación (1 por equipo OT)
- * - muestra notificaciones ya creadas
- * - selector de equipo primero
- * - bloquea equipos con notificación
- * - botón PDF
- * - al guardar refresca lista y vuelve a selector
- * ========================= */
+/* =========================================================
+   MODAL PRINCIPAL
+========================================================= */
+
 const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
   const [ordenTrabajo, setOrdenTrabajo] = useState(null);
   const [loadingOrden, setLoadingOrden] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [loadingTrabajadores, setLoadingTrabajadores] = useState(false);
+  const [loadingNotis, setLoadingNotis] = useState(false);
 
   const [activeTab, setActiveTab] = useState("general");
 
-  // ✅ Equipo OT seleccionado
   const [equipoSeleccionado, setEquipoSeleccionado] = useState(null);
-
-  // ✅ Selector de equipo
   const [openSelectEquipo, setOpenSelectEquipo] = useState(false);
 
-  // ✅ Notificaciones ya creadas para esta OT
   const [notificacionesOT, setNotificacionesOT] = useState([]);
-  const [loadingNotis, setLoadingNotis] = useState(false);
 
   const [form, setForm] = useState({
     fechaInicio: "",
@@ -198,7 +296,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
     recomendaciones: "",
     estadoGeneralEquipo: "OPERATIVO",
     tecnicos: [],
-    planes: [], // { ordenTrabajoActividadId, planMantenimientoId|null, estado, comentario }
+    planes: [],
   });
 
   const [listaTrabajadores, setListaTrabajadores] = useState([]);
@@ -210,25 +308,25 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
   const [fotosAntes, setFotosAntes] = useState([]);
   const [fotosDespues, setFotosDespues] = useState([]);
 
-  // docs opcionales
   const [acta, setActa] = useState(null);
   const [informe, setInforme] = useState(null);
   const [checklistAdjunto, setChecklistAdjunto] = useState(null);
   const [archivoExtra, setArchivoExtra] = useState(null);
 
-  /** =========================
-   * Helpers carga
-   * ========================= */
+  /* =========================================================
+     CARGAS
+  ========================================================= */
+
   const cargarOrdenTrabajo = async () => {
     try {
       setLoadingOrden(true);
       const data = await getOrdenTrabajoById(ordenTrabajoId);
       setOrdenTrabajo(data);
 
-      // OJO: no auto-seleccionamos si hay múltiples (queremos selector primero)
-      const equipos = Array.isArray(data?.equipos) ? data.equipos : [];
-      if (equipos.length === 1) {
-        setEquipoSeleccionado(equipos[0]);
+      const registros = Array.isArray(data?.equipos) ? data.equipos : [];
+
+      if (registros.length === 1) {
+        setEquipoSeleccionado(registros[0]);
       } else {
         setEquipoSeleccionado(null);
       }
@@ -298,39 +396,47 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
     setActiveTab("general");
   };
 
-  /** =========================
-   * Effects (NO hooks condicionales)
-   * ========================= */
+  /* =========================================================
+     EFFECTS
+  ========================================================= */
+
   useEffect(() => {
     if (!isOpen || !ordenTrabajoId) return;
 
     (async () => {
       resetForm();
-      await Promise.all([cargarOrdenTrabajo(), cargarTrabajadores(), cargarNotificacionesOT()]);
+      await Promise.all([
+        cargarOrdenTrabajo(),
+        cargarTrabajadores(),
+        cargarNotificacionesOT(),
+      ]);
     })();
   }, [isOpen, ordenTrabajoId]);
 
-  // abrir selector cuando abre el modal
   useEffect(() => {
     if (!isOpen) return;
     setOpenSelectEquipo(true);
   }, [isOpen]);
 
-  /** =========================
-   * Computed
-   * ========================= */
+  /* =========================================================
+     COMPUTED
+  ========================================================= */
+
   const equiposOT = useMemo(() => {
     if (!ordenTrabajo?.equipos) return [];
     return ordenTrabajo.equipos.map((eq) => ({
       ...eq,
       actividades: Array.isArray(eq.actividades) ? eq.actividades : [],
+      trabajadores: Array.isArray(eq.trabajadores) ? eq.trabajadores : [],
     }));
   }, [ordenTrabajo]);
 
   const notiByEquipoOTId = useMemo(() => {
     const map = new Map();
     (notificacionesOT || []).forEach((n) => {
-      if (n?.ordenTrabajoEquipoId) map.set(n.ordenTrabajoEquipoId, n);
+      if (n?.ordenTrabajoEquipoId) {
+        map.set(n.ordenTrabajoEquipoId, n);
+      }
     });
     return map;
   }, [notificacionesOT]);
@@ -343,25 +449,23 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
 
   const totalActividades = actividadesEquipoSeleccionado.length;
 
-  const checklistCompletado = useMemo(
-    () =>
-      form.planes.filter(
-        (p) =>
-          actividadesEquipoSeleccionado.some((a) => a.id === p.ordenTrabajoActividadId) &&
-          !!p.estado
-      ).length,
-    [form.planes, actividadesEquipoSeleccionado]
-  );
+  const checklistCompletado = useMemo(() => {
+    return form.planes.filter(
+      (p) =>
+        actividadesEquipoSeleccionado.some(
+          (a) => a.id === p.ordenTrabajoActividadId
+        ) && !!p.estado
+    ).length;
+  }, [form.planes, actividadesEquipoSeleccionado]);
 
   const labelEquipoSeleccionado = useMemo(() => {
     if (!equipoSeleccionado) return "No seleccionado";
-    return (
-      equipoSeleccionado?.numeroEquipo ||
-      equipoSeleccionado?.equipo?.codigo ||
-      equipoSeleccionado?.equipo?.nombre ||
-      equipoSeleccionado?.descripcionEquipo ||
-      `Equipo ${equipoSeleccionado.id}`
-    );
+    return getRegistroOTLabel(equipoSeleccionado);
+  }, [equipoSeleccionado]);
+
+  const subtituloEquipoSeleccionado = useMemo(() => {
+    if (!equipoSeleccionado) return "";
+    return getRegistroOTSubLabel(equipoSeleccionado);
   }, [equipoSeleccionado]);
 
   const notiActual = useMemo(() => {
@@ -377,66 +481,89 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
     return { total, hechas, faltan: Math.max(0, total - hechas) };
   }, [equiposOT.length, notificacionesOT.length]);
 
-  /** =========================
-   * Cuando selecciona equipo:
-   * - set numeroEquipo
-   * - limpiar planes del equipo anterior
-   * - si ya existe noti, bloquear submit (UI)
-   * ========================= */
+  /* =========================================================
+     CARGA AUTOMÁTICA DE TÉCNICOS DEL REGISTRO OT
+  ========================================================= */
+
   useEffect(() => {
-  if (!equipoSeleccionado) return;
+    if (!equipoSeleccionado) return;
 
-  const label =
-    equipoSeleccionado?.numeroEquipo ||
-    equipoSeleccionado?.equipo?.codigo ||
-    equipoSeleccionado?.descripcionEquipo ||
-    "";
+    const label = getRegistroOTLabel(equipoSeleccionado);
+    const eqFull = equiposOT.find((x) => x.id === equipoSeleccionado.id);
+    const trabajadoresOT = Array.isArray(eqFull?.trabajadores)
+      ? eqFull.trabajadores
+      : [];
 
-  // ✅ buscar el equipo “completo” dentro de equiposOT (ahí vienen actividades + trabajadores)
-  const eqFull = equiposOT.find((x) => x.id === equipoSeleccionado.id);
+    const tecnicosAuto = trabajadoresOT
+      .map((tw) => {
+        const w = tw?.trabajador;
+        const id = tw?.trabajadorId || w?.id;
+        if (!id) return null;
 
-  // ✅ trabajadores asignados en OT para este equipo
-  const trabajadoresOT = Array.isArray(eqFull?.trabajadores) ? eqFull.trabajadores : [];
+        const nombre =
+          `${w?.nombre || ""} ${w?.apellido || ""}`.trim() || `Trabajador ${id}`;
 
-  // ⚠️ según tu include, cada item puede venir como:
-  // { trabajadorId, esEncargado, trabajador: { id, nombre, apellido, rol, empresa } }
-  const tecnicosAuto = trabajadoresOT
-    .map((tw) => {
-      const w = tw?.trabajador;
-      const id = tw?.trabajadorId || w?.id;
-      if (!id) return null;
+        return {
+          id,
+          nombre,
+          rol: formatearRol(w?.rol || ""),
+          empresa: w?.empresa || "—",
+          esEncargado: !!tw?.esEncargado,
+        };
+      })
+      .filter(Boolean);
 
-      const nombre = `${w?.nombre || ""} ${w?.apellido || ""}`.trim() || `Trabajador ${id}`;
-      const rol = (w?.rol || "")
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (l) => l.toUpperCase());
+    setTecnicosSeleccionados(tecnicosAuto);
 
-      return {
-        id,
-        nombre,
-        rol: rol || "—",
-        empresa: w?.empresa || "—",
-        esEncargado: !!tw?.esEncargado,
-      };
-    })
-    .filter(Boolean);
+    setForm((prev) => ({
+      ...prev,
+      numeroEquipo: label,
+      planes: [],
+    }));
 
-  // ✅ set
-  setTecnicosSeleccionados(tecnicosAuto);
+    setActiveTab("general");
+  }, [equipoSeleccionado, equiposOT]);
 
-  // ✅ limpia planes del equipo anterior (pero deja técnicos precargados)
-  setForm((prev) => ({ ...prev, numeroEquipo: label, planes: [] }));
-  setActiveTab("general");
-}, [equipoSeleccionado, equiposOT]);
+  /* =========================================================
+     HANDLERS BÁSICOS
+  ========================================================= */
 
-  /** =========================
-   * Handlers básicos
-   * ========================= */
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  // Técnicos
+  const getActividad = (actividadId) =>
+    form.planes.find((p) => p.ordenTrabajoActividadId === actividadId);
+
+  const upsertPlanActividad = (actividad, patch = {}) => {
+    const existente = getActividad(actividad.id);
+
+    if (!existente) {
+      setForm((prev) => ({
+        ...prev,
+        planes: [
+          ...prev.planes,
+          {
+            ...buildDefaultPlanItem(actividad),
+            ...patch,
+          },
+        ],
+      }));
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      planes: prev.planes.map((p) =>
+        p.ordenTrabajoActividadId === actividad.id ? { ...p, ...patch } : p
+      ),
+    }));
+  };
+
+  /* =========================================================
+     TÉCNICOS
+  ========================================================= */
+
   const agregarTecnico = (trabajadorId) => {
     const trabajador = listaTrabajadores.find((t) => t.id === trabajadorId);
     if (!trabajador) return;
@@ -446,121 +573,125 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
       return;
     }
 
-    const rolFormateado = (trabajador.rol || "")
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase());
-
     setTecnicosSeleccionados((prev) => [
       ...prev,
       {
         id: trabajador.id,
         nombre: `${trabajador.nombre} ${trabajador.apellido || ""}`.trim(),
-        rol: rolFormateado,
-        empresa: trabajador.empresa,
+        rol: formatearRol(trabajador.rol || ""),
+        empresa: trabajador.empresa || "—",
+        esEncargado: false,
       },
     ]);
   };
 
   const eliminarTecnico = (id) => {
     setTecnicosSeleccionados((prev) => prev.filter((t) => t.id !== id));
-  };
 
-  // Checklist
-  const getActividad = (actividadId) =>
-    form.planes.find((p) => p.ordenTrabajoActividadId === actividadId);
-
-  const handleActividadEstado = (actividad, estado) => {
-    const resto = form.planes.filter((p) => p.ordenTrabajoActividadId !== actividad.id);
-
-    const prev = getActividad(actividad.id);
-
-resto.push({
-  ordenTrabajoActividadId: actividad.id,
-  planMantenimientoId: null,
-  estado,
-  comentario: prev?.comentario || "",
-  trabajadorId: prev?.trabajadorId ?? null, 
-});
-
-    setForm((prev) => ({ ...prev, planes: resto }));
-  };
-
-  const handleActividadComentario = (actividad, comentario) => {
-    const existente = getActividad(actividad.id);
-
-    if (!existente) {
-      setForm((prev) => ({
-        ...prev,
-        planes: [
-          ...prev.planes,
-          {
-            ordenTrabajoActividadId: actividad.id,
-            planMantenimientoId: null,
-            estado: null,
-            comentario,
-            trabajadorId 
-          },
-        ],
-      }));
-    } else {
-      setForm((prev) => ({
-        ...prev,
-        planes: prev.planes.map((p) =>
-          p.ordenTrabajoActividadId === actividad.id ? { ...p, comentario } : p
-        ),
-      }));
-    }
-  };
-
-  const handleActividadTrabajador = (actividad, trabajadorId) => {
-  const existente = getActividad(actividad.id);
-
-  if (!existente) {
-    setForm((prev) => ({
-      ...prev,
-      planes: [
-        ...prev.planes,
-        {
-          ordenTrabajoActividadId: actividad.id,
-          planMantenimientoId: null,
-          estado: null,
-          comentario: "",
-          trabajadorId: trabajadorId || null,
-        },
-      ],
-    }));
-  } else {
     setForm((prev) => ({
       ...prev,
       planes: prev.planes.map((p) =>
-        p.ordenTrabajoActividadId === actividad.id
-          ? { ...p, trabajadorId: trabajadorId || null }
-          : p
+        p.trabajadorId === id ? { ...p, trabajadorId: null } : p
       ),
     }));
-  }
-};
-
-  // Correctivos
-  const agregarCorrectivo = () => {
-    setCorrectivos((prev) => [...prev, { id: Date.now(), fotos: [], comentario: "" }]);
   };
+
+  /* =========================================================
+     CHECKLIST
+  ========================================================= */
+
+  const handleActividadEstado = (actividad, estado) => {
+    const prev = getActividad(actividad.id);
+
+    upsertPlanActividad(actividad, {
+      planMantenimientoId: prev?.planMantenimientoId || actividad.planMantenimientoId || null,
+      estado,
+      comentario: prev?.comentario || "",
+      trabajadorId: prev?.trabajadorId || null,
+      duracionPlan: prev?.duracionPlan ?? null,
+      unidadDuracionPlan: prev?.unidadDuracionPlan || "min",
+      fechaInicioPlan: prev?.fechaInicioPlan || "",
+      fechaFinPlan: prev?.fechaFinPlan || "",
+      observaciones: prev?.observaciones || "",
+    });
+  };
+
+  const handleActividadComentario = (actividad, comentario) => {
+    upsertPlanActividad(actividad, { comentario });
+  };
+
+  const handleActividadTrabajador = (actividad, trabajadorId) => {
+    upsertPlanActividad(actividad, {
+      trabajadorId: trabajadorId || null,
+    });
+  };
+
+  const handleActividadDuracion = (actividad, duracionPlan) => {
+    upsertPlanActividad(actividad, {
+      duracionPlan: duracionPlan === "" ? null : Number(duracionPlan),
+    });
+  };
+
+  const handleActividadUnidad = (actividad, unidadDuracionPlan) => {
+    upsertPlanActividad(actividad, {
+      unidadDuracionPlan,
+    });
+  };
+
+  const handleActividadFechaInicio = (actividad, fechaInicioPlan) => {
+    upsertPlanActividad(actividad, {
+      fechaInicioPlan,
+    });
+  };
+
+  const handleActividadFechaFin = (actividad, fechaFinPlan) => {
+    upsertPlanActividad(actividad, {
+      fechaFinPlan,
+    });
+  };
+
+  const handleActividadObservaciones = (actividad, observaciones) => {
+    upsertPlanActividad(actividad, {
+      observaciones,
+    });
+  };
+
+  /* =========================================================
+     CORRECTIVOS
+  ========================================================= */
+
+  const agregarCorrectivo = () => {
+    setCorrectivos((prev) => [
+      ...prev,
+      { id: Date.now() + Math.random(), fotos: [], comentario: "" },
+    ]);
+  };
+
   const eliminarCorrectivo = (id) => {
     setCorrectivos((prev) => prev.filter((c) => c.id !== id));
   };
+
   const actualizarComentarioCorrectivo = (id, comentario) => {
-    setCorrectivos((prev) => prev.map((c) => (c.id === id ? { ...c, comentario } : c)));
-  };
-  const actualizarFotosCorrectivo = (id, files) => {
-    setCorrectivos((prev) => prev.map((c) => (c.id === id ? { ...c, fotos: files } : c)));
+    setCorrectivos((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, comentario } : c))
+    );
   };
 
-  // Adjuntos (preview local)
+  const actualizarFotosCorrectivo = (id, files) => {
+    setCorrectivos((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, fotos: files } : c))
+    );
+  };
+
+  /* =========================================================
+     ADJUNTOS PREVIEW
+  ========================================================= */
+
   const convertirAdjuntos = () => {
     const lista = [];
 
     const mapFiles = (files, categoria) => {
-      Array.from(files).forEach((file) => {
+      Array.from(files || []).forEach((file) => {
         lista.push({
           nombre: file.name,
           url: URL.createObjectURL(file),
@@ -574,59 +705,64 @@ resto.push({
 
     if (fotosAntes?.length) mapFiles(fotosAntes, "ANTES");
     if (fotosDespues?.length) mapFiles(fotosDespues, "DESPUES");
-    correctivos.forEach((c) => c.fotos?.length && mapFiles(c.fotos, "CORRECTIVO"));
 
-    if (acta)
+    correctivos.forEach((c) => {
+      if (c.fotos?.length) mapFiles(c.fotos, "CORRECTIVO");
+    });
+
+    if (acta) {
       lista.push({
         nombre: acta.name,
         url: URL.createObjectURL(acta),
         extension: acta.name.split(".").pop(),
         categoria: "ACTA_CONFORMIDAD",
       });
+    }
 
-    if (informe)
+    if (informe) {
       lista.push({
         nombre: informe.name,
         url: URL.createObjectURL(informe),
         extension: informe.name.split(".").pop(),
         categoria: "INFORME",
       });
+    }
 
-    if (checklistAdjunto)
+    if (checklistAdjunto) {
       lista.push({
         nombre: checklistAdjunto.name,
         url: URL.createObjectURL(checklistAdjunto),
         extension: checklistAdjunto.name.split(".").pop(),
         categoria: "CHECKLIST",
       });
+    }
 
-    if (archivoExtra)
+    if (archivoExtra) {
       lista.push({
         nombre: archivoExtra.name,
         url: URL.createObjectURL(archivoExtra),
         extension: archivoExtra.name.split(".").pop(),
         categoria: "OTRO",
       });
+    }
 
     return lista;
   };
 
-  /** =========================
-   * Submit
-   * - crea notificación 1x equipo
-   * - refresca notificaciones OT
-   * - vuelve a selector para elegir el siguiente
-   * ========================= */
+  /* =========================================================
+     SUBMIT
+  ========================================================= */
+
   const handleSubmit = async () => {
     try {
       if (!equipoSeleccionado?.id) {
-        alert("⚠️ Debes seleccionar un equipo");
+        alert("⚠️ Debes seleccionar un equipo o ubicación técnica");
         setOpenSelectEquipo(true);
         return;
       }
 
       if (yaExisteNotiEquipo) {
-        alert("⚠️ Este equipo ya tiene notificación. Puedes abrir su PDF.");
+        alert("⚠️ Este registro ya tiene notificación. Puedes abrir su PDF.");
         return;
       }
 
@@ -635,22 +771,43 @@ resto.push({
         return;
       }
 
+      if (new Date(form.fechaFin) < new Date(form.fechaInicio)) {
+        alert("⚠️ La fecha fin no puede ser menor que la fecha inicio");
+        return;
+      }
+
       if (tecnicosSeleccionados.length === 0) {
-        const confirmar = window.confirm("No has seleccionado técnicos. ¿Deseas continuar?");
+        const confirmar = window.confirm(
+          "No has seleccionado técnicos. ¿Deseas continuar?"
+        );
         if (!confirmar) return;
+      }
+
+      const setIdsActs = new Set(
+        actividadesEquipoSeleccionado.map((a) => a.id)
+      );
+
+      const planesFiltrados = (form.planes || []).filter((p) =>
+        setIdsActs.has(p.ordenTrabajoActividadId)
+      );
+
+      const actividadesOKSinResponsable = planesFiltrados.filter(
+        (p) => p.estado === "OK" && !p.trabajadorId
+      );
+
+      if (actividadesOKSinResponsable.length > 0) {
+        alert("⚠️ Todas las actividades en estado OK deben tener responsable");
+        return;
       }
 
       setLoading(true);
 
       const adjuntos = convertirAdjuntos();
+
       const resumenCorrectivos = correctivos
         .map((c, i) => `${i + 1}. ${c.comentario}`.trim())
         .filter(Boolean)
         .join("\n");
-
-      // SOLO planes del equipo seleccionado
-      const setIdsActs = new Set(actividadesEquipoSeleccionado.map((a) => a.id));
-      const planesFiltrados = (form.planes || []).filter((p) => setIdsActs.has(p.ordenTrabajoActividadId));
 
       await crearNotificacionService({
         ...form,
@@ -659,9 +816,16 @@ resto.push({
         ordenTrabajoEquipoId: equipoSeleccionado.id,
         precargarPlanes: planesFiltrados.length === 0,
         planes: planesFiltrados.map((p) => ({
-          ...p,
-          planMantenimientoId: null, 
-            trabajadorId: p.trabajadorId ?? null,
+          ordenTrabajoActividadId: p.ordenTrabajoActividadId,
+          planMantenimientoId: p.planMantenimientoId || null,
+          estado: p.estado,
+          comentario: p.comentario || "",
+          trabajadorId: p.trabajadorId || null,
+          duracionPlan: p.duracionPlan ?? null,
+          unidadDuracionPlan: p.unidadDuracionPlan || "min",
+          fechaInicioPlan: p.fechaInicioPlan || null,
+          fechaFinPlan: p.fechaFinPlan || null,
+          observaciones: p.observaciones || "",
         })),
         horometro: form.horometro ? Number(form.horometro) : null,
         numeroMisiones: form.numeroMisiones ? Number(form.numeroMisiones) : null,
@@ -669,10 +833,9 @@ resto.push({
         adjuntos,
       });
 
-      // refrescar lista para bloquear equipo + mostrar PDF
       await cargarNotificacionesOT();
 
-      alert("✅ Notificación creada. Elige el siguiente equipo.");
+      alert("✅ Notificación creada. Elige el siguiente registro.");
       resetForm();
       setEquipoSeleccionado(null);
       setOpenSelectEquipo(true);
@@ -683,40 +846,67 @@ resto.push({
         error?.response?.data?.message ||
         error.message ||
         "Error desconocido";
+
       alert("❌ Error al crear notificación: " + msg);
     } finally {
       setLoading(false);
     }
   };
 
-  /** =========================
-   * UI helpers
-   * ========================= */
+  /* =========================================================
+     UI HELPERS
+  ========================================================= */
+
   const ESTADO_CONFIG = {
-    OK: { label: "✓ OK", active: "bg-emerald-500 text-white shadow-md", hover: "hover:border-emerald-500" },
-    NO_OK: { label: "✗ NO OK", active: "bg-red-500 text-white shadow-md", hover: "hover:border-red-500" },
-    NO_APLICA: { label: "— N/A", active: "bg-slate-500 text-white shadow-md", hover: "hover:border-slate-500" },
+    OK: {
+      label: "✓ OK",
+      active: "bg-emerald-500 text-white shadow-md",
+      hover: "hover:border-emerald-500",
+    },
+    NO_OK: {
+      label: "✗ NO OK",
+      active: "bg-red-500 text-white shadow-md",
+      hover: "hover:border-red-500",
+    },
+    NO_APLICA: {
+      label: "— N/A",
+      active: "bg-slate-500 text-white shadow-md",
+      hover: "hover:border-slate-500",
+    },
   };
 
   const estadoBadgeColor = (estado) => {
-    if (estado === "OK") return "bg-emerald-100 text-emerald-700 border-emerald-300";
-    if (estado === "NO_OK") return "bg-red-100 text-red-700 border-red-300";
-    if (estado === "NO_APLICA") return "bg-slate-100 text-slate-600 border-slate-300";
+    if (estado === "OK")
+      return "bg-emerald-100 text-emerald-700 border-emerald-300";
+    if (estado === "NO_OK")
+      return "bg-red-100 text-red-700 border-red-300";
+    if (estado === "NO_APLICA")
+      return "bg-slate-100 text-slate-600 border-slate-300";
     return "bg-amber-50 text-amber-600 border-amber-200";
   };
 
   const tipoTrabajoColor = (tipo) => {
     if (!tipo) return "bg-blue-100 text-blue-700";
+
     switch (tipo) {
-      case "REVISION": return "bg-blue-100 text-blue-700";
-      case "INSPECCION": return "bg-indigo-100 text-indigo-700";
-      case "CAMBIO": return "bg-red-100 text-red-700";
-      case "LIMPIEZA": return "bg-cyan-100 text-cyan-700";
-      case "LUBRICACION": return "bg-yellow-100 text-yellow-700";
-      case "AJUSTE": return "bg-orange-100 text-orange-700";
-      case "APLICACION": return "bg-green-100 text-green-700";
-      case "TORQUEO_REGULACION": return "bg-purple-100 text-purple-700";
-      default: return "bg-slate-100 text-slate-700";
+      case "REVISION":
+        return "bg-blue-100 text-blue-700";
+      case "INSPECCION":
+        return "bg-indigo-100 text-indigo-700";
+      case "CAMBIO":
+        return "bg-red-100 text-red-700";
+      case "LIMPIEZA":
+        return "bg-cyan-100 text-cyan-700";
+      case "LUBRICACION":
+        return "bg-yellow-100 text-yellow-700";
+      case "AJUSTE":
+        return "bg-orange-100 text-orange-700";
+      case "APLICACION":
+        return "bg-green-100 text-green-700";
+      case "TORQUEO_REGULACION":
+        return "bg-purple-100 text-purple-700";
+      default:
+        return "bg-slate-100 text-slate-700";
     }
   };
 
@@ -734,23 +924,41 @@ resto.push({
       icon: "☑️",
       badge:
         totalActividades > 0
-          ? { text: `${checklistCompletado}/${totalActividades}`, done: checklistDone }
+          ? {
+              text: `${checklistCompletado}/${totalActividades}`,
+              done: checklistDone,
+            }
           : null,
     },
     {
       id: "correctivos",
       label: "Correctivos",
       icon: "🔧",
-      badge: correctivos.length > 0 ? { text: correctivos.length, done: false } : null,
+      badge:
+        correctivos.length > 0
+          ? { text: correctivos.length, done: false }
+          : null,
     },
     { id: "adjuntos", label: "Adjuntos", icon: "📎" },
   ];
 
+  const trabajadoresDisponiblesFiltrados = useMemo(() => {
+    return listaTrabajadores.filter((t) => {
+      const rolOk = !filtroRol || t.rol === filtroRol;
+      const nombreOk =
+        !busquedaNombre ||
+        `${t.nombre} ${t.apellido || ""}`
+          .toLowerCase()
+          .includes(busquedaNombre.toLowerCase());
+
+      const noAgregado = !tecnicosSeleccionados.some((s) => s.id === t.id);
+
+      return rolOk && nombreOk && noAgregado;
+    });
+  }, [listaTrabajadores, filtroRol, busquedaNombre, tecnicosSeleccionados]);
+
   if (!isOpen) return null;
 
-  /** =========================
-   * Render
-   * ========================= */
   return (
     <>
       <ModalElegirEquipo
@@ -766,14 +974,13 @@ resto.push({
 
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[95vw] lg:max-w-7xl my-8">
-
           {/* HEADER */}
           <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 p-6 rounded-t-3xl">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <h2 className="text-3xl font-bold text-white flex items-center gap-3">
                   <span className="text-4xl">✅</span>
-                  Cierre Técnico (Notificación por equipo)
+                  Cierre Técnico (Notificación por registro)
                 </h2>
 
                 <div className="flex flex-wrap items-center gap-3 mt-2">
@@ -794,7 +1001,7 @@ resto.push({
                   <span className="text-amber-100 text-sm">•</span>
 
                   <p className="text-amber-100 text-sm truncate">
-                    Equipo:{" "}
+                    Registro:{" "}
                     <span className="font-bold">{labelEquipoSeleccionado}</span>
                   </p>
 
@@ -804,7 +1011,7 @@ resto.push({
                     className="ml-2 text-xs font-bold px-3 py-1 rounded-full bg-white/20 text-white hover:bg-white/30"
                     disabled={loadingOrden || loadingNotis}
                   >
-                    Elegir/Cambiar equipo
+                    Elegir / Cambiar
                   </button>
 
                   {yaExisteNotiEquipo && (
@@ -812,13 +1019,19 @@ resto.push({
                       type="button"
                       onClick={() => abrirPdfNotificacion(notiActual.id)}
                       className="text-xs font-bold px-3 py-1 rounded-full bg-red-600 text-white hover:bg-red-700 inline-flex items-center gap-2"
-                      title="Abrir PDF del equipo seleccionado"
+                      title="Abrir PDF del registro seleccionado"
                     >
                       <FileText className="w-4 h-4" />
                       PDF
                     </button>
                   )}
                 </div>
+
+                {subtituloEquipoSeleccionado ? (
+                  <p className="text-amber-100/90 text-xs mt-2 truncate">
+                    {subtituloEquipoSeleccionado}
+                  </p>
+                ) : null}
 
                 {(loadingOrden || loadingNotis) && (
                   <div className="mt-3 inline-flex items-center gap-2 text-xs font-bold bg-white/20 text-white px-3 py-1 rounded-full">
@@ -838,7 +1051,7 @@ resto.push({
             </div>
           </div>
 
-          {/* ALERT si equipo ya tiene notificación */}
+          {/* ALERT */}
           {yaExisteNotiEquipo && (
             <div className="px-6 pt-5">
               <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4 flex items-start justify-between gap-4">
@@ -846,13 +1059,15 @@ resto.push({
                   <CheckCircle2 className="w-6 h-6 text-emerald-600 mt-0.5" />
                   <div>
                     <p className="font-bold text-emerald-800">
-                      Este equipo ya tiene Notificación creada.
+                      Este registro ya tiene Notificación creada.
                     </p>
                     <p className="text-sm text-emerald-700 mt-1">
-                      Está bloqueado para evitar duplicados. Puedes abrir el PDF cuando lo necesites.
+                      Está bloqueado para evitar duplicados. Puedes abrir el PDF
+                      cuando lo necesites.
                     </p>
                   </div>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => abrirPdfNotificacion(notiActual.id)}
@@ -874,23 +1089,30 @@ resto.push({
                   onClick={() => setActiveTab(tab.id)}
                   className={`
                     px-8 py-4 font-bold transition-all whitespace-nowrap relative
-                    ${activeTab === tab.id
-                      ? "text-amber-600 bg-white"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}
+                    ${
+                      activeTab === tab.id
+                        ? "text-amber-600 bg-white"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    }
                   `}
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xl">{tab.icon}</span>
                     <span>{tab.label}</span>
+
                     {tab.badge && (
-                      <span className={`
-                        text-xs font-bold px-2 py-0.5 rounded-full
-                        ${tab.badge.done ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}
-                      `}>
+                      <span
+                        className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          tab.badge.done
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
                         {tab.badge.text}
                       </span>
                     )}
                   </div>
+
                   {activeTab === tab.id && (
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-t-full" />
                   )}
@@ -901,22 +1123,22 @@ resto.push({
 
           {/* CONTENT */}
           <div className="p-8 max-h-[70vh] overflow-y-auto">
-            {/* TAB: GENERAL */}
+            {/* GENERAL */}
             {activeTab === "general" && (
               <div className="space-y-6">
-
                 {!equipoSeleccionado && (
                   <div className="text-center py-10 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300">
                     <div className="text-5xl mb-3">🖥️</div>
                     <p className="text-sm text-slate-600 mb-2">
-                      Primero selecciona un equipo para crear su notificación.
+                      Primero selecciona un equipo o ubicación técnica para crear su
+                      notificación.
                     </p>
                     <button
                       type="button"
                       onClick={() => setOpenSelectEquipo(true)}
                       className="px-4 py-2 rounded-lg bg-amber-500 text-white font-bold hover:bg-amber-600"
                     >
-                      Elegir equipo
+                      Elegir registro
                     </button>
                   </div>
                 )}
@@ -985,6 +1207,7 @@ resto.push({
                       <p className="text-xs font-bold text-slate-600 mb-2">
                         Seleccionados ({tecnicosSeleccionados.length})
                       </p>
+
                       {tecnicosSeleccionados.map((tecnico) => (
                         <div
                           key={tecnico.id}
@@ -994,16 +1217,30 @@ resto.push({
                             <div className="bg-purple-100 rounded-full p-2">
                               <span className="text-base">👤</span>
                             </div>
+
                             <div>
-                              <p className="font-bold text-slate-800 text-sm">{tecnico.nombre}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
+                              <p className="font-bold text-slate-800 text-sm">
+                                {tecnico.nombre}
+                              </p>
+
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                 <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full font-semibold">
-                                  {tecnico.rol}
+                                  {tecnico.rol || "—"}
                                 </span>
-                                <span className="text-xs text-slate-500">• {tecnico.empresa}</span>
+
+                                <span className="text-xs text-slate-500">
+                                  • {tecnico.empresa}
+                                </span>
+
+                                {tecnico.esEncargado && (
+                                  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold">
+                                    Encargado
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
+
                           <button
                             type="button"
                             disabled={!equipoSeleccionado || yaExisteNotiEquipo}
@@ -1018,18 +1255,24 @@ resto.push({
                   )}
 
                   <div className="bg-white rounded-xl p-4 border-2 border-purple-200">
-                    <p className="text-xs font-bold text-slate-700 mb-3">Agregar Técnico</p>
+                    <p className="text-xs font-bold text-slate-700 mb-3">
+                      Agregar Técnico
+                    </p>
 
                     {loadingTrabajadores ? (
                       <div className="text-center py-6">
                         <div className="inline-block w-6 h-6 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                        <p className="text-slate-600 mt-2 text-sm">Cargando trabajadores...</p>
+                        <p className="text-slate-600 mt-2 text-sm">
+                          Cargando trabajadores...
+                        </p>
                       </div>
                     ) : (
                       <>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                           <div>
-                            <label className="block text-xs font-bold text-slate-600 mb-1.5">Filtrar por Rol</label>
+                            <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                              Filtrar por Rol
+                            </label>
                             <select
                               value={filtroRol}
                               disabled={!equipoSeleccionado || yaExisteNotiEquipo}
@@ -1037,15 +1280,23 @@ resto.push({
                               className="w-full px-3 py-2 text-xs border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-slate-100"
                             >
                               <option value="">Todos los roles</option>
-                              <option value="tecnico_electrico">Técnico Eléctrico</option>
-                              <option value="tecnico_mecanico">Técnico Mecánico</option>
-                              <option value="operario_de_mantenimiento">Operario de Mantenimiento</option>
+                              <option value="tecnico_electrico">
+                                Técnico Eléctrico
+                              </option>
+                              <option value="tecnico_mecanico">
+                                Técnico Mecánico
+                              </option>
+                              <option value="operario_de_mantenimiento">
+                                Operario de Mantenimiento
+                              </option>
                               <option value="supervisor">Supervisor</option>
                             </select>
                           </div>
 
                           <div>
-                            <label className="block text-xs font-bold text-slate-600 mb-1.5">Buscar por Nombre</label>
+                            <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                              Buscar por Nombre
+                            </label>
                             <input
                               type="text"
                               placeholder="Escribe el nombre..."
@@ -1058,43 +1309,32 @@ resto.push({
                         </div>
 
                         <div className="max-h-64 overflow-y-auto border-2 border-slate-200 rounded-lg">
-                          {(() => {
-                            const filtrados = listaTrabajadores.filter((t) => {
-                              const rolOk = !filtroRol || t.rol === filtroRol;
-                              const nombreOk =
-                                !busquedaNombre ||
-                                `${t.nombre} ${t.apellido || ""}`.toLowerCase().includes(busquedaNombre.toLowerCase());
-                              const noAgregado = !tecnicosSeleccionados.some((s) => s.id === t.id);
-                              return rolOk && nombreOk && noAgregado;
-                            });
-
-                            if (!equipoSeleccionado) {
-                              return (
-                                <div className="text-center py-6 text-slate-400">
-                                  <p className="text-sm">Selecciona un equipo para agregar técnicos</p>
-                                </div>
-                              );
-                            }
-
-                            if (yaExisteNotiEquipo) {
-                              return (
-                                <div className="text-center py-6 text-slate-500">
-                                  <p className="text-sm font-semibold">Este equipo ya está cerrado.</p>
-                                  <p className="text-xs mt-1">Cambia de equipo o abre el PDF.</p>
-                                </div>
-                              );
-                            }
-
-                            if (filtrados.length === 0) {
-                              return (
-                                <div className="text-center py-6 text-slate-400">
-                                  <p className="text-sm">No hay trabajadores disponibles</p>
-                                  <p className="text-xs mt-1">Intenta cambiar los filtros</p>
-                                </div>
-                              );
-                            }
-
-                            return filtrados.map((trabajador) => (
+                          {!equipoSeleccionado ? (
+                            <div className="text-center py-6 text-slate-400">
+                              <p className="text-sm">
+                                Selecciona un registro para agregar técnicos
+                              </p>
+                            </div>
+                          ) : yaExisteNotiEquipo ? (
+                            <div className="text-center py-6 text-slate-500">
+                              <p className="text-sm font-semibold">
+                                Este registro ya está cerrado.
+                              </p>
+                              <p className="text-xs mt-1">
+                                Cambia de registro o abre el PDF.
+                              </p>
+                            </div>
+                          ) : trabajadoresDisponiblesFiltrados.length === 0 ? (
+                            <div className="text-center py-6 text-slate-400">
+                              <p className="text-sm">
+                                No hay trabajadores disponibles
+                              </p>
+                              <p className="text-xs mt-1">
+                                Intenta cambiar los filtros
+                              </p>
+                            </div>
+                          ) : (
+                            trabajadoresDisponiblesFiltrados.map((trabajador) => (
                               <button
                                 key={trabajador.id}
                                 type="button"
@@ -1105,24 +1345,30 @@ resto.push({
                                   <div className="bg-purple-100 group-hover:bg-purple-200 rounded-full p-2 transition-all">
                                     <span className="text-sm">👤</span>
                                   </div>
+
                                   <div>
                                     <p className="font-bold text-slate-800 text-sm">
                                       {trabajador.nombre} {trabajador.apellido}
                                     </p>
-                                    <div className="flex items-center gap-2 mt-0.5">
+
+                                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                       <span className="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
-                                        {(trabajador.rol || "").replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                                        {formatearRol(trabajador.rol || "")}
                                       </span>
-                                      <span className="text-xs text-slate-500">• {trabajador.empresa}</span>
+
+                                      <span className="text-xs text-slate-500">
+                                        • {trabajador.empresa || "—"}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
+
                                 <div className="text-purple-600 opacity-0 group-hover:opacity-100 transition-all">
                                   +
                                 </div>
                               </button>
-                            ));
-                          })()}
+                            ))
+                          )}
                         </div>
                       </>
                     )}
@@ -1137,7 +1383,9 @@ resto.push({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">Horómetro</label>
+                      <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                        Horómetro
+                      </label>
                       <input
                         type="number"
                         step="0.01"
@@ -1151,7 +1399,9 @@ resto.push({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">Número de Misiones</label>
+                      <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                        Número de Misiones
+                      </label>
                       <input
                         type="number"
                         placeholder="0"
@@ -1164,7 +1414,9 @@ resto.push({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">Número de Equipo</label>
+                      <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                        Número / Referencia
+                      </label>
                       <input
                         type="text"
                         name="numeroEquipo"
@@ -1173,11 +1425,15 @@ resto.push({
                         className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg bg-slate-100"
                         disabled
                       />
-                      <p className="text-xs text-green-600 mt-1">✓ Cargado desde el equipo seleccionado</p>
+                      <p className="text-xs text-green-600 mt-1">
+                        ✓ Cargado desde el registro seleccionado
+                      </p>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">Código de Repuesto</label>
+                      <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                        Código de Repuesto
+                      </label>
                       <input
                         type="text"
                         placeholder="Ej: REP-123"
@@ -1194,9 +1450,10 @@ resto.push({
                 {/* ESTADO */}
                 <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 rounded-2xl p-5 border border-orange-200">
                   <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <span className="text-xl">🔧</span> Estado General del Equipo{" "}
+                    <span className="text-xl">🔧</span> Estado General del Registro{" "}
                     <span className="text-red-500">*</span>
                   </h3>
+
                   <select
                     name="estadoGeneralEquipo"
                     value={form.estadoGeneralEquipo}
@@ -1207,7 +1464,9 @@ resto.push({
                   >
                     <option value="OPERATIVO">✅ Operativo</option>
                     <option value="INOPERATIVO">❌ Inoperativo</option>
-                    <option value="OPERATIVO_CON_OBSERVACIONES">⚠️ Operativo con Observaciones</option>
+                    <option value="OPERATIVO_CON_OBSERVACIONES">
+                      ⚠️ Operativo con Observaciones
+                    </option>
                   </select>
                 </div>
 
@@ -1216,15 +1475,35 @@ resto.push({
                   <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
                     <span className="text-xl">📝</span> Descripciones
                   </h3>
+
                   <div className="space-y-3">
                     {[
-                      { name: "descripcionGeneral", label: "Descripción General", placeholder: "Descripción general..." },
-                      { name: "descripcionMantenimiento", label: "Descripción del Mantenimiento", placeholder: "Mantenimiento realizado..." },
-                      { name: "observaciones", label: "Observaciones", placeholder: "Observaciones..." },
-                      { name: "recomendaciones", label: "Recomendaciones", placeholder: "Recomendaciones..." },
+                      {
+                        name: "descripcionGeneral",
+                        label: "Descripción General",
+                        placeholder: "Descripción general...",
+                      },
+                      {
+                        name: "descripcionMantenimiento",
+                        label: "Descripción del Mantenimiento",
+                        placeholder: "Mantenimiento realizado...",
+                      },
+                      {
+                        name: "observaciones",
+                        label: "Observaciones",
+                        placeholder: "Observaciones...",
+                      },
+                      {
+                        name: "recomendaciones",
+                        label: "Recomendaciones",
+                        placeholder: "Recomendaciones...",
+                      },
                     ].map((field) => (
                       <div key={field.name}>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">{field.label}</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          {field.label}
+                        </label>
+
                         <textarea
                           name={field.name}
                           value={form[field.name]}
@@ -1244,13 +1523,21 @@ resto.push({
                   <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
                     <span className="text-xl">📸</span> Fotos del Mantenimiento
                   </h3>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {[
                       { label: "Fotos Antes", state: fotosAntes, setter: setFotosAntes },
-                      { label: "Fotos Después", state: fotosDespues, setter: setFotosDespues },
+                      {
+                        label: "Fotos Después",
+                        state: fotosDespues,
+                        setter: setFotosDespues,
+                      },
                     ].map(({ label, state, setter }) => (
                       <div key={label}>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">{label}</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          {label}
+                        </label>
+
                         <input
                           type="file"
                           multiple
@@ -1259,6 +1546,7 @@ resto.push({
                           onChange={(e) => setter(e.target.files)}
                           className="w-full text-sm px-3 py-2 border-2 border-dashed border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all hover:border-indigo-400 cursor-pointer bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
                         />
+
                         {state?.length > 0 && (
                           <p className="text-xs text-emerald-600 font-semibold mt-1.5">
                             ✓ {state.length} archivo(s)
@@ -1268,23 +1556,24 @@ resto.push({
                     ))}
                   </div>
                 </div>
-
               </div>
             )}
 
-            {/* TAB: CHECKLIST */}
+            {/* CHECKLIST */}
             {activeTab === "checklist" && (
               <div className="space-y-4">
                 {!equipoSeleccionado && (
                   <div className="text-center py-10 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300">
                     <div className="text-5xl mb-3">🖥️</div>
-                    <p className="text-sm text-slate-600 mb-1">Selecciona un equipo para ver su checklist</p>
+                    <p className="text-sm text-slate-600 mb-1">
+                      Selecciona un registro para ver su checklist
+                    </p>
                     <button
                       type="button"
                       onClick={() => setOpenSelectEquipo(true)}
                       className="mt-2 px-4 py-2 rounded-lg bg-amber-500 text-white font-bold hover:bg-amber-600"
                     >
-                      Elegir equipo
+                      Elegir registro
                     </button>
                   </div>
                 )}
@@ -1292,15 +1581,31 @@ resto.push({
                 {equipoSeleccionado && totalActividades > 0 && (
                   <div className="bg-white rounded-2xl p-4 border-2 border-slate-200 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-bold text-slate-700">Progreso del Checklist</h3>
-                      <span className={`text-sm font-bold ${checklistDone ? "text-emerald-600" : "text-amber-600"}`}>
+                      <h3 className="text-sm font-bold text-slate-700">
+                        Progreso del Checklist
+                      </h3>
+
+                      <span
+                        className={`text-sm font-bold ${
+                          checklistDone ? "text-emerald-600" : "text-amber-600"
+                        }`}
+                      >
                         {checklistCompletado}/{totalActividades}
                       </span>
                     </div>
+
                     <div className="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden">
                       <div
-                        className={`h-3 rounded-full transition-all duration-500 ${checklistDone ? "bg-emerald-500" : "bg-amber-500"}`}
-                        style={{ width: `${totalActividades > 0 ? (checklistCompletado / totalActividades) * 100 : 0}%` }}
+                        className={`h-3 rounded-full transition-all duration-500 ${
+                          checklistDone ? "bg-emerald-500" : "bg-amber-500"
+                        }`}
+                        style={{
+                          width: `${
+                            totalActividades > 0
+                              ? (checklistCompletado / totalActividades) * 100
+                              : 0
+                          }%`,
+                        }}
                       />
                     </div>
 
@@ -1308,8 +1613,13 @@ resto.push({
                       <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-start gap-2">
                         <AlertCircle className="w-4 h-4 mt-0.5" />
                         <div>
-                          <p className="font-bold">Este equipo ya tiene notificación.</p>
-                          <p>El checklist aquí es solo para crear. Si quieres ver lo guardado, abre el PDF.</p>
+                          <p className="font-bold">
+                            Este registro ya tiene notificación.
+                          </p>
+                          <p>
+                            El checklist aquí es solo para crear. Si quieres ver lo
+                            guardado, abre el PDF.
+                          </p>
                         </div>
                       </div>
                     )}
@@ -1319,7 +1629,9 @@ resto.push({
                 {equipoSeleccionado && actividadesEquipoSeleccionado.length === 0 && (
                   <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300">
                     <div className="text-5xl mb-3">☑️</div>
-                    <p className="text-sm text-slate-600 mb-1">Este equipo no tiene actividades registradas</p>
+                    <p className="text-sm text-slate-600 mb-1">
+                      Este registro no tiene actividades registradas
+                    </p>
                   </div>
                 )}
 
@@ -1327,11 +1639,23 @@ resto.push({
                   <div className="rounded-2xl overflow-hidden border-2 border-slate-200 shadow-sm">
                     <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-5 py-3 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">🖥️</span>
+                        {(() => {
+                          const Icon = getRegistroOTIcon(equipoSeleccionado);
+                          return <Icon className="w-6 h-6 text-white" />;
+                        })()}
+
                         <div>
-                          <p className="font-bold text-white text-sm">{labelEquipoSeleccionado}</p>
+                          <p className="font-bold text-white text-sm">
+                            {labelEquipoSeleccionado}
+                          </p>
+                          {subtituloEquipoSeleccionado ? (
+                            <p className="text-white/70 text-xs">
+                              {subtituloEquipoSeleccionado}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
+
                       <span className="text-xs bg-white/20 text-white px-3 py-1 rounded-full font-semibold">
                         {actividadesEquipoSeleccionado.length} actividad(es)
                       </span>
@@ -1346,17 +1670,27 @@ resto.push({
                         return (
                           <div
                             key={actividad.id}
-                            className={`p-4 transition-all ${estadoActual ? "bg-white" : "bg-amber-50/40"}`}
+                            className={`p-4 transition-all ${
+                              estadoActual ? "bg-white" : "bg-amber-50/40"
+                            }`}
                           >
                             <div className="flex items-start justify-between gap-3 mb-3">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                                  <span className="text-xs font-bold text-slate-500">#{idx + 1}</span>
+                                  <span className="text-xs font-bold text-slate-500">
+                                    #{idx + 1}
+                                  </span>
+
                                   {actividad.tipoTrabajo && (
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${tipoTrabajoColor(actividad.tipoTrabajo)}`}>
+                                    <span
+                                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${tipoTrabajoColor(
+                                        actividad.tipoTrabajo
+                                      )}`}
+                                    >
                                       {actividad.tipoTrabajo}
                                     </span>
                                   )}
+
                                   {esDePlan ? (
                                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">
                                       Del plan
@@ -1369,82 +1703,253 @@ resto.push({
                                 </div>
 
                                 <p className="font-bold text-slate-800 text-sm leading-snug">
-                                  {actividad.tarea || actividad.descripcion || `Actividad ${actividad.id}`}
+                                  {actividad.tarea ||
+                                    actividad.descripcion ||
+                                    `Actividad ${actividad.id}`}
                                 </p>
 
-                                {actividad.componente && (
-                                  <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                                    <span>⚙️</span> {actividad.componente}
-                                  </p>
-                                )}
+                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                  {actividad.componente && (
+                                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                                      <span>⚙️</span> {actividad.componente}
+                                    </p>
+                                  )}
+
+                                  {actividad.rolTecnico && (
+                                    <span className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
+                                      {formatearRol(actividad.rolTecnico)}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
 
                               {estadoActual && (
-                                <span className={`text-xs font-bold px-3 py-1 rounded-full border ${estadoBadgeColor(estadoActual)} shrink-0`}>
-                                  {estadoActual === "OK" ? "✓ OK" : estadoActual === "NO_OK" ? "✗ NO OK" : "— N/A"}
+                                <span
+                                  className={`text-xs font-bold px-3 py-1 rounded-full border ${estadoBadgeColor(
+                                    estadoActual
+                                  )} shrink-0`}
+                                >
+                                  {estadoActual === "OK"
+                                    ? "✓ OK"
+                                    : estadoActual === "NO_OK"
+                                    ? "✗ NO OK"
+                                    : "— N/A"}
                                 </span>
                               )}
                             </div>
 
-                            <div className="flex gap-2 mb-2">
-                              {Object.entries(ESTADO_CONFIG).map(([estadoKey, config]) => (
-                                <button
-                                  key={estadoKey}
-                                  type="button"
-                                  disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                                  onClick={() => handleActividadEstado(actividad, estadoKey)}
-                                  className={`
-                                    flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border-2
-                                    ${estadoActual === estadoKey
-                                      ? config.active
-                                      : `bg-white text-slate-600 border-slate-300 ${config.hover}`}
-                                    ${(!equipoSeleccionado || yaExisteNotiEquipo) ? "opacity-60 cursor-not-allowed" : ""}
-                                  `}
-                                >
-                                  {config.label}
-                                </button>
-                              ))}
+                            {/* ESTADO */}
+                            <div className="flex gap-2 mb-3">
+                              {Object.entries(ESTADO_CONFIG).map(
+                                ([estadoKey, config]) => (
+                                  <button
+                                    key={estadoKey}
+                                    type="button"
+                                    disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                    onClick={() =>
+                                      handleActividadEstado(actividad, estadoKey)
+                                    }
+                                    className={`
+                                      flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border-2
+                                      ${
+                                        estadoActual === estadoKey
+                                          ? config.active
+                                          : `bg-white text-slate-600 border-slate-300 ${config.hover}`
+                                      }
+                                      ${
+                                        !equipoSeleccionado || yaExisteNotiEquipo
+                                          ? "opacity-60 cursor-not-allowed"
+                                          : ""
+                                      }
+                                    `}
+                                  >
+                                    {config.label}
+                                  </button>
+                                )
+                              )}
                             </div>
 
                             {estadoActual && (
-                              <textarea
-                                placeholder="Comentarios adicionales (opcional)..."
-                                value={registrado?.comentario || ""}
-                                disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                                onChange={(e) => handleActividadComentario(actividad, e.target.value)}
-                                rows="2"
-                                className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none text-xs transition-all disabled:bg-slate-100"
-                              />
+                              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                {/* COLUMNA IZQUIERDA */}
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">
+                                      Comentario
+                                    </label>
+                                    <textarea
+                                      placeholder="Comentarios adicionales..."
+                                      value={registrado?.comentario || ""}
+                                      disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                      onChange={(e) =>
+                                        handleActividadComentario(
+                                          actividad,
+                                          e.target.value
+                                        )
+                                      }
+                                      rows="2"
+                                      className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none text-xs transition-all disabled:bg-slate-100"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">
+                                      Responsable
+                                    </label>
+                                    <select
+                                      value={registrado?.trabajadorId || ""}
+                                      disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                      onChange={(e) =>
+                                        handleActividadTrabajador(
+                                          actividad,
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-xs disabled:bg-slate-100"
+                                    >
+                                      <option value="">— Seleccionar técnico —</option>
+
+                                      {tecnicosSeleccionados.map((t) => (
+                                        <option key={t.id} value={t.id}>
+                                          {t.nombre}
+                                          {t.rol ? ` • ${t.rol}` : ""}
+                                        </option>
+                                      ))}
+                                    </select>
+
+                                    {estadoActual === "OK" &&
+                                      !registrado?.trabajadorId && (
+                                        <p className="text-xs text-red-600 font-semibold mt-1">
+                                          ⚠️ Debes elegir responsable si está OK
+                                        </p>
+                                      )}
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">
+                                      Observaciones de ejecución
+                                    </label>
+                                    <textarea
+                                      value={registrado?.observaciones || ""}
+                                      disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                      onChange={(e) =>
+                                        handleActividadObservaciones(
+                                          actividad,
+                                          e.target.value
+                                        )
+                                      }
+                                      rows="2"
+                                      placeholder="Observaciones de esta actividad..."
+                                      className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-xs resize-none disabled:bg-slate-100"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* COLUMNA DERECHA */}
+                                <div className="space-y-3">
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-bold text-slate-600 mb-1">
+                                        Duración real
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={
+                                          registrado?.duracionPlan ?? ""
+                                        }
+                                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                        onChange={(e) =>
+                                          handleActividadDuracion(
+                                            actividad,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-xs disabled:bg-slate-100"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-xs font-bold text-slate-600 mb-1">
+                                        Unidad
+                                      </label>
+                                      <select
+                                        value={
+                                          registrado?.unidadDuracionPlan || "min"
+                                        }
+                                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                        onChange={(e) =>
+                                          handleActividadUnidad(
+                                            actividad,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-xs disabled:bg-slate-100"
+                                      >
+                                        <option value="min">Min</option>
+                                        <option value="h">Horas</option>
+                                      </select>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-bold text-slate-600 mb-1">
+                                        Inicio real
+                                      </label>
+                                      <input
+                                        type="datetime-local"
+                                        value={registrado?.fechaInicioPlan || ""}
+                                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                        onChange={(e) =>
+                                          handleActividadFechaInicio(
+                                            actividad,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-xs disabled:bg-slate-100"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-xs font-bold text-slate-600 mb-1">
+                                        Fin real
+                                      </label>
+                                      <input
+                                        type="datetime-local"
+                                        value={registrado?.fechaFinPlan || ""}
+                                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                        onChange={(e) =>
+                                          handleActividadFechaFin(
+                                            actividad,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-xs disabled:bg-slate-100"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                                      <Clock3 className="w-4 h-4" />
+                                      <span>
+                                        Aquí puedes guardar la ejecución real de la
+                                        actividad.
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 text-xs text-slate-600 mt-2">
+                                      <UserCog className="w-4 h-4" />
+                                      <span>
+                                        Si la actividad está en <b>OK</b>, asigna
+                                        responsable.
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                             )}
-
-                            {estadoActual && (
-  <div className="mb-2">
-    <label className="block text-xs font-bold text-slate-600 mb-1">
-      Responsable (obligatorio si está OK)
-    </label>
-
-    <select
-      value={registrado?.trabajadorId || ""}
-      disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-      onChange={(e) => handleActividadTrabajador(actividad, e.target.value)}
-      className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg text-xs disabled:bg-slate-100"
-    >
-      <option value="">— Seleccionar técnico —</option>
-
-      {tecnicosSeleccionados.map((t) => (
-        <option key={t.id} value={t.id}>
-          {t.nombre} {t.rol ? `• ${t.rol}` : ""}
-        </option>
-      ))}
-    </select>
-
-    {estadoActual === "OK" && !registrado?.trabajadorId && (
-      <p className="text-xs text-red-600 font-semibold mt-1">
-        ⚠️ Debes elegir responsable si está OK
-      </p>
-    )}
-  </div>
-)}
                           </div>
                         );
                       })}
@@ -1454,13 +1959,14 @@ resto.push({
               </div>
             )}
 
-            {/* TAB: CORRECTIVOS */}
+            {/* CORRECTIVOS */}
             {activeTab === "correctivos" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                     <span className="text-xl">🔧</span> Trabajos Correctivos
                   </h3>
+
                   <button
                     type="button"
                     disabled={!equipoSeleccionado || yaExisteNotiEquipo}
@@ -1474,8 +1980,12 @@ resto.push({
                 {correctivos.length === 0 ? (
                   <div className="text-center py-10 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300">
                     <div className="text-5xl mb-3">🔧</div>
-                    <p className="text-sm text-slate-600 mb-1">No hay correctivos registrados</p>
-                    <p className="text-xs text-slate-500">Agrega correctivos si aplican</p>
+                    <p className="text-sm text-slate-600 mb-1">
+                      No hay correctivos registrados
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Agrega correctivos si aplican
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1493,7 +2003,9 @@ resto.push({
                           ✕
                         </button>
 
-                        <h4 className="font-bold text-slate-800 mb-3 text-sm">Correctivo #{index + 1}</h4>
+                        <h4 className="font-bold text-slate-800 mb-3 text-sm">
+                          Correctivo #{index + 1}
+                        </h4>
 
                         <div className="space-y-3">
                           <div>
@@ -1503,7 +2015,12 @@ resto.push({
                             <textarea
                               value={correctivo.comentario}
                               disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                              onChange={(e) => actualizarComentarioCorrectivo(correctivo.id, e.target.value)}
+                              onChange={(e) =>
+                                actualizarComentarioCorrectivo(
+                                  correctivo.id,
+                                  e.target.value
+                                )
+                              }
                               rows="2"
                               placeholder="Describe el trabajo correctivo realizado..."
                               className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none disabled:bg-slate-100"
@@ -1519,9 +2036,15 @@ resto.push({
                               multiple
                               accept="image/*"
                               disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                              onChange={(e) => actualizarFotosCorrectivo(correctivo.id, e.target.files)}
+                              onChange={(e) =>
+                                actualizarFotosCorrectivo(
+                                  correctivo.id,
+                                  e.target.files
+                                )
+                              }
                               className="w-full text-sm px-3 py-2 border-2 border-dashed border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all hover:border-red-400 cursor-pointer bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
                             />
+
                             {correctivo.fotos?.length > 0 && (
                               <p className="text-xs text-emerald-600 font-semibold mt-1.5">
                                 ✓ {correctivo.fotos.length} archivo(s)
@@ -1536,18 +2059,19 @@ resto.push({
               </div>
             )}
 
-            {/* TAB: ADJUNTOS */}
+            {/* ADJUNTOS */}
             {activeTab === "adjuntos" && (
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <span className="text-xl">📎</span> Documentos Adjuntos (Opcional)
+                  <span className="text-xl">📎</span> Documentos Adjuntos
                 </h3>
 
                 <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-xl p-4 border-2 border-emerald-300">
                   <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
                     <span className="text-lg">📄</span>
-                    Acta de Conformidad (opcional)
+                    Acta de Conformidad
                   </label>
+
                   <input
                     type="file"
                     accept=".pdf,.doc,.docx"
@@ -1555,6 +2079,7 @@ resto.push({
                     onChange={(e) => setActa(e.target.files[0])}
                     className="w-full text-sm px-3 py-2 border-2 border-dashed border-emerald-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all hover:border-emerald-500 cursor-pointer bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
                   />
+
                   {acta && (
                     <p className="text-xs text-emerald-700 font-bold mt-2 bg-emerald-200 px-3 py-1.5 rounded-lg">
                       ✓ {acta.name}
@@ -1564,12 +2089,33 @@ resto.push({
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {[
-                    { label: "📄 Informe", state: informe, setter: setInforme, accept: ".pdf,.doc,.docx" },
-                    { label: "📄 Checklist", state: checklistAdjunto, setter: setChecklistAdjunto, accept: ".pdf,.doc,.docx,.xlsx,.xls" },
-                    { label: "📎 Archivo Adicional", state: archivoExtra, setter: setArchivoExtra, accept: "*" },
+                    {
+                      label: "📄 Informe",
+                      state: informe,
+                      setter: setInforme,
+                      accept: ".pdf,.doc,.docx",
+                    },
+                    {
+                      label: "📄 Checklist",
+                      state: checklistAdjunto,
+                      setter: setChecklistAdjunto,
+                      accept: ".pdf,.doc,.docx,.xlsx,.xls",
+                    },
+                    {
+                      label: "📎 Archivo Adicional",
+                      state: archivoExtra,
+                      setter: setArchivoExtra,
+                      accept: "*",
+                    },
                   ].map(({ label, state, setter, accept }) => (
-                    <div key={label} className="bg-white rounded-lg p-4 border-2 border-slate-200">
-                      <label className="block text-sm font-bold text-slate-800 mb-2">{label}</label>
+                    <div
+                      key={label}
+                      className="bg-white rounded-lg p-4 border-2 border-slate-200"
+                    >
+                      <label className="block text-sm font-bold text-slate-800 mb-2">
+                        {label}
+                      </label>
+
                       <input
                         type="file"
                         accept={accept}
@@ -1577,7 +2123,12 @@ resto.push({
                         onChange={(e) => setter(e.target.files[0])}
                         className="w-full text-xs disabled:opacity-60"
                       />
-                      {state && <p className="text-xs text-slate-600 mt-1.5 truncate">✓ {state.name}</p>}
+
+                      {state && (
+                        <p className="text-xs text-slate-600 mt-1.5 truncate">
+                          ✓ {state.name}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1621,9 +2172,9 @@ resto.push({
                   className="px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 hover:from-amber-600 hover:via-amber-700 hover:to-orange-600 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 inline-flex items-center gap-2"
                   title={
                     !equipoSeleccionado
-                      ? "Selecciona un equipo"
+                      ? "Selecciona un registro"
                       : yaExisteNotiEquipo
-                      ? "Este equipo ya tiene notificación"
+                      ? "Este registro ya tiene notificación"
                       : "Guardar notificación"
                   }
                 >
@@ -1639,7 +2190,6 @@ resto.push({
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </>
