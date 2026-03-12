@@ -5,155 +5,154 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
 
 
   const DEFAULT_FORM = {
-  numeroOV: "",
-  fechaOV: "",
-  numeroOrdenCliente: "",
-  fechaOrdenCliente: "",
-  clienteId: "",
-  id_cliente: "",
-  paisId: "",
-  tipoEquipoPropiedad: "Vendido",
-  sede: "",
-  almacen: "",
-  operadorLogistico: "",
-  status: "Almacen",
-  idPlaca: "",
-  nombre: "",
-  descripcion: "",
-  marca: "",
-  modelo: "",
-  serie: "",
-  fechaEntregaPrevista: "",
-  fechaEntregaReal: "",
-  estado: "No instalado",
-  finGarantia: "",
-  familiaId: "",
-  tipoEquipo: "",
-  linea: "Acceso",
-  lineaOtroTexto: "",
-  codigo: "",
-  creticidad:"B",
-  planesMantenimientoIds: [],
-};
+    numeroOV: "",
+    fechaOV: "",
+    numeroOrdenCliente: "",
+    fechaOrdenCliente: "",
+    clienteId: "",
+    id_cliente: "",
+    paisId: "",
+    tipoEquipoPropiedad: "Vendido",
+    sede: "",
+    almacen: "",
+    operadorLogistico: "",
+    status: "Almacen",
+    idPlaca: "",
+    nombre: "",
+    descripcion: "",
+    marca: "",
+    modelo: "",
+    serie: "",
+    fechaEntregaPrevista: "",
+    fechaEntregaReal: "",
+    estado: "No instalado",
+    finGarantia: "",
+    familiaId: "",
+    tipoEquipo: "",
+    linea: "Acceso",
+    lineaOtroTexto: "",
+    codigo: "",
+    creticidad: "B",
+    planesMantenimientoIds: [],
+  };
 
-const [form, setForm] = useState(DEFAULT_FORM);
+  const [form, setForm] = useState(DEFAULT_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("general");
   const [showNewFamilia, setShowNewFamilia] = useState(false);
   const [newFamilia, setNewFamilia] = useState({ nombre: "", descripcion: "" });
-const [planes, setPlanes] = useState([]);
-const [loadingPlanes, setLoadingPlanes] = useState(false);
-// 1. Agrega useMemo a tus imports de React arriba
-// import { useState, useEffect, useMemo } from "react";
+  const [planes, setPlanes] = useState([]);
+  const [loadingPlanes, setLoadingPlanes] = useState(false);
+  // 1. Agrega useMemo a tus imports de React arriba
+  // import { useState, useEffect, useMemo } from "react";
 
-const [busquedaPlan, setBusquedaPlan] = useState("");
+  const [busquedaPlan, setBusquedaPlan] = useState("");
 
-const planesFiltrados = useMemo(() => {
-  return planes.filter(p => 
-    p.nombre?.toLowerCase().includes(busquedaPlan.toLowerCase()) ||
-    p.codigoPlan?.toLowerCase().includes(busquedaPlan.toLowerCase())
-  );
-}, [planes, busquedaPlan]);
+  const planesFiltrados = useMemo(() => {
+    return planes.filter(p =>
+      p.nombre?.toLowerCase().includes(busquedaPlan.toLowerCase()) ||
+      p.codigoPlan?.toLowerCase().includes(busquedaPlan.toLowerCase())
+    );
+  }, [planes, busquedaPlan]);
 
 
-useEffect(() => {
-  const loadPlanes = async () => {
-    setLoadingPlanes(true);
-    try {
-      const data = await planMantenimientoService.getPlanes();
-      setPlanes(Array.isArray(data) ? data.filter(p => p.activo) : []);
-    } catch (e) {
-      console.error("Error cargando planes", e);
-      setPlanes([]);
-    } finally {
-      setLoadingPlanes(false);
+  useEffect(() => {
+    const loadPlanes = async () => {
+      setLoadingPlanes(true);
+      try {
+        const data = await planMantenimientoService.getPlanes();
+        setPlanes(Array.isArray(data) ? data.filter(p => p.activo) : []);
+      } catch (e) {
+        console.error("Error cargando planes", e);
+        setPlanes([]);
+      } finally {
+        setLoadingPlanes(false);
+      }
+    };
+
+    if (isOpen) loadPlanes();
+  }, [isOpen]);
+
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (initialData) {
+      setForm({
+        ...DEFAULT_FORM,
+        ...initialData,
+        planesMantenimientoIds: Array.isArray(initialData.planesMantenimiento)
+          ? initialData.planesMantenimiento.map((p) => p.id)
+          : Array.isArray(initialData.planesMantenimientoIds)
+            ? initialData.planesMantenimientoIds
+            : [],
+      });
+    } else {
+      setForm(DEFAULT_FORM);
     }
-  };
 
-  if (isOpen) loadPlanes();
-}, [isOpen]);
-
-
-useEffect(() => {
-  if (!isOpen) return;
-
-  if (initialData) {
-    setForm({
-      ...DEFAULT_FORM,
-      ...initialData,
-      planesMantenimientoIds: Array.isArray(initialData.planesMantenimiento)
-        ? initialData.planesMantenimiento.map((p) => p.id)
-        : Array.isArray(initialData.planesMantenimientoIds)
-          ? initialData.planesMantenimientoIds
-          : [],
-    });
-  } else {
-    setForm(DEFAULT_FORM);
-  }
-
-  setError(null);
-  setActiveTab("general");
-  setShowNewFamilia(false);
-  setNewFamilia({ nombre: "", descripcion: "" });
-}, [initialData, isOpen]);
+    setError(null);
+    setActiveTab("general");
+    setShowNewFamilia(false);
+    setNewFamilia({ nombre: "", descripcion: "" });
+  }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
-const handleSubmit = async () => {
-  // 1. Crear una lista de campos faltantes
-  const faltantes = [];
-  if (!form.codigo) faltantes.push("Código");
-  if (!form.nombre) faltantes.push("Nombre");
-  if (!form.numeroOV) faltantes.push("Número OV");
-  if (!form.clienteId) faltantes.push("Cliente");
-  if (!form.paisId) faltantes.push("País");
-  if (!form.tipoEquipoPropiedad) faltantes.push("Tipo de Propiedad");
+  const handleSubmit = async () => {
+    // 1. Crear una lista de campos faltantes
+    const faltantes = [];
+    if (!form.codigo) faltantes.push("Código");
+    if (!form.nombre) faltantes.push("Nombre");
+    if (!form.numeroOV) faltantes.push("Número OV");
+    if (!form.clienteId) faltantes.push("Cliente");
+    if (!form.paisId) faltantes.push("País");
+    if (!form.tipoEquipoPropiedad) faltantes.push("Tipo de Propiedad");
 
-  if (faltantes.length > 0) {
-    setError(`Faltan completar campos obligatorios: ${faltantes.join(", ")}`);
-    return;
-  }
+    if (faltantes.length > 0) {
+      setError(`Faltan completar campos obligatorios: ${faltantes.join(", ")}`);
+      return;
+    }
 
-  // Validar "Otros" en línea
-  if (form.linea === "Otros" && !form.lineaOtroTexto) {
-    setError("Debes especificar el texto para 'Otros' en Línea");
-    return;
-  }
+    // Validar "Otros" en línea
+    if (form.linea === "Otros" && !form.lineaOtroTexto) {
+      setError("Debes especificar el texto para 'Otros' en Línea");
+      return;
+    }
 
-  setLoading(true);
-  setError(null);
+    setLoading(true);
+    setError(null);
 
-  setLoading(true);
-  setError(null);
+    setLoading(true);
+    setError(null);
 
-  try {
-    // 2. Preparamos los datos básicos SIN el campo de imágenes
-    const dataToSave = {
-      ...form,
-      newFamilia: showNewFamilia && newFamilia.nombre ? newFamilia : null,
-      // imagenes: []  <-- Simplemente no lo incluimos o lo mandamos vacío
-    };
+    try {
+      // 2. Preparamos los datos básicos SIN el campo de imágenes
+      const dataToSave = {
+        ...form,
+        newFamilia: showNewFamilia && newFamilia.nombre ? newFamilia : null,
+        // imagenes: []  <-- Simplemente no lo incluimos o lo mandamos vacío
+      };
 
-    // 3. Enviamos solo la data de texto
-    await onSave(dataToSave);
-    
-    onClose();
-  } catch (err) {
-    // Si sigue saliendo 400, el error está en uno de los campos de texto arriba
-    setError(err.response?.data?.message || err.message || "Error al guardar el equipo");
-  } finally {
-    setLoading(false);
-  }
-};
+      // 3. Enviamos solo la data de texto
+      await onSave(dataToSave);
+
+      onClose();
+    } catch (err) {
+      // Si sigue saliendo 400, el error está en uno de los campos de texto arriba
+      setError(err.response?.data?.message || err.message || "Error al guardar el equipo");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const tabs = [
     { id: "general", label: "General", icon: Package },
     { id: "orden", label: "Orden de Venta", icon: User },
-    { id: "equipo", label: "Datos del Equipo", icon: Wrench },
     { id: "fechas", label: "Fechas y Garantía", icon: Calendar },
     { id: "planes", label: "Planes", icon: Wrench },
-  { id: "archivos", label: "Archivos", icon: ImageIcon },
+    { id: "archivos", label: "Archivos", icon: ImageIcon },
   ];
 
   const getTipoPropiedadIcon = (tipo) => {
@@ -200,11 +199,10 @@ const handleSubmit = async () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-colors whitespace-nowrap ${
-                    activeTab === tab.id
+                  className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === tab.id
                       ? "text-blue-600 border-b-2 border-blue-600 bg-white"
                       : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   {tab.label}
@@ -299,11 +297,10 @@ const handleSubmit = async () => {
                       key={tipo}
                       type="button"
                       onClick={() => setForm({ ...form, tipoEquipoPropiedad: tipo })}
-                      className={`p-4 border-2 rounded-xl transition-all flex flex-col items-center gap-2 ${
-                        form.tipoEquipoPropiedad === tipo
+                      className={`p-4 border-2 rounded-xl transition-all flex flex-col items-center gap-2 ${form.tipoEquipoPropiedad === tipo
                           ? "border-blue-500 bg-blue-50 text-blue-700"
                           : "border-gray-200 hover:border-gray-300 text-gray-600"
-                      }`}
+                        }`}
                       disabled={loading}
                     >
                       {getTipoPropiedadIcon(tipo)}
@@ -540,11 +537,11 @@ const handleSubmit = async () => {
                         {familia.nombre}
                       </option>
                     ))}
-                   
-             {/* <option value="nueva">+ Crear nueva familia</option> */}
+
+                    {/* <option value="nueva">+ Crear nueva familia</option> */}
                   </select>
                 </div>
-                
+
                 {showNewFamilia && (
                   <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                     <div className="flex items-center justify-between mb-3">
@@ -729,159 +726,158 @@ const handleSubmit = async () => {
               </div>
             </div>
           )}
-{/* TAB: Archivos / Imágenes */}
-{activeTab === "archivos" && (
-  <div className="space-y-4">
-    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-      <p className="text-sm font-semibold text-blue-900">Galería del Equipo</p>
-      <p className="text-xs text-blue-700 mt-1">Sube fotos del estado físico, placas o comprobantes.</p>
-    </div>
+          {/* TAB: Archivos / Imágenes */}
+          {activeTab === "archivos" && (
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <p className="text-sm font-semibold text-blue-900">Galería del Equipo</p>
+                <p className="text-xs text-blue-700 mt-1">Sube fotos del estado físico, placas o comprobantes.</p>
+              </div>
 
-    {/* Zona de Carga */}
-    <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-2xl p-10 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group">
-      <input 
-        type="file" 
-        multiple 
-        accept="image/*" 
-        className="hidden" 
-        id="upload-img"
-        onChange={(e) => {
-          // Aquí manejarás la lógica de archivos
-          const files = Array.from(e.target.files);
-          console.log("Archivos seleccionados:", files);
-        }}
-      />
-      <label htmlFor="upload-img" className="flex flex-col items-center gap-3 cursor-pointer">
-        <div className="p-4 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
-          <UploadCloud size={32} className="text-blue-600" />
-        </div>
-        <span className="text-sm font-bold text-slate-600">Haz clic para añadir imágenes</span>
-        <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">JPG, PNG o WEBP</span>
-      </label>
-    </div>
+              {/* Zona de Carga */}
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-2xl p-10 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  id="upload-img"
+                  onChange={(e) => {
+                    // Aquí manejarás la lógica de archivos
+                    const files = Array.from(e.target.files);
+                    console.log("Archivos seleccionados:", files);
+                  }}
+                />
+                <label htmlFor="upload-img" className="flex flex-col items-center gap-3 cursor-pointer">
+                  <div className="p-4 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                    <UploadCloud size={32} className="text-blue-600" />
+                  </div>
+                  <span className="text-sm font-bold text-slate-600">Haz clic para añadir imágenes</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">JPG, PNG o WEBP</span>
+                </label>
+              </div>
 
-    {/* Contenedor de Vista Previa (Placeholder) */}
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-       {/* Aquí se mapearán las imágenes seleccionadas */}
-       <div className="aspect-square bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center border-dotted">
-         <ImageIcon className="text-slate-300" size={32} />
-       </div>
-    </div>
-  </div>
-)}
+              {/* Contenedor de Vista Previa (Placeholder) */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                {/* Aquí se mapearán las imágenes seleccionadas */}
+                <div className="aspect-square bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center border-dotted">
+                  <ImageIcon className="text-slate-300" size={32} />
+                </div>
+              </div>
+            </div>
+          )}
 
 
           {/* TAB: Planes de Mantenimiento */}
-{activeTab === "planes" && (
-  <div className="space-y-4">
-    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
-      <p className="text-sm font-semibold text-blue-900">
-        Vincular Planes de Mantenimiento al Equipo
-      </p>
-      <p className="text-xs text-blue-700 mt-1">
-        Selecciona uno o varios planes. Se guardarán como relación (belongsToMany).
-      </p>
-    </div>
-{/* --- BUSCADOR --- */}
-<div className="relative mb-4">
-  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-  <input
-    type="text"
-    placeholder="Buscar plan por nombre o código..."
-    value={busquedaPlan}
-    onChange={(e) => setBusquedaPlan(e.target.value)}
-    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
-  />
-</div>
-    {loadingPlanes ? (
-      
-      <div className="flex items-center gap-2 text-slate-600">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        Cargando planes...
-      </div>
-    ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-{planesFiltrados.length === 0 ? (
-  <div className="md:col-span-2 p-10 border border-dashed border-slate-300 rounded-xl text-center">
-    <p className="text-slate-700 font-medium">
-       {planes.length === 0 ? "No hay planes activos" : "No se encontraron planes"}
-    </p>
-  </div>
-) : (
-          planesFiltrados.map((p) => {
-            const checked = form.planesMantenimientoIds.includes(p.id);
+          {activeTab === "planes" && (
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <p className="text-sm font-semibold text-blue-900">
+                  Vincular Planes de Mantenimiento al Equipo
+                </p>
+                <p className="text-xs text-blue-700 mt-1">
+                  Selecciona uno o varios planes. Se guardarán como relación (belongsToMany).
+                </p>
+              </div>
+              {/* --- BUSCADOR --- */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Buscar plan por nombre o código..."
+                  value={busquedaPlan}
+                  onChange={(e) => setBusquedaPlan(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
+                />
+              </div>
+              {loadingPlanes ? (
 
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  setForm((prev) => {
-                    const existe = prev.planesMantenimientoIds.includes(p.id);
-                    return {
-                      ...prev,
-                      planesMantenimientoIds: existe
-                        ? prev.planesMantenimientoIds.filter((x) => x !== p.id)
-                        : [...prev.planesMantenimientoIds, p.id],
-                    };
-                  });
-                }}
-                className={`text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 ${
-                  checked
-                    ? "border-emerald-400 bg-emerald-50"
-                    : "border-slate-200 bg-white hover:border-slate-300"
-                }`}
-                disabled={loading}
-              >
-                <div className={`mt-0.5 ${checked ? "text-emerald-600" : "text-slate-400"}`}>
-                  <CheckCircle2 className="w-5 h-5" />
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Cargando planes...
                 </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {planesFiltrados.length === 0 ? (
+                    <div className="md:col-span-2 p-10 border border-dashed border-slate-300 rounded-xl text-center">
+                      <p className="text-slate-700 font-medium">
+                        {planes.length === 0 ? "No hay planes activos" : "No se encontraron planes"}
+                      </p>
+                    </div>
+                  ) : (
+                    planesFiltrados.map((p) => {
+                      const checked = form.planesMantenimientoIds.includes(p.id);
 
-                <div className="flex-1">
-                  <p className="font-bold text-slate-800">{p.nombre}</p>
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    <span className="text-xs px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
-                      {p.codigoPlan || "SIN CÓDIGO"}
-                    </span>
-                    <span className="text-xs px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
-                      {p.tipo}
-                    </span>
-                    {p.esEspecifico && (
-                      <span className="text-xs px-2 py-1 rounded-full border border-emerald-200 bg-emerald-100 text-emerald-700 font-bold">
-                        ESPECÍFICO
-                      </span>
-                    )}
-                  </div>
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setForm((prev) => {
+                              const existe = prev.planesMantenimientoIds.includes(p.id);
+                              return {
+                                ...prev,
+                                planesMantenimientoIds: existe
+                                  ? prev.planesMantenimientoIds.filter((x) => x !== p.id)
+                                  : [...prev.planesMantenimientoIds, p.id],
+                              };
+                            });
+                          }}
+                          className={`text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 ${checked
+                              ? "border-emerald-400 bg-emerald-50"
+                              : "border-slate-200 bg-white hover:border-slate-300"
+                            }`}
+                          disabled={loading}
+                        >
+                          <div className={`mt-0.5 ${checked ? "text-emerald-600" : "text-slate-400"}`}>
+                            <CheckCircle2 className="w-5 h-5" />
+                          </div>
 
-                  <p className="text-xs text-slate-500 mt-2">
-                    {p.actividades?.length || 0} actividades
-                  </p>
+                          <div className="flex-1">
+                            <p className="font-bold text-slate-800">{p.nombre}</p>
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              <span className="text-xs px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+                                {p.codigoPlan || "SIN CÓDIGO"}
+                              </span>
+                              <span className="text-xs px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+                                {p.tipo}
+                              </span>
+                              {p.esEspecifico && (
+                                <span className="text-xs px-2 py-1 rounded-full border border-emerald-200 bg-emerald-100 text-emerald-700 font-bold">
+                                  ESPECÍFICO
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-xs text-slate-500 mt-2">
+                              {p.actividades?.length || 0} actividades
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
-              </button>
-            );
-          })
-        )}
-      </div>
-    )}
+              )}
 
-    {/* resumen */}
-    <div className="flex items-center justify-between border-t pt-4">
-      <p className="text-sm text-slate-600">
-        Seleccionados:{" "}
-        <b className="text-slate-800">{form.planesMantenimientoIds.length}</b>
-      </p>
+              {/* resumen */}
+              <div className="flex items-center justify-between border-t pt-4">
+                <p className="text-sm text-slate-600">
+                  Seleccionados:{" "}
+                  <b className="text-slate-800">{form.planesMantenimientoIds.length}</b>
+                </p>
 
-      <button
-        type="button"
-        onClick={() => setForm((p) => ({ ...p, planesMantenimientoIds: [] }))}
-        className="text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-lg hover:bg-slate-100 transition"
-        disabled={loading}
-      >
-        Limpiar selección
-      </button>
-    </div>
-  </div>
-)}
+                <button
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, planesMantenimientoIds: [] }))}
+                  className="text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-lg hover:bg-slate-100 transition"
+                  disabled={loading}
+                >
+                  Limpiar selección
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
