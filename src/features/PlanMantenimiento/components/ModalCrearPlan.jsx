@@ -512,7 +512,7 @@ export default function ModalCrearPlan({
               {form.contextoObjetivo === "EQUIPO" ? (
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">
-                    Equipo <span className="text-blue-600">(Auto-poblar plan)</span>
+                    Equipo <span className="text-blue-600">(Equipo de referencia)</span>
                   </label>
                   <select
                     value={form.equipoId}
@@ -529,7 +529,7 @@ export default function ModalCrearPlan({
               ) : (
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">
-                    Nombre Ubicación Técnica
+                    Ubicación Técnica de Referencia
                   </label>
                   <input 
                     className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none" 
@@ -650,9 +650,6 @@ export default function ModalCrearPlan({
                   className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none bg-white"
                 >
                   <option>PREVENTIVO</option>
-                  <option>CORRECTIVO</option>
-                  <option>MEJORA</option>
-                  <option>INSPECCION</option>
                 </select>
               </div>
             </div>

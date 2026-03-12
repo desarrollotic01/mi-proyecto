@@ -26,7 +26,7 @@ const emptyLinea = () => ({
   itemCode: "",
   description: "",
   quantity: 1,
-  warehouseCode: "01",
+  warehouseCode: "",
   costCenter: "",
   projectCode: "",
   rubro: "",
