@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { 
-  X, 
-  Loader2, 
-  AlertCircle, 
-  CalendarDays, 
-  Package, 
-  FileText, 
-  Wrench, 
-  ShoppingCart, 
-  Building2, 
-  Globe, 
+import {
+  X,
+  Loader2,
+  AlertCircle,
+  CalendarDays,
+  Package,
+  FileText,
+  Wrench,
+  ShoppingCart,
+  Building2,
+  Globe,
   Info,
   ClipboardList,
   CheckCircle2
@@ -17,15 +17,13 @@ import {
 
 import { paisService } from "../../mantenimiento/services/paisService";
 import { clienteService } from "../../mantenimiento/services/clienteService";
-// Si el error persiste, verifica si faltan "../" adicionales según tu estructura
 import { planMantenimientoService } from "../../PlanMantenimiento/services/planMantenimientoService";
 
-// --- HELPERS ---
 const emptyForm = () => ({
   codigo: "",
   nombre: "",
   id_cliente: "",
-  ClienteId: "", 
+  ClienteId: "",
   tipoEquipoPropiedad: "Vendido",
   paisId: "",
   sede: "",
@@ -41,7 +39,7 @@ const emptyForm = () => ({
   fechaEntregaReal: "",
   finGarantia: "",
   especialidad: "",
-  planesIds: [], 
+  planesMantenimientoIds: [],
 });
 
 const normalizeDate = (v) => (v ? v : null);
@@ -56,15 +54,16 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
   const [form, setForm] = useState(emptyForm());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const [activeTab, setActiveTab] = useState("general");
 
   const [paises, setPaises] = useState([]);
   const [clientes, setClientes] = useState([]);
-  const [planesDisponibles, setPlanesDisponibles] = useState([]); 
+  const [planesDisponibles, setPlanesDisponibles] = useState([]);
   const [loadingCombos, setLoadingCombos] = useState(false);
+  const [loadingPlanes, setLoadingPlanes] = useState(false);
 
-  // Sincronización al abrir
+  // 1. SINCRONIZACIÓN AL ABRIR
   useEffect(() => {
     if (!isOpen) {
       setActiveTab("general");
@@ -73,15 +72,23 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
     setError(null);
 
     if (initialData) {
+      // INTENTO 1: Buscar si los planes ya venían en la tabla (como objetos o IDs)
+      const planesRaw = initialData.planes || initialData.planesMantenimiento || initialData.Planes || [];
+      const idsRaw = initialData.planesIds || initialData.planesMantenimientoIds || [];
+
+      let idsIniciales = [];
+      if (Array.isArray(planesRaw) && planesRaw.length > 0 && typeof planesRaw[0] === 'object') {
+        idsIniciales = planesRaw.map(p => String(p.id));
+      } else if (Array.isArray(idsRaw)) {
+        idsIniciales = idsRaw.map(String);
+      }
+
       setForm({
         ...emptyForm(),
         ...initialData,
         ClienteId: initialData.ClienteId || initialData.clienteId || initialData?.cliente?.id || "",
         paisId: initialData.paisId || initialData?.pais?.id || "",
-        // Mapeo de planes: si vienen objetos, extraemos solo los IDs
-        planesIds: Array.isArray(initialData.planes) 
-          ? initialData.planes.map(p => p.id) 
-          : (initialData.planesIds || []),
+        planesMantenimientoIds: idsIniciales, // Ponemos lo que hayamos encontrado de inicio
         codigo: String(initialData.codigo ?? ""),
         nombre: String(initialData.nombre ?? ""),
         numeroOV: String(initialData.numeroOV ?? ""),
@@ -104,7 +111,33 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
     }
   }, [isOpen, initialData]);
 
-  // Carga de listas maestras
+  // 2. INTENTO 2: CONSULTAR LOS PLANES AL BACKEND (Por si no venían en la tabla)
+  useEffect(() => {
+    if (isOpen && mode === "edit" && initialData?.id) {
+      const fetchPlanesAsignados = async () => {
+        setLoadingPlanes(true);
+        try {
+          // Si tu backend tiene esta ruta, nos devolverá los planes de esta ubicación
+          const planesDelBackend = await planMantenimientoService.getPlanesByUbicacionTecnica(initialData.id);
+
+          if (Array.isArray(planesDelBackend) && planesDelBackend.length > 0) {
+            const idsDelBackend = planesDelBackend.map(p => String(p.id));
+            setForm(prev => ({
+              ...prev,
+              planesMantenimientoIds: idsDelBackend
+            }));
+          }
+        } catch (err) {
+          console.warn("No se pudieron cargar los planes asignados por el backend.", err);
+        } finally {
+          setLoadingPlanes(false);
+        }
+      };
+      fetchPlanesAsignados();
+    }
+  }, [isOpen, mode, initialData?.id]);
+
+  // 3. CARGA DE LISTAS MAESTRAS (Catálogos)
   useEffect(() => {
     if (!isOpen) return;
     const loadCombos = async () => {
@@ -113,17 +146,15 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
         const [p, c, pl] = await Promise.all([
           paisService.getAll?.() ?? paisService.getPaises?.(),
           clienteService.getAll?.() ?? clienteService.getClientes?.(),
-          // Intentamos varios nombres de función comunes por si acaso
           planMantenimientoService.getAll?.() ?? planMantenimientoService.getPlanes?.() ?? []
         ]);
-        
+
         setPaises(Array.isArray(p) ? p : []);
         setClientes(Array.isArray(c) ? c : []);
-        
-        // Manejo flexible de la respuesta de planes (array directo o {data: []})
+
         const planesData = Array.isArray(pl) ? pl : (pl?.data || []);
-        setPlanesDisponibles(planesData);
-        
+        setPlanesDisponibles(planesData.filter(plan => plan.activo !== false));
+
       } catch (err) {
         console.error("Error cargando combos:", err);
         setError("Error de conexión al cargar catálogos.");
@@ -150,20 +181,25 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const setFormValue = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  // SELECCIONAR / DESELECCIONAR PLAN
   const togglePlan = (planId) => {
+    const idStr = String(planId);
     setForm(f => {
-      const exists = f.planesIds.includes(planId);
+      const exists = f.planesMantenimientoIds.includes(idStr);
       return {
         ...f,
-        planesIds: exists 
-          ? f.planesIds.filter(id => id !== planId)
-          : [...f.planesIds, planId]
+        planesMantenimientoIds: exists
+          ? f.planesMantenimientoIds.filter(id => id !== idStr)
+          : [...f.planesMantenimientoIds, idStr]
       };
     });
   };
 
   const buildPayload = () => {
-    return {
+    // Convertimos los IDs seleccionados a números, que es lo que suelen esperar los backends.
+    const planesNumericos = form.planesMantenimientoIds.map(Number);
+
+    const payload = {
       codigo: String(form.codigo).trim(),
       nombre: String(form.nombre).trim(),
       id_cliente: normalizeStr(form.id_cliente),
@@ -183,8 +219,12 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
       fechaEntregaReal: normalizeDate(form.fechaEntregaReal),
       finGarantia: normalizeDate(form.finGarantia),
       especialidad: normalizeStr(form.especialidad),
-      planesIds: form.planesIds, 
+      // Solo enviamos los IDs como números
+      planesMantenimientoIds: planesNumericos,
+      planesIds: planesNumericos // Mantenemos este por si es el que esperaba tu API originalmente
     };
+
+    return payload;
   };
 
   const handleSubmit = async () => {
@@ -220,9 +260,9 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans">
       <div className="bg-white w-full max-w-4xl flex flex-col rounded-[1.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ maxHeight: '92vh' }}>
-        
+
         {/* HEADER */}
         <div className="flex items-start justify-between px-8 py-6 border-b border-slate-100 bg-white">
           <div>
@@ -238,8 +278,8 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
           </button>
         </div>
 
-        {/* TABS */}
-        <div className="border-b border-slate-200 bg-slate-50/50 px-8">
+        {/* TABS CON CONTADOR ESTILO NOTIFICACIÓN */}
+        <div className="border-b border-slate-200 bg-slate-50/50 px-8 pt-2">
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -248,17 +288,16 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-4 text-sm font-bold transition-all border-b-[3px] whitespace-nowrap ${
-                    isSelected
-                      ? "border-blue-600 text-blue-700 bg-white"
+                  className={`flex items-center gap-2 px-5 py-3.5 text-sm font-bold transition-all border-b-[3px] whitespace-nowrap ${isSelected
+                      ? "border-blue-600 text-blue-700 bg-white rounded-t-xl"
                       : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-                  }`}
+                    }`}
                 >
                   <Icon size={18} strokeWidth={isSelected ? 2.5 : 2} />
                   {tab.label}
-                  {tab.id === 'planes' && form.planesIds.length > 0 && (
-                    <span className="ml-1 bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
-                      {form.planesIds.length}
+                  {tab.id === 'planes' && form.planesMantenimientoIds.length > 0 && (
+                    <span className="ml-1.5 flex items-center justify-center bg-blue-600 text-white text-[11px] font-black h-5 w-5 rounded-full shadow-sm">
+                      {form.planesMantenimientoIds.length}
                     </span>
                   )}
                 </button>
@@ -277,7 +316,7 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
           )}
 
           <div className="max-w-3xl mx-auto">
-            
+
             {activeTab === "general" && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -312,12 +351,12 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {["Vendido", "Propio", "Atendido"].map((tipo) => (
-                        <PropertyCard 
+                        <PropertyCard
                           key={tipo}
-                          active={form.tipoEquipoPropiedad === tipo} 
-                          onClick={() => setFormValue("tipoEquipoPropiedad", tipo)} 
-                          icon={getTipoPropiedadIcon(tipo)} 
-                          label={tipo} 
+                          active={form.tipoEquipoPropiedad === tipo}
+                          onClick={() => setFormValue("tipoEquipoPropiedad", tipo)}
+                          icon={getTipoPropiedadIcon(tipo)}
+                          label={tipo}
                         />
                       ))}
                     </div>
@@ -339,7 +378,7 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                   <Field label="Almacén Base">
                     <input value={form.almacen} onChange={update("almacen")} placeholder="Ej: Almacén Central" className={inputCls} disabled={loading} />
                   </Field>
-                  
+
                   <Field label="Operador Logístico">
                     <input value={form.operadorLogistico} onChange={update("operadorLogistico")} placeholder="Ej: DHL, Shalom" className={inputCls} disabled={loading} />
                   </Field>
@@ -359,7 +398,7 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                   <Field label="Fecha Orden de Venta">
                     <input type="date" value={form.fechaOV} onChange={update("fechaOV")} className={inputCls} disabled={loading} />
                   </Field>
-                  <div className="hidden md:block"></div> 
+                  <div className="hidden md:block"></div>
                   <Field label="N° Orden de Compra Cliente">
                     <input value={form.numeroOrdenCliente} onChange={update("numeroOrdenCliente")} placeholder="Ej: OC-999" className={inputCls} disabled={loading} />
                   </Field>
@@ -382,7 +421,7 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                   <Field label="Fin de Garantía" className="md:col-span-2">
                     <input type="date" value={form.finGarantia} onChange={update("finGarantia")} className={inputCls} disabled={loading} />
                   </Field>
-                  
+
                   <div className="md:col-span-2 mt-2 p-5 bg-slate-100/50 border border-slate-200 rounded-2xl flex gap-4">
                     <div className="p-2 bg-blue-100 text-blue-600 rounded-xl shrink-0 h-fit"><Info size={20} /></div>
                     <div>
@@ -396,10 +435,9 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
               </div>
             )}
 
-            {/* TAB: PLANES (CORREGIDA LÓGICA DE RENDERIZADO) */}
             {activeTab === "planes" && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex gap-3">
+              <div className="space-y-5 animate-in fade-in duration-200 pb-10">
+                <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex gap-3 shadow-sm">
                   <ClipboardList className="text-blue-500 shrink-0" size={20} />
                   <p className="text-xs text-blue-700 font-medium leading-relaxed">
                     Selecciona los planes de mantenimiento que se aplicarán a esta ubicación técnica.
@@ -407,10 +445,10 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
-                  {loadingCombos ? (
+                  {loadingCombos || loadingPlanes ? (
                     <div className="flex flex-col items-center py-10 gap-3">
-                       <Loader2 className="animate-spin text-blue-600" />
-                       <p className="text-sm text-slate-400 font-bold">Cargando planes...</p>
+                      <Loader2 className="animate-spin text-blue-600" />
+                      <p className="text-sm text-slate-400 font-bold">Buscando planes asignados...</p>
                     </div>
                   ) : planesDisponibles.length === 0 ? (
                     <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl">
@@ -418,32 +456,40 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                     </div>
                   ) : (
                     planesDisponibles.map((plan) => {
-                      const isSelected = form.planesIds.includes(plan.id);
+                      const isSelected = form.planesMantenimientoIds.includes(String(plan.id));
+
                       return (
-                        <div 
+                        <div
                           key={plan.id}
                           onClick={() => togglePlan(plan.id)}
-                          className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer hover:shadow-md ${
-                            isSelected ? "border-blue-500 bg-blue-50/50 shadow-sm" : "border-slate-100 bg-white"
-                          }`}
+                          className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${isSelected ? "border-blue-500 bg-blue-50 shadow-sm" : "border-slate-200 bg-white hover:border-blue-300"
+                            }`}
                         >
                           <div className="flex items-center gap-4">
-                            <div className={`p-2.5 rounded-xl ${isSelected ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-400"}`}>
-                              <ClipboardList size={20} />
+                            <div className={`p-3 rounded-xl ${isSelected ? "bg-blue-600 text-white shadow-md shadow-blue-500/30" : "bg-slate-100 text-slate-400"}`}>
+                              <ClipboardList size={22} strokeWidth={2.5} />
                             </div>
                             <div>
-                              <p className="text-sm font-black text-slate-800">{plan.nombre || plan.codigoPlan}</p>
-                              <div className="flex gap-2 mt-1">
-                                <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded font-black uppercase">{plan.frecuencia}</span>
-                                <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded font-black uppercase">{plan.tipo}</span>
+                              <p className={`text-sm font-black ${isSelected ? "text-blue-900" : "text-slate-700"}`}>
+                                {plan.nombre || plan.codigoPlan}
+                              </p>
+                              <div className="flex gap-2 mt-1.5">
+                                <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider ${isSelected ? "bg-blue-200/50 text-blue-700" : "bg-slate-100 text-slate-500"}`}>
+                                  {plan.frecuencia}
+                                </span>
+                                <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider ${isSelected ? "bg-blue-200/50 text-blue-700" : "bg-slate-100 text-slate-500"}`}>
+                                  {plan.tipo}
+                                </span>
                               </div>
                             </div>
                           </div>
-                          {isSelected ? (
-                             <CheckCircle2 className="text-blue-600" size={24} strokeWidth={2.5} />
-                          ) : (
-                             <div className="w-6 h-6 rounded-full border-2 border-slate-100" />
-                          )}
+                          <div>
+                            {isSelected ? (
+                              <CheckCircle2 className="text-blue-600" size={28} strokeWidth={2.5} />
+                            ) : (
+                              <div className="w-[26px] h-[26px] rounded-full border-2 border-slate-200 bg-slate-50/50" />
+                            )}
+                          </div>
                         </div>
                       );
                     })
@@ -457,7 +503,7 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
 
         {/* FOOTER */}
         <div className="border-t border-slate-100 bg-white px-8 py-5 flex items-center justify-end gap-4 rounded-b-[1.5rem]">
-          <button onClick={onClose} disabled={loading} className="px-8 py-3.5 border-2 border-slate-100 text-slate-500 rounded-2xl hover:bg-slate-50 transition-colors font-bold text-sm uppercase tracking-widest">
+          <button onClick={onClose} disabled={loading} className="px-8 py-3.5 border-2 border-slate-200 text-slate-500 rounded-2xl hover:bg-slate-50 transition-colors font-bold text-sm uppercase tracking-widest">
             Cancelar
           </button>
           <button
@@ -474,16 +520,14 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
   );
 }
 
-// --- SUB-COMPONENTES UI ---
 function PropertyCard({ active, onClick, icon, label }) {
   return (
-    <div 
+    <div
       onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border-2 cursor-pointer transition-all hover:-translate-y-1 ${
-        active 
-          ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-500/20" 
+      className={`flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border-2 cursor-pointer transition-all hover:-translate-y-1 ${active
+          ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-500/20"
           : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"
-      }`}
+        }`}
     >
       <div className={`p-3 rounded-xl ${active ? "bg-blue-600 text-white shadow-inner" : "bg-slate-50 text-slate-400"}`}>
         {icon}
