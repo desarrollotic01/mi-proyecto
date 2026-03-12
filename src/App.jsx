@@ -14,6 +14,9 @@ import TrabajadoresPage from "./features/Trabajores/pages/TrabajadorPage";
 import MaintenanceGuides from "./features/GuiaMantenimiento/GuiaMantenimiento";
 import GuiasKanban from "./pages/GuiaMantenimientoKanban";
 // 1. Importa tu nuevo componente (ajusta la ruta según donde crees el archivo)
+
+
+//Lista de link de e
 import ListaLink from "./features/Equipo/ListaLink";
 function AppLayout() {
   return (

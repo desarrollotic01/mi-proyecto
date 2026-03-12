@@ -1,7 +1,7 @@
 import { Box } from "lucide-react";
 import EquipoCard from "./EquipoCard";
 
-export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onView, onMove, onCreatePlan, moveCategory }) { 
+export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onView, onMove, onCreatePlan, moveCategory }) {
   const colorStyles = {
     blue: "bg-[#3b82f6]",
     orange: "bg-[#f59e0b]",
@@ -13,6 +13,9 @@ export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit
   };
 
   const bgHeader = colorStyles[color] || colorStyles.blue;
+  
+  // Protección contra arrays rotos
+  const equiposSeguros = Array.isArray(equipos) ? equipos : [];
 
   return (
     <div className="flex flex-col min-w-[320px] flex-1">
@@ -24,27 +27,27 @@ export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit
           <h3 className="text-white font-black text-sm uppercase tracking-wide">{title}</h3>
         </div>
         <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white text-[11px] font-black shadow-inner">
-          {equipos.length}
+          {equiposSeguros.length}
         </div>
       </div>
 
       <div className="bg-[#f8fafc] border-x border-b border-slate-200 p-3 min-h-[450px] space-y-3 rounded-b-[1rem] shadow-sm">
-        {equipos.length === 0 ? (
+        {equiposSeguros.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 opacity-30">
             <Box size={48} className="text-slate-400 mb-3" />
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sin equipos</p>
           </div>
         ) : (
-          equipos.map((equipo) => (
-            <EquipoCard 
-              key={equipo.id} 
-              equipo={equipo} 
-              onEdit={onEdit} 
-              onDelete={onDelete} 
-              onView={onView} 
-              onMove={onMove} 
-              onCreatePlan={onCreatePlan} 
-              moveCategory={moveCategory} 
+          equiposSeguros.map((equipo) => (
+            <EquipoCard
+              key={equipo?.id || Math.random()}
+              equipo={equipo}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onView={onView}
+              onMove={onMove}
+              onCreatePlan={onCreatePlan}
+              moveCategory={moveCategory}
             />
           ))
         )}

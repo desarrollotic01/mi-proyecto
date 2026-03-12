@@ -1,25 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  X,
-  Plus,
-  Trash2,
-  Save,
-  Wrench,
-  Clock,
-  Users,
-  ChevronDown,
-  ChevronUp,
-  Upload,
-  FileText,
-  Sparkles,
-  Package,
-  CalendarDays,
-  Hash,
+  X, Plus, Trash2, Save, Wrench, Clock, Users,
+  ChevronDown, ChevronUp, Upload, FileText, Sparkles,
+  Package, CalendarDays, Hash,
 } from "lucide-react";
 import { planMantenimientoService } from "../services/planMantenimientoService";
 import { equipoService } from "../../mantenimiento/services/equipoService";
 
-/** UID simple para el front (no dependas del index) */
+/** UID simple para el front */
 const uid = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
@@ -39,9 +27,6 @@ const fromMinutes = (minutos, unidad) => {
   if (!Number.isFinite(m) || m <= 0) return 0;
   return unidad === "h" ? m / 60 : m;
 };
-
-
-
 
 const FRECUENCIAS = [
   { value: "POR_HORA", label: "Por hora" },
@@ -71,16 +56,6 @@ const DEFAULT_ACTIVIDAD = () => ({
   adjuntos: [],
 });
 
-
-const Prueba = () => ({
-
- 
-});
-
-
-
-
-
 const DEFAULT_ITEM_ACTIVIDAD = () => ({
   uid: uid(),
   recurso: "MATERIAL",
@@ -104,25 +79,19 @@ const DEFAULT_ITEM_PLAN = () => ({
   observacion: "",
 });
 
-export default function ModalCrearPlan({
-  onClose,
-  onCreated,
-  equipoPreseleccionado,
-}) {
+export default function ModalCrearPlan({ onClose, onCreated, equipoPreseleccionado }) {
   const [equipos, setEquipos] = useState([]);
   const [guardando, setGuardando] = useState(false);
-
-  /** expanded por uid (no por index) */
   const [expandedByUid, setExpandedByUid] = useState({});
 
   // items/adjuntos generales del plan
   const [itemsPlan, setItemsPlan] = useState([DEFAULT_ITEM_PLAN()]);
   const [adjuntosPlan, setAdjuntosPlan] = useState([]);
 
-  // ESTADO DEL FORMULARIO CORREGIDO
+  // ESTADO DEL FORMULARIO
   const [form, setForm] = useState({
     codigoPlan: "",
-    contextoObjetivo: "EQUIPO", // Puede ser "EQUIPO" o "UBICACION_TECNICA"
+    contextoObjetivo: "EQUIPO", // "EQUIPO" o "UBICACION_TECNICA"
     ubicacionId: "",
     familiaId: equipoPreseleccionado?.familia?.id || "",
     tipoEquipo: equipoPreseleccionado?.tipoEquipo || "",
@@ -146,12 +115,7 @@ export default function ModalCrearPlan({
     
     if (!selectedId) {
       setForm(prev => ({ 
-        ...prev, 
-        equipoId: "", 
-        familiaId: "", 
-        tipoEquipo: "", 
-        modeloEquipo: "",
-        nombre: "" 
+        ...prev, equipoId: "", familiaId: "", tipoEquipo: "", modeloEquipo: "", nombre: "" 
       }));
       setActividades([]);
       return;
@@ -223,7 +187,6 @@ export default function ModalCrearPlan({
     loadEquipos();
   }, []);
 
-  // SI CAMBIA equipoPreseleccionado: sincroniza form
   useEffect(() => {
     if (!equipoPreseleccionado) return;
     setForm((prev) => ({
@@ -232,9 +195,7 @@ export default function ModalCrearPlan({
       tipoEquipo: equipoPreseleccionado?.tipoEquipo || "",
       modeloEquipo: equipoPreseleccionado?.modelo || "",
       equipoId: equipoPreseleccionado?.id || "",
-      nombre: `Plan de Mantenimiento - ${
-        equipoPreseleccionado.nombre || equipoPreseleccionado.codigo
-      }`,
+      nombre: `Plan de Mantenimiento - ${equipoPreseleccionado.nombre || equipoPreseleccionado.codigo}`,
     }));
   }, [equipoPreseleccionado]);
 
@@ -248,9 +209,7 @@ export default function ModalCrearPlan({
   // MEMO FILTROS
   // =========================
   const familias = useMemo(() => {
-    return [
-      ...new Map(equipos.filter((e) => e.familiaId).map((e) => [e.familiaId, { id: e.familiaId, nombre: e.familiaNombre }])).values(),
-    ];
+    return [...new Map(equipos.filter((e) => e.familiaId).map((e) => [e.familiaId, { id: e.familiaId, nombre: e.familiaNombre }])).values()];
   }, [equipos]);
 
   const tipos = useMemo(() => {
@@ -258,21 +217,14 @@ export default function ModalCrearPlan({
   }, [equipos, form.familiaId]);
 
   const modelos = useMemo(() => {
-    return [
-      ...new Set(
-        equipos.filter((e) => {
-            if (form.familiaId && e.familiaId !== form.familiaId) return false;
-            if (form.tipoEquipo && e.tipoEquipo !== form.tipoEquipo) return false;
-            return true;
-          }).map((e) => e.modelo).filter(Boolean)
-      ),
-    ];
+    return [...new Set(equipos.filter((e) => {
+      if (form.familiaId && e.familiaId !== form.familiaId) return false;
+      if (form.tipoEquipo && e.tipoEquipo !== form.tipoEquipo) return false;
+      return true;
+    }).map((e) => e.modelo).filter(Boolean))];
   }, [equipos, form.familiaId, form.tipoEquipo]);
 
-  // LA LISTA DE EQUIPOS SIEMPRE MUESTRA TODOS
-  const equiposFiltrados = useMemo(() => {
-    return equipos; 
-  }, [equipos]);
+  const equiposFiltrados = useMemo(() => equipos, [equipos]);
 
   // =========================
   // CRUD ITEMS Y ACTIVIDADES
@@ -294,32 +246,16 @@ export default function ModalCrearPlan({
       return copy;
     });
   };
-  const toggleActividad = (uidActividad) => {
-    setExpandedByUid((prev) => ({ ...prev, [uidActividad]: !prev[uidActividad] }));
-  };
-  const updateActividad = (uidActividad, patch) => {
-    setActividades((prev) => prev.map((a) => (a.uid === uidActividad ? { ...a, ...patch } : a)));
-  };
+  const toggleActividad = (uidActividad) => setExpandedByUid((prev) => ({ ...prev, [uidActividad]: !prev[uidActividad] }));
+  const updateActividad = (uidActividad, patch) => setActividades((prev) => prev.map((a) => (a.uid === uidActividad ? { ...a, ...patch } : a)));
   const addItemToActividad = (uidActividad) => {
-    setActividades((prev) => prev.map((a) => {
-        if (a.uid !== uidActividad) return a;
-        return { ...a, items: [...a.items, DEFAULT_ITEM_ACTIVIDAD()] };
-      })
-    );
+    setActividades((prev) => prev.map((a) => a.uid !== uidActividad ? a : { ...a, items: [...a.items, DEFAULT_ITEM_ACTIVIDAD()] }));
   };
   const updateItemActividad = (uidActividad, uidItem, patch) => {
-    setActividades((prev) => prev.map((a) => {
-        if (a.uid !== uidActividad) return a;
-        return { ...a, items: a.items.map((it) => it.uid === uidItem ? { ...it, ...patch } : it ) };
-      })
-    );
+    setActividades((prev) => prev.map((a) => a.uid !== uidActividad ? a : { ...a, items: a.items.map((it) => it.uid === uidItem ? { ...it, ...patch } : it) }));
   };
   const removeItemActividad = (uidActividad, uidItem) => {
-    setActividades((prev) => prev.map((a) => {
-        if (a.uid !== uidActividad) return a;
-        return { ...a, items: a.items.filter((it) => it.uid !== uidItem) };
-      })
-    );
+    setActividades((prev) => prev.map((a) => a.uid !== uidActividad ? a : { ...a, items: a.items.filter((it) => it.uid !== uidItem) }));
   };
 
   // UPLOAD ADJUNTOS
@@ -343,11 +279,7 @@ export default function ModalCrearPlan({
       const res = await fetch("/api/adjuntos/upload", { method: "POST", body: formData });
       if (!res.ok) throw new Error("Error al subir adjuntos");
       const archivos = await res.json();
-      setActividades((prev) => prev.map((a) => {
-          if (a.uid !== uidActividad) return a;
-          return { ...a, adjuntos: [...(a.adjuntos || []), ...(archivos || [])] };
-        })
-      );
+      setActividades((prev) => prev.map((a) => a.uid !== uidActividad ? a : { ...a, adjuntos: [...(a.adjuntos || []), ...(archivos || [])] }));
     } catch (err) { alert(err.message); }
   };
 
@@ -356,20 +288,15 @@ export default function ModalCrearPlan({
     if (!form.nombre?.trim()) return "El nombre del plan es obligatorio";
     if (!form.tipo) return "El tipo de plan es obligatorio";
     if (!form.frecuencia) return "La frecuencia del plan es obligatoria";
-
     if (form.frecuencia === "POR_HORA") {
       const fh = Number(form.frecuenciaHoras);
       if (!Number.isFinite(fh) || fh <= 0) return "Si la frecuencia es POR_HORA, frecuenciaHoras debe ser > 0";
       if (!Number.isInteger(fh)) return "frecuenciaHoras debe ser un número entero";
     }
-
     if (form.contextoObjetivo === "EQUIPO" && !form.familiaId && !form.tipoEquipo && !form.modeloEquipo) {
       return "Debe especificar al menos Familia, Tipo o Modelo para el plan de equipo";
     }
-
-    if (!Array.isArray(actividades) || actividades.length === 0) {
-      return "El plan de mantenimiento debe tener al menos una actividad";
-    }
+    if (!Array.isArray(actividades) || actividades.length === 0) return "El plan de mantenimiento debe tener al menos una actividad";
     return null;
   };
 
@@ -401,7 +328,6 @@ export default function ModalCrearPlan({
         frecuencia: form.frecuencia,
         frecuenciaHoras: form.frecuencia === "POR_HORA" ? Number(form.frecuenciaHoras) : null,
         
-        // ENVIO DEL CONTEXTO (EQUIPO O UT)
         contextoObjetivo: form.contextoObjetivo,
         equipoObjetivoId: form.contextoObjetivo === "EQUIPO" ? form.equipoId : null,
         ubicacionTecnicaObjetivoId: form.contextoObjetivo === "UBICACION_TECNICA" ? form.ubicacionId : null,
@@ -493,50 +419,27 @@ export default function ModalCrearPlan({
               {/* SELECTOR DE CONTEXTO */}
               <div className="md:col-span-3 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex gap-8 mb-2">
                 <label className="flex items-center gap-3 cursor-pointer font-bold text-slate-700">
-                  <input 
-                    type="radio" name="ctx" checked={form.contextoObjetivo === "EQUIPO"} 
+                  <input type="radio" name="ctx" checked={form.contextoObjetivo === "EQUIPO"} 
                     onChange={() => setForm(p => ({ ...p, contextoObjetivo: "EQUIPO", ubicacionId: "" }))} 
-                    className="w-5 h-5 text-blue-600" 
-                  /> Plan para Equipo
+                    className="w-5 h-5 text-blue-600" /> Plan para Equipo
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer font-bold text-slate-700">
-                  <input 
-                    type="radio" name="ctx" checked={form.contextoObjetivo === "UBICACION_TECNICA"} 
+                  <input type="radio" name="ctx" checked={form.contextoObjetivo === "UBICACION_TECNICA"} 
                     onChange={() => setForm(p => ({ ...p, contextoObjetivo: "UBICACION_TECNICA", equipoId: "", familiaId: "", tipoEquipo: "", modeloEquipo: "" }))} 
-                    className="w-5 h-5 text-blue-600" 
-                  /> Plan para Ubicación Técnica
+                    className="w-5 h-5 text-blue-600" /> Plan para Ubicación Técnica
                 </label>
               </div>
 
-              {/* SELECTOR DINÁMICO (EQUIPO VS UBICACION) */}
-              {form.contextoObjetivo === "EQUIPO" ? (
+              {/* SELECTOR DINÁMICO (CAMPO ELIMINADO AQUÍ) */}
+              {form.contextoObjetivo === "EQUIPO" && (
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">
                     Equipo <span className="text-blue-600">(Auto-poblar plan)</span>
                   </label>
-                  <select
-                    value={form.equipoId}
-                    onChange={handleEquipoChange}
-                    disabled={disabledPorEquipo}
-                    className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}
-                  >
+                  <select value={form.equipoId} onChange={handleEquipoChange} disabled={disabledPorEquipo} className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}>
                     <option value="">Seleccione un equipo...</option>
-                    {equiposFiltrados.map((eq) => (
-                      <option key={eq.id} value={eq.id}>{eq.codigo} - {eq.nombre}</option>
-                    ))}
+                    {equiposFiltrados.map((eq) => (<option key={eq.id} value={eq.id}>{eq.codigo} - {eq.nombre}</option>))}
                   </select>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">
-                    Nombre Ubicación Técnica
-                  </label>
-                  <input 
-                    className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none" 
-                    placeholder="Ej: Sala Eléctrica 01" 
-                    value={form.nombre} 
-                    onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))} 
-                  />
                 </div>
               )}
 
@@ -545,12 +448,7 @@ export default function ModalCrearPlan({
                 <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                   <Hash size={16} /> Código del Plan <span className="text-red-500">*</span>
                 </label>
-                <input
-                  className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none"
-                  value={form.codigoPlan}
-                  onChange={(e) => setForm((p) => ({ ...p, codigoPlan: e.target.value }))}
-                  placeholder="PM-0001"
-                />
+                <input className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none" value={form.codigoPlan} onChange={(e) => setForm((p) => ({ ...p, codigoPlan: e.target.value }))} placeholder="PM-0001" />
               </div>
 
               {/* FRECUENCIA */}
@@ -558,70 +456,43 @@ export default function ModalCrearPlan({
                 <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                   <CalendarDays size={16} /> Frecuencia <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={form.frecuencia}
-                  onChange={(e) => setForm((p) => ({ ...p, frecuencia: e.target.value }))}
-                  className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none bg-white"
-                >
+                <select value={form.frecuencia} onChange={(e) => setForm((p) => ({ ...p, frecuencia: e.target.value }))} className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none bg-white">
                   {FRECUENCIAS.map((f) => (<option key={f.value} value={f.value}>{f.label}</option>))}
                 </select>
               </div>
 
-              {/* FRECUENCIA HORAS (solo POR_HORA) */}
+              {/* FRECUENCIA HORAS */}
               <div className="relative">
                 <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                   <Clock size={16} /> Frecuencia (horas) {form.frecuencia === "POR_HORA" && <span className="text-red-500">*</span>}
                 </label>
                 {form.frecuencia === "POR_HORA" ? (
-                  <input
-                    type="number" min="1" step="1"
-                    value={form.frecuenciaHoras}
-                    onChange={(e) => setForm((p) => ({ ...p, frecuenciaHoras: e.target.value }))}
-                    className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none"
-                    placeholder="Ej: 8"
-                  />
+                  <input type="number" min="1" step="1" value={form.frecuenciaHoras} onChange={(e) => setForm((p) => ({ ...p, frecuenciaHoras: e.target.value }))} className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none" placeholder="Ej: 8" />
                 ) : (
-                  <div className="w-full border-2 border-slate-200 p-3.5 rounded-xl bg-slate-50 text-slate-500 text-sm">
-                    Solo aplica si es <b>POR_HORA</b>
-                  </div>
+                  <div className="w-full border-2 border-slate-200 p-3.5 rounded-xl bg-slate-50 text-slate-500 text-sm">Solo aplica si es <b>POR_HORA</b></div>
                 )}
               </div>
 
-              {/* FAMILIA, TIPO, MODELO (SOLO SI ES EQUIPO) */}
+              {/* FAMILIA, TIPO, MODELO */}
               {form.contextoObjetivo === "EQUIPO" && (
                 <>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">Familia</label>
-                    <select
-                      value={form.familiaId}
-                      onChange={(e) => setForm((p) => ({ ...p, familiaId: e.target.value }))}
-                      disabled={disabledPorEquipo}
-                      className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}
-                    >
+                    <select value={form.familiaId} onChange={(e) => setForm((p) => ({ ...p, familiaId: e.target.value }))} disabled={disabledPorEquipo} className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}>
                       <option value="">Todas las familias</option>
                       {familias.map((f) => (<option key={f.id} value={f.id}>{f.nombre}</option>))}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Equipo</label>
-                    <select
-                      value={form.tipoEquipo}
-                      onChange={(e) => setForm((p) => ({ ...p, tipoEquipo: e.target.value, modeloEquipo: "", equipoId: "" }))}
-                      disabled={disabledPorEquipo}
-                      className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}
-                    >
+                    <select value={form.tipoEquipo} onChange={(e) => setForm((p) => ({ ...p, tipoEquipo: e.target.value, modeloEquipo: "", equipoId: "" }))} disabled={disabledPorEquipo} className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}>
                       <option value="">Todos los tipos</option>
                       {tipos.map((t) => (<option key={t} value={t}>{t}</option>))}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">Modelo</label>
-                    <select
-                      value={form.modeloEquipo}
-                      onChange={(e) => setForm((p) => ({ ...p, modeloEquipo: e.target.value, equipoId: "" }))}
-                      disabled={disabledPorEquipo}
-                      className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}
-                    >
+                    <select value={form.modeloEquipo} onChange={(e) => setForm((p) => ({ ...p, modeloEquipo: e.target.value, equipoId: "" }))} disabled={disabledPorEquipo} className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}>
                       <option value="">Todos los modelos</option>
                       {modelos.map((m) => (<option key={m} value={m}>{m}</option>))}
                     </select>
@@ -629,26 +500,14 @@ export default function ModalCrearPlan({
                 </>
               )}
 
-              {/* NOMBRE */}
+              {/* NOMBRE Y TIPO PLAN */}
               <div className={form.contextoObjetivo === "EQUIPO" ? "lg:col-span-2" : "lg:col-span-1"}>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  Nombre del Plan <span className="text-red-500">*</span>
-                </label>
-                <input
-                  className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none"
-                  value={form.nombre}
-                  onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))}
-                />
+                <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Plan <span className="text-red-500">*</span></label>
+                <input className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none" value={form.nombre} onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))} />
               </div>
-
-              {/* TIPO PLAN */}
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Plan</label>
-                <select
-                  value={form.tipo}
-                  onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))}
-                  className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none bg-white"
-                >
+                <select value={form.tipo} onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))} className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none bg-white">
                   <option>PREVENTIVO</option>
                   <option>CORRECTIVO</option>
                   <option>MEJORA</option>
@@ -659,7 +518,7 @@ export default function ModalCrearPlan({
           </div>
 
           {/* =========================
-              ✅ ITEMS GENERALES DEL PLAN
+              ITEMS GENERALES DEL PLAN
           ========================= */}
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden mb-6">
             <div className="flex justify-between items-center p-6 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-slate-200">
@@ -682,42 +541,15 @@ export default function ModalCrearPlan({
                   </button>
 
                   <div className="grid grid-cols-1 md:grid-cols-6 gap-3 pr-10">
-                    <div>
-                      <label className="text-xs font-bold text-slate-600 mb-1 block">ItemCode <span className="text-red-500">*</span></label>
-                      <input value={it.itemCode} onChange={(e) => updateItemPlan(it.uid, { itemCode: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-bold text-slate-600 mb-1 block">Descripción</label>
-                      <input value={it.description} onChange={(e) => updateItemPlan(it.uid, { description: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-600 mb-1 block">Cantidad <span className="text-red-500">*</span></label>
-                      <input type="number" min="1" value={it.quantity} onChange={(e) => updateItemPlan(it.uid, { quantity: Number(e.target.value) }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-600 mb-1 block">Almacén</label>
-                      <input value={it.warehouseCode} onChange={(e) => updateItemPlan(it.uid, { warehouseCode: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-600 mb-1 block">Centro costo</label>
-                      <input value={it.costCenter} onChange={(e) => updateItemPlan(it.uid, { costCenter: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-600 mb-1 block">Proyecto</label>
-                      <input value={it.projectCode} onChange={(e) => updateItemPlan(it.uid, { projectCode: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-600 mb-1 block">Rubro</label>
-                      <input value={it.rubro} onChange={(e) => updateItemPlan(it.uid, { rubro: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-bold text-slate-600 mb-1 block">Paquete trabajo</label>
-                      <input value={it.paqueteTrabajo} onChange={(e) => updateItemPlan(it.uid, { paqueteTrabajo: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" />
-                    </div>
-                    <div className="md:col-span-6">
-                      <label className="text-xs font-bold text-slate-600 mb-1 block">Observación</label>
-                      <input value={it.observacion} onChange={(e) => updateItemPlan(it.uid, { observacion: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" />
-                    </div>
+                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">ItemCode <span className="text-red-500">*</span></label><input value={it.itemCode} onChange={(e) => updateItemPlan(it.uid, { itemCode: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
+                    <div className="md:col-span-2"><label className="text-xs font-bold text-slate-600 mb-1 block">Descripción</label><input value={it.description} onChange={(e) => updateItemPlan(it.uid, { description: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
+                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Cantidad <span className="text-red-500">*</span></label><input type="number" min="1" value={it.quantity} onChange={(e) => updateItemPlan(it.uid, { quantity: Number(e.target.value) }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
+                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Almacén</label><input value={it.warehouseCode} onChange={(e) => updateItemPlan(it.uid, { warehouseCode: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
+                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Centro costo</label><input value={it.costCenter} onChange={(e) => updateItemPlan(it.uid, { costCenter: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
+                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Proyecto</label><input value={it.projectCode} onChange={(e) => updateItemPlan(it.uid, { projectCode: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
+                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Rubro</label><input value={it.rubro} onChange={(e) => updateItemPlan(it.uid, { rubro: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
+                    <div className="md:col-span-2"><label className="text-xs font-bold text-slate-600 mb-1 block">Paquete trabajo</label><input value={it.paqueteTrabajo} onChange={(e) => updateItemPlan(it.uid, { paqueteTrabajo: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
+                    <div className="md:col-span-6"><label className="text-xs font-bold text-slate-600 mb-1 block">Observación</label><input value={it.observacion} onChange={(e) => updateItemPlan(it.uid, { observacion: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
                   </div>
                 </div>
               ))}
@@ -725,7 +557,7 @@ export default function ModalCrearPlan({
           </div>
 
           {/* =========================
-              ✅ ADJUNTOS GENERALES DEL PLAN
+              ADJUNTOS GENERALES DEL PLAN
           ========================= */}
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden mb-6">
             <div className="flex justify-between items-center p-6 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-slate-200">
@@ -802,22 +634,10 @@ export default function ModalCrearPlan({
                       {abierto && (
                         <div className="p-6 space-y-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-2">Sistema</label>
-                              <input value={act.sistema} onChange={(e) => updateActividad(act.uid, { sistema: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-2">Subsistema</label>
-                              <input value={act.subsistema} onChange={(e) => updateActividad(act.uid, { subsistema: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-2">Componente</label>
-                              <input value={act.componente} onChange={(e) => updateActividad(act.uid, { componente: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" />
-                            </div>
-                            <div className="md:col-span-2">
-                              <label className="block text-xs font-bold text-slate-600 mb-2">Tarea <span className="text-red-500">*</span></label>
-                              <input value={act.tarea} onChange={(e) => updateActividad(act.uid, { tarea: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" />
-                            </div>
+                            <div><label className="block text-xs font-bold text-slate-600 mb-2">Sistema</label><input value={act.sistema} onChange={(e) => updateActividad(act.uid, { sistema: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" /></div>
+                            <div><label className="block text-xs font-bold text-slate-600 mb-2">Subsistema</label><input value={act.subsistema} onChange={(e) => updateActividad(act.uid, { subsistema: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" /></div>
+                            <div><label className="block text-xs font-bold text-slate-600 mb-2">Componente</label><input value={act.componente} onChange={(e) => updateActividad(act.uid, { componente: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" /></div>
+                            <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-600 mb-2">Tarea <span className="text-red-500">*</span></label><input value={act.tarea} onChange={(e) => updateActividad(act.uid, { tarea: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" /></div>
                             <div>
                               <label className="block text-xs font-bold text-slate-600 mb-2">Tipo de Trabajo</label>
                               <select value={act.tipoTrabajo} onChange={(e) => updateActividad(act.uid, { tipoTrabajo: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none bg-white">
@@ -918,16 +738,10 @@ export default function ModalCrearPlan({
               Cancelar
             </button>
             <button onClick={guardarPlan} disabled={guardando} className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 disabled:from-slate-400 disabled:to-slate-500 text-white px-10 py-3.5 rounded-xl font-bold flex items-center gap-3">
-              {guardando ? <><div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>Guardando...</> : <><Save size={22} />Guardar Plan</>}
+              {guardando ? <><div className="w-5 h-5 border-[3px] border-white border-t-transparent rounded-full animate-spin"></div>Guardando...</> : <><Save size={22} />Guardar Plan</>}
             </button>
           </div>
         </div>
-
-        <style jsx>{`
-          .border-3 {
-            border-width: 3px;
-          }
-        `}</style>
       </div>
     </div>
   );
