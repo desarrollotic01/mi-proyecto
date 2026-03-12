@@ -83,82 +83,114 @@ export default function MantenimientoKanban({
     );
   };
 
-  const reorganizarColumnasPorOTs = (columns) => {
-    const nuevasColumnas = {};
+  const getTargetKey = (obj) => {
+  if (obj?.equipoId) return `E:${String(obj.equipoId)}`;
+  if (obj?.ubicacionTecnicaId) return `U:${String(obj.ubicacionTecnicaId)}`;
+  if (obj?.ubicacionId) return `U:${String(obj.ubicacionId)}`;
+  return null;
+};
 
-    Object.keys(columns).forEach(colId => {
-      nuevasColumnas[colId] = { items: [] };
-    });
+const reorganizarColumnasPorOTs = (columns) => {
+  const nuevasColumnas = {};
 
-    Object.values(columns).forEach(col => {
-      col.items.forEach(item => {
-        const otsDelAviso = ordenesTrabajoData.filter(
-          ot => ot.avisoId === item.id
-        );
+  Object.keys(columns).forEach((colId) => {
+    nuevasColumnas[colId] = { items: [] };
+  });
 
-        if (!otsDelAviso || otsDelAviso.length === 0) {
-          nuevasColumnas[item.estado]?.items.push({
-            ...item,
-            _estadoReal: item.estado,
-            _estadoOriginal: item.estado,
-            _tieneOTs: false,
-            _esParcial: false,
-            _equiposPendientes: 0,
-            _cantidadOTs: 0,
-            _desglose: null
-          });
-          return;
-        }
+  Object.values(columns).forEach((col) => {
+    col.items.forEach((item) => {
+      const otsDelAviso = ordenesTrabajoData.filter(
+        (ot) => String(ot.avisoId) === String(item.id)
+      );
 
-        const totalEquiposAviso = item.equiposRelacion?.length || 0;
-        const equiposConOT = new Set();
+      // Targets reales del aviso
+      const targetsAviso = new Set();
 
-        otsDelAviso.forEach(ot => {
-          ot.equipos?.forEach(eq => {
-            equiposConOT.add(eq.equipoId);
-          });
-        });
+      (item.equiposRelacion || []).forEach((rel) => {
+        const key = getTargetKey(rel);
+        if (key) targetsAviso.add(key);
+      });
 
-        const cantidadEquiposConOT = equiposConOT.size;
-        const equiposPendientes = totalEquiposAviso - cantidadEquiposConOT;
-        
-        const estaCompleto = 
-          totalEquiposAviso > 0 && 
-          cantidadEquiposConOT === totalEquiposAviso;
-        
-        const esParcial = 
-          cantidadEquiposConOT > 0 && 
-          cantidadEquiposConOT < totalEquiposAviso;
+      (item.ubicacionesRelacion || []).forEach((rel) => {
+        const key = getTargetKey(rel);
+        if (key) targetsAviso.add(key);
+      });
 
-        const porEstado = {};
-        otsDelAviso.forEach(ot => {
-          porEstado[ot.estado] = (porEstado[ot.estado] || 0) + 1;
-        });
-
-        const columnaDestino = estaCompleto ? "CON_OT" : "TRATADO";
-
-        nuevasColumnas[columnaDestino]?.items.push({
+      // Si no tiene OTs, se queda en su estado real
+      if (!otsDelAviso.length) {
+        nuevasColumnas[item.estado]?.items.push({
           ...item,
+          _estadoReal: item.estado,
           _estadoOriginal: item.estado,
-          _estadoReal: columnaDestino,
-          _tieneOTs: true,
-          _esParcial: esParcial,
-          _equiposPendientes: equiposPendientes,
-          _cantidadOTs: otsDelAviso.length,
-          _desglose: {
-            total: otsDelAviso.length,
-            porEstado,
-            equiposConOT: cantidadEquiposConOT,
-            equiposTotales: totalEquiposAviso,
-            esMultiple: otsDelAviso.length > 1
-          }
+          _tieneOTs: false,
+          _esParcial: false,
+          _equiposPendientes: 0,
+          _cantidadOTs: 0,
+          _desglose: null,
+        });
+        return;
+      }
+
+      // Targets cubiertos por las OTs
+      const targetsConOT = new Set();
+
+      otsDelAviso.forEach((ot) => {
+        (ot.equipos || []).forEach((targetOT) => {
+          const key = getTargetKey(targetOT);
+          if (key) targetsConOT.add(key);
         });
       });
+
+      const totalTargetsAviso = targetsAviso.size;
+      const cantidadTargetsConOT = targetsConOT.size;
+      const equiposPendientes = Math.max(0, totalTargetsAviso - cantidadTargetsConOT);
+
+      const estaCompleto =
+        totalTargetsAviso > 0 && cantidadTargetsConOT >= totalTargetsAviso;
+
+      const esParcial =
+        cantidadTargetsConOT > 0 && cantidadTargetsConOT < totalTargetsAviso;
+
+      const porEstado = {};
+      otsDelAviso.forEach((ot) => {
+        const estadoOT = ot.estado || "CREADO";
+        porEstado[estadoOT] = (porEstado[estadoOT] || 0) + 1;
+      });
+
+      // Si hay al menos una OT y cubre todos los targets => CON_OT
+      // Si hay OT parcial => TRATADO
+      // Si por alguna razón no se pudo calcular targets del aviso, al menos mostrar CON_OT
+      let columnaDestino = "TRATADO";
+
+      if (totalTargetsAviso === 0) {
+        columnaDestino = "CON_OT";
+      } else if (estaCompleto) {
+        columnaDestino = "CON_OT";
+      } else if (esParcial) {
+        columnaDestino = "TRATADO";
+      }
+
+      nuevasColumnas[columnaDestino]?.items.push({
+        ...item,
+        _estadoOriginal: item.estado,
+        _estadoReal: columnaDestino,
+        _tieneOTs: true,
+        _esParcial: esParcial,
+        _equiposPendientes: equiposPendientes,
+        _cantidadOTs: otsDelAviso.length,
+        _desglose: {
+          total: otsDelAviso.length,
+          porEstado,
+          equiposConOT: cantidadTargetsConOT,
+          equiposTotales: totalTargetsAviso,
+          esMultiple: otsDelAviso.length > 1,
+        },
+      });
     });
+  });
 
-    return nuevasColumnas;
-  };
-
+  return nuevasColumnas;
+};
   const columnasReorganizadas = reorganizarColumnasPorOTs(filteredColumns);
 
   return (
