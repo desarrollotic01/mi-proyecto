@@ -13,8 +13,8 @@ import PlanesMantenimiento from "./features/PlanMantenimiento/pages/planesManten
 import TrabajadoresPage from "./features/Trabajores/pages/TrabajadorPage";
 import MaintenanceGuides from "./features/GuiaMantenimiento/GuiaMantenimiento";
 import GuiasKanban from "./pages/GuiaMantenimientoKanban";
-// 1. Importa tu nuevo componente (ajusta la ruta según donde crees el archivo)
 import ListaLink from "./features/Equipo/ListaLink";
+
 function AppLayout() {
   return (
     <ProtectedRoute>
@@ -24,16 +24,17 @@ function AppLayout() {
     </ProtectedRoute>
   );
 }
+
 export default function App() {
   return (
     <Routes>
-      {/* --- RUTAS PÚBLICAS --- */}
       <Route path="/login" element={<Login />} />
 
-      {/* CORRECCIÓN: Se agrega la barra '/' antes de los ':' */}
+      {/* RUTAS PÚBLICAS */}
+      <Route path="/portal/cliente/:token" element={<ListaLink />} />
       <Route path="/visor-cliente/:token" element={<ListaLink />} />
 
-      {/* --- RUTAS PRIVADAS --- */}
+      {/* RUTAS PRIVADAS */}
       <Route path="/" element={<AppLayout />}>
         <Route index element={<Navigate to="Avisos" replace />} />
         <Route path="Avisos" element={<Mantenimiento />} />
@@ -44,10 +45,9 @@ export default function App() {
         <Route path="planes-mantenimiento" element={<PlanesMantenimiento />} />
         <Route path="trabajadores" element={<TrabajadoresPage />} />
         <Route path="guiaMantenimiento" element={<MaintenanceGuides />} />
-        <Route path="GuiasKanban" element={<GuiasKanban/>} />
+        <Route path="GuiasKanban" element={<GuiasKanban />} />
       </Route>
 
-      {/* DEFAULT */}
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   );
