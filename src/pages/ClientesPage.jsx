@@ -70,12 +70,38 @@ const handleActivarDesactivar = async (linkId) => {
   }
 };
 
-const copiarAlPortapapeles = (token) => {
+const copiarAlPortapapeles = async (token) => {
   const urlExterna = `${window.location.origin}/portal/cliente/${token}`;
-  navigator.clipboard.writeText(urlExterna);
-  alert(`¡Enlace copiado!\n\n${urlExterna}`);
-};
 
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(urlExterna);
+      alert(`¡Enlace copiado!\n\n${urlExterna}`);
+      return;
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = urlExterna;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    const ok = document.execCommand("copy");
+    document.body.removeChild(textArea);
+
+    if (ok) {
+      alert(`¡Enlace copiado!\n\n${urlExterna}`);
+    } else {
+      alert(`No se pudo copiar automáticamente.\n\nCopia este enlace:\n${urlExterna}`);
+    }
+  } catch (error) {
+    console.error("Error copiando al portapapeles:", error);
+    alert(`No se pudo copiar automáticamente.\n\nCopia este enlace:\n${urlExterna}`);
+  }
+};
 
   if (!isOpen) return null;
 
@@ -170,12 +196,12 @@ const copiarAlPortapapeles = (token) => {
   </button>
 )}
                     {link.activo && (
-                      <button
-                        onClick={() => copiarAlPortapapeles(link.token)}
-                        className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
-                      >
-                        <Copy size={16} /> Copiar
-                      </button>
+                     <button
+  onClick={() => copiarAlPortapapeles(link.token)}
+  className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+>
+  <Copy size={16} /> Copiar
+</button>
                     )}
                   </div>
                 </div>
