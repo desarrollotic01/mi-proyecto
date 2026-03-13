@@ -56,9 +56,8 @@ export default function UbicacionesTecnicasPage() {
     });
   }, [items, searchTerm]);
 
-  // 👇 CÁLCULO DE TOTALES PARA LOS CONTADORES
   const stats = useMemo(() => ({
-    total: filtered.length, // Total según el filtro
+    total: filtered.length,
     paises: new Set(filtered.map(u => u.paisId).filter(Boolean)).size,
     vendidos: filtered.filter(u => String(u.tipoEquipoPropiedad).toLowerCase() === "vendido").length
   }), [filtered]);
@@ -83,52 +82,57 @@ export default function UbicacionesTecnicasPage() {
   if (loading && items.length === 0) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-3 font-sans text-slate-900">
-      <div className="max-w-full mx-auto space-y-3">
+    // 1. Padding responsivo en el contenedor principal (p-3 en móvil, p-6 en PC)
+    <div className="min-h-screen bg-[#f8fafc] p-3 sm:p-6 font-sans text-slate-800 w-full overflow-x-hidden">
+      <div className="max-w-[1600px] mx-auto space-y-4 sm:space-y-5">
         
-        {/* Header Compacto */}
-        <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-          <h1 className="text-base font-black text-slate-800 flex items-center gap-2">
-            <MapPin size={18} className="text-blue-600"/> Gestión de Activos
+        {/* 2. Header Responsivo: Se apila en móvil (flex-col) y se alinea en PC (sm:flex-row) */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white px-4 sm:px-6 py-4 rounded-2xl border border-slate-200 shadow-sm gap-4">
+          <h1 className="text-[16px] sm:text-[17px] font-black text-slate-800 flex items-center gap-2.5 tracking-tight w-full sm:w-auto">
+            <MapPin size={20} className="text-blue-600 stroke-[2.5] shrink-0"/> Gestión de Activos
           </h1>
-          <div className="flex gap-2">
-             <button onClick={loadAllData} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/></button>
-             <button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-[11px] font-black flex items-center gap-1.5 shadow-md shadow-blue-200 transition-all">
-               <Plus size={14} strokeWidth={3}/> NUEVO REGISTRO
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+             <button onClick={loadAllData} className="p-2 sm:p-2.5 text-slate-400 hover:text-blue-600 transition-colors border border-transparent hover:border-slate-200 rounded-lg bg-slate-50 hover:bg-white shrink-0">
+               <RefreshCw size={18} className={loading ? "animate-spin" : ""}/>
+             </button>
+             <button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-blue-600 text-white px-4 sm:px-5 py-2.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 hover:bg-blue-700 transition-all uppercase tracking-wider flex-1 sm:flex-none">
+               <Plus size={16} strokeWidth={3} className="shrink-0"/> 
+               <span className="hidden sm:inline">NUEVO REGISTRO</span>
+               <span className="sm:hidden">NUEVO</span>
              </button>
           </div>
         </div>
 
-        {/* 👇 SECCIÓN DE CONTADORES (TOTALES) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <StatCard icon={Package} label="Total Activos" value={stats.total} color="blue" />
+        {/* 3. Contadores: Grid responsivo, 1 columna móvil, 3 en PC */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-5">
+          <StatCard icon={Box} label="Total Activos" value={stats.total} color="blue" />
           <StatCard icon={Globe} label="Países Activos" value={stats.paises} color="indigo" />
           <StatCard icon={Zap} label="Equipos Vendidos" value={stats.vendidos} color="emerald" />
         </div>
 
-        {/* Buscador Slim */}
+        {/* Buscador */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input 
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} 
-            placeholder="Buscar identificación, nombre, placa, especialidad..." 
-            className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-xs outline-none focus:border-blue-500 bg-white shadow-sm transition-all"
+            placeholder="Buscar identificación, nombre, placa..." 
+            className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-[12px] font-medium outline-none focus:border-blue-500 bg-white shadow-sm transition-all text-slate-700 placeholder:text-slate-400"
           />
         </div>
 
-        {/* Tabla Compacta con Nombres de Campo */}
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[10px] border-collapse">
+        {/* 4. TABLA RESPONSIVA: overflow-x-auto + min-w-[1024px] */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm w-full overflow-hidden">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left text-[11px] border-collapse min-w-[1024px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-tighter">
-                  <th className="px-3 py-2 w-8 text-center italic">#</th>
-                  <th className="px-3 py-2">Identificación</th>
-                  <th className="px-3 py-2">Datos del Equipo</th>
-                  <th className="px-3 py-2">Cliente / Ubicación</th>
-                  <th className="px-3 py-2">Logística</th>
-                  <th className="px-3 py-2">Comercial / Fechas</th>
-                  <th className="px-3 py-2 text-right">Acciones</th>
+                <tr className="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-black uppercase tracking-widest text-[9px]">
+                  <th className="px-4 py-4 w-10 text-center">#</th>
+                  <th className="px-4 py-4">Identificación</th>
+                  <th className="px-4 py-4">Datos del Equipo</th>
+                  <th className="px-4 py-4">Cliente / Ubicación</th>
+                  <th className="px-4 py-4">Logística</th>
+                  <th className="px-4 py-4">Comercial / Fechas</th>
+                  <th className="px-4 py-4 text-right pr-6">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -136,67 +140,72 @@ export default function UbicacionesTecnicasPage() {
                   const cli = clientes.find(c => String(c.id) === String(item.clienteId));
                   const pFound = paises.find(p => String(p.id) === String(item.paisId));
                   return (
-                    <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                      <td className="px-2 py-3 text-center text-slate-300 font-mono text-[9px]">{idx + 1}</td>
+                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                      <td className="px-4 py-5 text-center text-slate-300 font-mono text-[10px] align-top pt-6">{idx + 1}</td>
 
                       {/* IDENTIFICACIÓN */}
-                      <td className="px-3 py-3 align-top">
-                        <div className="flex flex-col gap-1">
-                          <div><span className="font-bold text-slate-400 uppercase">CÓDIGO:</span> <span className="font-black text-blue-700">{val(item.codigo)}</span></div>
-                          <div><span className="font-bold text-slate-400 uppercase">PLACA:</span> <span className="text-slate-700 font-bold">{val(item.idPlaca)}</span></div>
-                          <div><span className="font-bold text-slate-400 uppercase">PROPIEDAD:</span> <span className="text-slate-600 uppercase font-medium">{val(item.tipoEquipoPropiedad)}</span></div>
+                      <td className="px-4 py-5 align-top">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="text-[10px]"><span className="font-bold text-slate-400">CÓDIGO:</span> <span className="font-black text-blue-600 text-[11px] ml-1">{val(item.codigo)}</span></div>
+                          <div className="text-[10px]"><span className="font-bold text-slate-400">PLACA:</span> <span className="text-slate-700 font-bold ml-1">{val(item.idPlaca)}</span></div>
+                          <div className="text-[10px]"><span className="font-bold text-slate-400">PROPIEDAD:</span> <span className="text-slate-700 font-bold ml-1 uppercase">{val(item.tipoEquipoPropiedad)}</span></div>
                         </div>
                       </td>
 
                       {/* DATOS DEL EQUIPO */}
-                      <td className="px-3 py-3 align-top max-w-[180px]">
-                        <div className="flex flex-col gap-1">
-                          <div className="font-black text-slate-800 uppercase text-[11px] mb-1 leading-none">{val(item.nombre)}</div>
-                          <div><span className="font-bold text-slate-400 uppercase">ESPEC:</span> <span className="text-indigo-600 font-bold">{val(item.especialidad)}</span></div>
-                          <div className="mt-1"><span className="font-bold text-slate-400 uppercase">DESC:</span> <span className="text-slate-500 italic line-clamp-2">{val(item.descripcion)}</span></div>
+                      <td className="px-4 py-5 align-top max-w-[220px]">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="font-black text-slate-800 uppercase text-[11px] mb-0.5 leading-tight whitespace-normal">{val(item.nombre)}</div>
+                          <div className="text-[10px]"><span className="font-bold text-slate-400">ESPEC:</span> <span className="text-blue-600 font-bold ml-1">{val(item.especialidad)}</span></div>
+                          <div className="text-[10px] mt-0.5 flex">
+                             <span className="font-bold text-slate-400 mr-1">DESC:</span> 
+                             <span className="text-slate-500 italic line-clamp-2 leading-tight flex-1">{val(item.descripcion)}</span>
+                          </div>
                         </div>
                       </td>
 
                       {/* CLIENTE / UBICACIÓN */}
-                      <td className="px-3 py-3 align-top">
-                        <div className="flex flex-col gap-1">
-                          <div className="font-black text-slate-700 uppercase leading-tight truncate max-w-[150px]">{cli?.nombre || cli?.razonSocial || "Sin Cliente"}</div>
-                          <div><span className="font-bold text-slate-400 uppercase">ID_CLI:</span> {val(item.id_cliente)}</div>
-                          <div><span className="font-bold text-slate-400 uppercase">SEDE:</span> {val(item.sede)}</div>
-                          <div><span className="font-bold text-slate-400 uppercase">PAÍS:</span> {pFound?.nombre || "-"}</div>
+                      <td className="px-4 py-5 align-top max-w-[220px]">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="font-black text-slate-800 uppercase leading-tight truncate mb-0.5">{cli?.nombre || cli?.razonSocial || "Sin Cliente"}</div>
+                          <div className="text-[10px]"><span className="font-bold text-slate-400">ID_CLI:</span> <span className="text-slate-700 font-bold ml-1">{val(item.id_cliente)}</span></div>
+                          <div className="text-[10px]"><span className="font-bold text-slate-400">SEDE:</span> <span className="text-slate-700 font-bold ml-1">{val(item.sede)}</span></div>
+                          <div className="text-[10px]"><span className="font-bold text-slate-400">PAÍS:</span> <span className="text-slate-700 font-bold ml-1">{pFound?.nombre || "-"}</span></div>
                         </div>
                       </td>
 
                       {/* LOGÍSTICA */}
-                      <td className="px-3 py-3 align-top">
-                        <div className="flex flex-col gap-1">
-                          <div><span className="font-bold text-slate-400 uppercase">ALMACÉN:</span> <span className="font-bold text-slate-800">{val(item.almacen)}</span></div>
-                          <div><span className="font-bold text-slate-400 uppercase">OPERADOR:</span> <span className="font-bold text-slate-800">{val(item.operadorLogistico)}</span></div>
+                      <td className="px-4 py-5 align-top">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="text-[10px]"><span className="font-bold text-slate-400">ALMACÉN:</span> <span className="font-bold text-slate-700 ml-1">{val(item.almacen)}</span></div>
+                          <div className="text-[10px]"><span className="font-bold text-slate-400">OPERADOR:</span> <span className="font-bold text-slate-700 ml-1">{val(item.operadorLogistico)}</span></div>
                         </div>
                       </td>
 
                       {/* COMERCIAL / FECHAS */}
-                      <td className="px-3 py-3 align-top min-w-[200px]">
-                        <div className="grid grid-cols-1 gap-1">
-                          <div className="flex gap-2">
-                            <div><span className="font-bold text-slate-400 uppercase">OV:</span> <span className="font-black text-slate-700">{val(item.numeroOV)}</span> <span className="text-[8px] text-slate-400">({fmtDate(item.fechaOV)})</span></div>
-                            <div><span className="font-bold text-slate-400 uppercase">OC:</span> <span className="text-slate-700 font-medium">{val(item.numeroOrdenCliente)}</span> <span className="text-[8px] text-slate-400">({fmtDate(item.fechaOrdenCliente)})</span></div>
+                      <td className="px-4 py-5 align-top min-w-[280px]">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-4">
+                            <div className="text-[10px]"><span className="font-bold text-slate-400">OV:</span> <span className="font-black text-slate-800 ml-1">{val(item.numeroOV)}</span> <span className="text-[9px] text-slate-400 italic ml-1">({fmtDate(item.fechaOV)})</span></div>
+                            <div className="text-[10px]"><span className="font-bold text-slate-400">OC:</span> <span className="font-bold text-slate-700 ml-1">{val(item.numeroOrdenCliente)}</span> <span className="text-[9px] text-slate-400 italic ml-1">({fmtDate(item.fechaOrdenCliente)})</span></div>
                           </div>
-                          <div className="h-[1px] bg-slate-100 my-0.5" />
-                          <div><span className="font-bold text-slate-400 uppercase">ENTREGA:</span> <span className="text-slate-700 font-bold">{fmtDate(item.fechaEntregaReal)}</span> <span className="text-slate-400 text-[9px] italic ml-1">(Prev: {fmtDate(item.fechaEntregaPrevista)})</span></div>
-                          <div><span className="font-bold text-slate-400 uppercase">GARANTÍA:</span> <span className="text-emerald-600 font-black">{fmtDate(item.finGarantia)}</span></div>
+                          <div className="flex flex-col gap-1 mt-1">
+                             <div className="text-[10px]"><span className="font-bold text-slate-400">ENTREGA:</span> <span className="text-slate-800 font-black text-[11px] ml-1">{fmtDate(item.fechaEntregaReal)}</span> <span className="text-slate-400 text-[9px] italic ml-1">(Prev: {fmtDate(item.fechaEntregaPrevista)})</span></div>
+                             <div className="text-[10px]"><span className="font-bold text-slate-400">GARANTÍA:</span> <span className="text-emerald-600 font-black text-[11px] ml-1">{fmtDate(item.finGarantia)}</span></div>
+                          </div>
                         </div>
                       </td>
 
                       {/* ACCIONES */}
-                      <td className="px-3 py-3 align-middle text-right">
-                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setEditing(item); setModalOpen(true); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-all"><Edit2 size={13}/></button>
-                          <button onClick={() => handleDelete(item.id)} disabled={busyId === item.id} className="p-1.5 text-red-500 hover:bg-red-50 rounded border border-transparent hover:border-red-100 transition-all">
-                            {busyId === item.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                      <td className="px-4 py-5 align-middle text-right pr-6">
+                        <div className="flex justify-end gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => { setEditing(item); setModalOpen(true); }} className="p-2 sm:p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors bg-blue-50/50 sm:bg-transparent"><Edit2 size={16}/></button>
+                          <button onClick={() => handleDelete(item.id)} disabled={busyId === item.id} className="p-2 sm:p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors bg-red-50/50 sm:bg-transparent">
+                            {busyId === item.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                           </button>
                         </div>
                       </td>
+
                     </tr>
                   );
                 })}
@@ -211,19 +220,19 @@ export default function UbicacionesTecnicasPage() {
   );
 }
 
-// 👇 COMPONENTE PARA LAS TARJETAS DE ESTADÍSTICAS (STAT CARDS)
+// 5. StatCard adaptado para móviles (menos padding)
 function StatCard({ icon: Icon, label, value, color }) {
   const colors = { 
-    blue: "bg-blue-50 text-blue-600", 
-    emerald: "bg-emerald-50 text-emerald-600", 
-    indigo: "bg-indigo-50 text-indigo-600" 
+    blue: "text-blue-600 bg-blue-50", 
+    emerald: "text-emerald-600 bg-emerald-50", 
+    indigo: "text-indigo-600 bg-indigo-50" 
   };
   return (
-    <div className="bg-white rounded-lg p-3 border border-slate-200 flex items-center gap-3 transition-all hover:border-blue-300 shadow-sm">
-      <div className={`p-2 rounded-md ${colors[color]}`}><Icon size={18} strokeWidth={2.5} /></div>
-      <div>
-        <p className="text-xl font-black text-slate-800 leading-none">{value}</p>
-        <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 tracking-widest">{label}</p>
+    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 flex items-center gap-3 sm:gap-4 shadow-sm w-full">
+      <div className={`p-3 sm:p-3.5 rounded-xl shrink-0 ${colors[color]}`}><Icon size={20} className="sm:w-6 sm:h-6" strokeWidth={2.5} /></div>
+      <div className="flex flex-col gap-0.5 sm:gap-1 overflow-hidden">
+        <p className="text-xl sm:text-2xl font-black text-slate-800 leading-none truncate">{value}</p>
+        <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none truncate">{label}</p>
       </div>
     </div>
   );
