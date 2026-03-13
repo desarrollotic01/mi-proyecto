@@ -12,6 +12,9 @@ import {
   ClipboardList,
 } from "lucide-react";
 
+import { itemService } from "../../features/PlanMantenimiento/services/itemService";
+import { rubroService } from "../../features/PlanMantenimiento/services/rubroService";
+
 /* ══════════════════════════════════════════
    HELPERS
 ══════════════════════════════════════════ */
@@ -23,6 +26,7 @@ const ensureId = () =>
 
 const emptyLinea = () => ({
   id: ensureId(),
+  itemId: "",
   itemCode: "",
   description: "",
   quantity: 1,
@@ -30,6 +34,7 @@ const emptyLinea = () => ({
   costCenter: "",
   projectCode: "",
   rubro: "",
+  rubroSapCode: "",
   paqueteTrabajo: "",
 });
 
@@ -93,7 +98,7 @@ const getTargetTypeLabel = (type) =>
    SUB-COMPONENTE: FORMULARIO DE SOLICITUD
 ══════════════════════════════════════════ */
 
-function FormSolicitud({ data, onChange }) {
+function FormSolicitud({ data, onChange, items = [], rubros = [], loadingCatalogos = false }) {
   const set = (field, value) => onChange({ ...data, [field]: value });
 
   const updateLinea = (id, field, value) =>
@@ -109,6 +114,57 @@ function FormSolicitud({ data, onChange }) {
       "lineas",
       data.lineas.filter((l) => l.id !== id)
     );
+
+  const handleSelectItem = (lineaId, selectedItemId) => {
+    const itemSeleccionado = items.find((i) => String(i.id) === String(selectedItemId));
+
+    if (!itemSeleccionado) {
+      updateLinea(lineaId, "itemId", "");
+      updateLinea(lineaId, "itemCode", "");
+      updateLinea(lineaId, "description", "");
+      updateLinea(lineaId, "rubroSapCode", "");
+      updateLinea(lineaId, "rubro", "");
+      return;
+    }
+
+    set(
+      "lineas",
+      data.lineas.map((l) => {
+        if (l.id !== lineaId) return l;
+
+        return {
+          ...l,
+          itemId: itemSeleccionado.id || "",
+          itemCode: itemSeleccionado.sapCode || "",
+          description: itemSeleccionado.nombre || "",
+          rubroSapCode: itemSeleccionado.rubroSapCode ?? "",
+          rubro:
+            itemSeleccionado.rubro?.nombre ||
+            itemSeleccionado.rubroNombre ||
+            "",
+        };
+      })
+    );
+  };
+
+  const handleSelectRubro = (lineaId, selectedSapCode) => {
+    const rubroSeleccionado = rubros.find(
+      (r) => String(r.sapCode) === String(selectedSapCode)
+    );
+
+    set(
+      "lineas",
+      data.lineas.map((l) => {
+        if (l.id !== lineaId) return l;
+
+        return {
+          ...l,
+          rubroSapCode: rubroSeleccionado?.sapCode ?? "",
+          rubro: rubroSeleccionado?.nombre || "",
+        };
+      })
+    );
+  };
 
   return (
     <div className="space-y-5">
@@ -184,14 +240,33 @@ function FormSolicitud({ data, onChange }) {
               key={l.id}
               className="grid grid-cols-12 gap-2 items-end bg-gray-50 border rounded-xl p-3"
             >
+              <div className="col-span-3">
+                <p className="text-xs text-gray-500 mb-1">Ítem *</p>
+                <select
+                  className="w-full px-2 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400 bg-white"
+                  value={l.itemId || ""}
+                  onChange={(e) => handleSelectItem(l.id, e.target.value)}
+                  disabled={loadingCatalogos}
+                >
+                  <option value="">
+                    {loadingCatalogos ? "Cargando items..." : "Seleccione un ítem"}
+                  </option>
+                  {items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.sapCode} - {item.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="col-span-2">
                 <p className="text-xs text-gray-500 mb-1">Código *</p>
                 <input
                   type="text"
                   placeholder="MAT-001"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
+                  className="w-full px-2 py-1.5 border rounded-lg text-sm bg-gray-100 focus:outline-none"
                   value={l.itemCode}
-                  onChange={(e) => updateLinea(l.id, "itemCode", e.target.value)}
+                  readOnly
                 />
               </div>
 
@@ -234,8 +309,8 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              <div className="col-span-1">
-                <p className="text-xs text-gray-500 mb-1">C. Costo</p>
+              <div className="col-span-2">
+                <p className="text-xs text-gray-500 mb-1">Centro de costo</p>
                 <input
                   type="text"
                   placeholder="CC-001"
@@ -247,7 +322,7 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              <div className="col-span-1">
+              <div className="col-span-2">
                 <p className="text-xs text-gray-500 mb-1">Proyecto</p>
                 <input
                   type="text"
@@ -260,22 +335,30 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              <div className="col-span-1">
+              <div className="col-span-2">
                 <p className="text-xs text-gray-500 mb-1">Rubro</p>
-                <input
-                  type="text"
-                  placeholder="Ej: Electricidad"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
-                  value={l.rubro || ""}
-                  onChange={(e) => updateLinea(l.id, "rubro", e.target.value)}
-                />
+                <select
+                  className="w-full px-2 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400 bg-white"
+                  value={l.rubroSapCode || ""}
+                  onChange={(e) => handleSelectRubro(l.id, e.target.value)}
+                  disabled={loadingCatalogos}
+                >
+                  <option value="">
+                    {loadingCatalogos ? "Cargando rubros..." : "Seleccione rubro"}
+                  </option>
+                  {rubros.map((rubro) => (
+                    <option key={rubro.id} value={rubro.sapCode}>
+                      {rubro.nombre}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="col-span-1">
                 <p className="text-xs text-gray-500 mb-1">Paquete</p>
                 <input
                   type="text"
-                  placeholder="Ej: PT-001"
+                  placeholder="PT-001"
                   className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
                   value={l.paqueteTrabajo || ""}
                   onChange={(e) =>
@@ -284,25 +367,28 @@ function FormSolicitud({ data, onChange }) {
                 />
               </div>
 
-              <div className="col-span-1 flex gap-1">
+              <div className="col-span-12 flex justify-end gap-2">
                 {data.lineas.length > 1 && (
                   <button
                     type="button"
                     onClick={() => removeLinea(l.id)}
-                    className="flex-1 py-1.5 bg-red-50 border border-red-200 text-red-500 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center"
+                    className="px-3 py-2 bg-red-50 border border-red-200 text-red-500 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-1"
                     title="Eliminar línea"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
+                    Eliminar
                   </button>
                 )}
+
                 {idx === data.lineas.length - 1 && (
                   <button
                     type="button"
                     onClick={addLinea}
-                    className="flex-1 py-1.5 bg-green-50 border border-green-200 text-green-600 rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center"
+                    className="px-3 py-2 bg-green-50 border border-green-200 text-green-600 rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-1"
                     title="Agregar línea"
                   >
                     <Plus className="w-3.5 h-3.5" />
+                    Agregar línea
                   </button>
                 )}
               </div>
@@ -331,6 +417,9 @@ export default function ModalSolicitudCompra({
   const [tab, setTab] = useState("general");
   const [general, setGeneral] = useState(emptyForm());
   const [porTarget, setPorTarget] = useState({});
+  const [items, setItems] = useState([]);
+  const [rubros, setRubros] = useState([]);
+  const [loadingCatalogos, setLoadingCatalogos] = useState(false);
 
   const normalizedTargets = useMemo(() => {
     if (Array.isArray(targets) && targets.length > 0) {
@@ -356,7 +445,10 @@ export default function ModalSolicitudCompra({
 
     const fallbackUbicaciones = (ubicacionesRelacion || []).map((rel) => {
       const id = String(
-        rel.ubicacionId || rel.ubicacionTecnicaId || rel?.ubicacion?.id || rel?.ubicacionTecnica?.id
+        rel.ubicacionId ||
+          rel.ubicacionTecnicaId ||
+          rel?.ubicacion?.id ||
+          rel?.ubicacionTecnica?.id
       );
 
       return {
@@ -377,6 +469,32 @@ export default function ModalSolicitudCompra({
 
     return [...fallbackEquipos, ...fallbackUbicaciones];
   }, [targets, equiposRelacion, ubicacionesRelacion, equiposInfo]);
+
+  useEffect(() => {
+    const cargarCatalogos = async () => {
+      try {
+        setLoadingCatalogos(true);
+
+        const [itemsData, rubrosData] = await Promise.all([
+          itemService.getAll(),
+          rubroService.getAll(),
+        ]);
+
+        setItems(Array.isArray(itemsData) ? itemsData : []);
+        setRubros(Array.isArray(rubrosData) ? rubrosData : []);
+      } catch (error) {
+        console.error("Error cargando catálogos de solicitud de compra:", error);
+        setItems([]);
+        setRubros([]);
+      } finally {
+        setLoadingCatalogos(false);
+      }
+    };
+
+    if (isOpen) {
+      cargarCatalogos();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -417,12 +535,28 @@ export default function ModalSolicitudCompra({
     normalizedTargets.forEach((target) => {
       const key = String(target.id);
       const f = porTarget[key];
+
       if (!isSolicitudVacia(f)) {
-        solicitudesPorEquipo[key] = f;
+        solicitudesPorEquipo[key] = {
+          ...f,
+          lineas: (f.lineas || []).map((linea) => ({
+            ...linea,
+            costingCode: linea.costCenter || "",
+          })),
+        };
       }
     });
 
-    onConfirm({ solicitudGeneral: general, solicitudesPorEquipo });
+    onConfirm({
+      solicitudGeneral: {
+        ...general,
+        lineas: (general.lineas || []).map((linea) => ({
+          ...linea,
+          costingCode: linea.costCenter || "",
+        })),
+      },
+      solicitudesPorEquipo,
+    });
   };
 
   const tabs = [
@@ -437,7 +571,9 @@ export default function ModalSolicitudCompra({
   ];
 
   const currentData =
-    tab === "general" ? general : porTarget[String(tab)] || normalizeForm(emptyForm());
+    tab === "general"
+      ? general
+      : porTarget[String(tab)] || normalizeForm(emptyForm());
 
   const currentSetFn =
     tab === "general" ? setGeneral : (form) => updateTargetForm(String(tab), form);
@@ -450,7 +586,7 @@ export default function ModalSolicitudCompra({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-5xl rounded-2xl flex flex-col max-h-[92vh] shadow-2xl">
+      <div className="bg-white w-full max-w-6xl rounded-2xl flex flex-col max-h-[92vh] shadow-2xl">
         <div className="p-6 border-b bg-gradient-to-r from-green-50 to-emerald-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-green-600 rounded-xl">
@@ -626,7 +762,13 @@ export default function ModalSolicitudCompra({
             </div>
 
             <div className="p-6">
-              <FormSolicitud data={currentData} onChange={currentSetFn} />
+              <FormSolicitud
+                data={currentData}
+                onChange={currentSetFn}
+                items={items}
+                rubros={rubros}
+                loadingCatalogos={loadingCatalogos}
+              />
             </div>
           </div>
         </div>

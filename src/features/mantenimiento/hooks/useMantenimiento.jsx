@@ -5,6 +5,8 @@ import {
   obtenerAvisos,
   crearAviso,
   actualizarEstadoAviso,
+  obtenerAvisosOrigenManual,
+  obtenerAvisosOrigenGuia,
 } from "../services/avisoServices";
 import { getAllOrdenesTrabajo } from "../services/ordenTrabajoService";
 
@@ -202,26 +204,36 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
   };
 
   /* ================= LOAD AVISOS ================= */
-  const cargarAvisos = async () => {
-    const avisos = await obtenerAvisos();
+ const cargarAvisos = async () => {
+  try {
+    const response = await obtenerAvisosOrigenManual();
+    const avisos = Array.isArray(response) ? response : [];
 
     const cols = Object.keys(ESTADOS_AV).reduce((acc, k) => {
       acc[k] = { name: ESTADOS_AV[k].label, items: [] };
       return acc;
     }, {});
 
-    // 🔄 TRANSFORMAR AVISOS antes de organizar en columnas
     avisos.forEach((aviso) => {
       const key = ESTADO_KEY_MAP[aviso.estadoAviso];
       if (!key) return;
-      
-      // Transformar el aviso y agregarlo a la columna correspondiente
+
       const avisoTransformado = transformarAviso(aviso);
       cols[key].items.push({ ...avisoTransformado, estado: key });
     });
 
     setColumns(cols);
-  };
+  } catch (error) {
+    console.error("Error cargando avisos:", error);
+
+    const cols = Object.keys(ESTADOS_AV).reduce((acc, k) => {
+      acc[k] = { name: ESTADOS_AV[k].label, items: [] };
+      return acc;
+    }, {});
+
+    setColumns(cols);
+  }
+};
 
   useEffect(() => {
     cargarAvisos();

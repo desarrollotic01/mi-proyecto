@@ -31,6 +31,16 @@ export const obtenerAvisos = async () => {
 };
 
 
+export const obtenerAvisosOrigenManual = async () => {
+  const response = await api.get("/avisos/origen/manual");
+  return Array.isArray(response.data?.data) ? response.data.data : [];
+};
+
+export const obtenerAvisosOrigenGuia = async () => {
+  const response = await api.get("/avisos/origen/guia");
+  return Array.isArray(response.data?.data) ? response.data.data : [];
+};
+
 export const crearAviso = async (payload) => {
   const { data } = await api.post("/avisos", payload);
   return normalizarAviso(data);
