@@ -42,10 +42,18 @@ const emptyForm = () => ({
   planesMantenimientoIds: [],
 });
 
+
+// para seleccion de
 const normalizeDate = (v) => (v ? v : null);
 const normalizeStr = (v) => {
   const s = String(v ?? "").trim();
   return s === "" ? null : s;
+};
+
+const extractDate = (dateStr) => {
+  if (!dateStr) return "";
+  // Corta el string para quedarse solo con la fecha "YYYY-MM-DD", ignorando las horas
+  return String(dateStr).split('T')[0];
 };
 
 export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initialData }) {
@@ -72,7 +80,8 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
     setError(null);
 
     if (initialData) {
-      // INTENTO 1: Buscar si los planes ya venían en la tabla (como objetos o IDs)
+
+      console.log("Datos exactos que llegan al editar:", initialData);
       const planesRaw = initialData.planes || initialData.planesMantenimiento || initialData.Planes || [];
       const idsRaw = initialData.planesIds || initialData.planesMantenimientoIds || [];
 
@@ -86,25 +95,31 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
       setForm({
         ...emptyForm(),
         ...initialData,
-        ClienteId: initialData.ClienteId || initialData.clienteId || initialData?.cliente?.id || "",
-        paisId: initialData.paisId || initialData?.pais?.id || "",
-        planesMantenimientoIds: idsIniciales, // Ponemos lo que hayamos encontrado de inicio
-        codigo: String(initialData.codigo ?? ""),
-        nombre: String(initialData.nombre ?? ""),
-        numeroOV: String(initialData.numeroOV ?? ""),
-        id_cliente: String(initialData.id_cliente ?? ""),
-        sede: String(initialData.sede ?? ""),
-        almacen: String(initialData.almacen ?? ""),
-        operadorLogistico: String(initialData.operadorLogistico ?? ""),
-        idPlaca: String(initialData.idPlaca ?? ""),
-        numeroOrdenCliente: String(initialData.numeroOrdenCliente ?? ""),
-        descripcion: String(initialData.descripcion ?? ""),
-        especialidad: String(initialData.especialidad ?? ""),
-        fechaOV: initialData.fechaOV ?? "",
-        fechaOrdenCliente: initialData.fechaOrdenCliente ?? "",
-        fechaEntregaPrevista: initialData.fechaEntregaPrevista ?? "",
-        fechaEntregaReal: initialData.fechaEntregaReal ?? "",
-        finGarantia: initialData.finGarantia ?? "",
+
+        // 🛠️ FORZAMOS A STRING PARA QUE LOS SELECTS COINCIDAN
+        ClienteId: String(initialData.ClienteId || initialData.clienteId || initialData?.cliente?.id || ""),
+        paisId: String(initialData.paisId || initialData?.pais?.id || ""),
+        planesMantenimientoIds: idsIniciales,
+
+        // 🛠️ LIMPIAMOS NULOS EN TEXTOS
+        codigo: String(initialData.codigo || ""),
+        nombre: String(initialData.nombre || ""),
+        numeroOV: String(initialData.numeroOV || ""),
+        id_cliente: String(initialData.id_cliente || ""),
+        sede: String(initialData.sede || ""),
+        almacen: String(initialData.almacen || ""),
+        operadorLogistico: String(initialData.operadorLogistico || ""),
+        idPlaca: String(initialData.idPlaca || ""),
+        numeroOrdenCliente: String(initialData.numeroOrdenCliente || ""),
+        descripcion: String(initialData.descripcion || ""),
+        especialidad: String(initialData.especialidad || ""),
+
+        // 🛠️ APLICAMOS EL EXTRACTOR A LAS FECHAS
+        fechaOV: extractDate(initialData.fechaOV),
+        fechaOrdenCliente: extractDate(initialData.fechaOrdenCliente),
+        fechaEntregaPrevista: extractDate(initialData.fechaEntregaPrevista),
+        fechaEntregaReal: extractDate(initialData.fechaEntregaReal),
+        finGarantia: extractDate(initialData.finGarantia),
       });
     } else {
       setForm(emptyForm());
@@ -149,11 +164,11 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
           planMantenimientoService.getAll?.() ?? planMantenimientoService.getPlanes?.() ?? []
         ]);
 
-        setPaises(Array.isArray(p) ? p : []);
-        setClientes(Array.isArray(c) ? c : []);
+   setPaises(Array.isArray(p) ? p : (p?.data || []));
+      setClientes(Array.isArray(c) ? c : (c?.data || []));
 
-        const planesData = Array.isArray(pl) ? pl : (pl?.data || []);
-        setPlanesDisponibles(planesData.filter(plan => plan.activo !== false));
+      const planesData = Array.isArray(pl) ? pl : (pl?.data || []);
+      setPlanesDisponibles(planesData.filter(plan => plan.activo !== false));
 
       } catch (err) {
         console.error("Error cargando combos:", err);
@@ -289,8 +304,8 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-5 py-3.5 text-sm font-bold transition-all border-b-[3px] whitespace-nowrap ${isSelected
-                      ? "border-blue-600 text-blue-700 bg-white rounded-t-xl"
-                      : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                    ? "border-blue-600 text-blue-700 bg-white rounded-t-xl"
+                    : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
                     }`}
                 >
                   <Icon size={18} strokeWidth={isSelected ? 2.5 : 2} />
@@ -328,9 +343,11 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                   </Field>
 
                   <Field label="Cliente" required className="md:col-span-2">
-                    <select value={form.ClienteId} onChange={update("ClienteId")} className={inputCls} disabled={loading || loadingCombos}>
+                    <select value={String(form.ClienteId)} onChange={update("ClienteId")} className={inputCls} disabled={loading || loadingCombos}>
                       <option value="">Seleccionar cliente...</option>
-                      {clientes.map((c) => (<option key={c.id} value={c.id}>{c.nombre || c.razonSocial}</option>))}
+                      {clientes.map((c) => (
+                        <option key={c.id} value={String(c.id)}>{c.nombre || c.razonSocial}</option>
+                      ))}
                     </select>
                   </Field>
 
@@ -365,10 +382,12 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
                   <Field label="País" required className="md:col-span-2 mt-2">
                     <div className="relative">
                       <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <select value={form.paisId} onChange={update("paisId")} className={`${inputCls} pl-12`} disabled={loading || loadingCombos}>
-                        <option value="">Seleccionar país...</option>
-                        {paises.map((p) => (<option key={p.id} value={p.id}>{p.nombre}</option>))}
-                      </select>
+                     <select value={String(form.paisId)} onChange={update("paisId")} className={`${inputCls} pl-12`} disabled={loading || loadingCombos}>
+  <option value="">Seleccionar país...</option>
+  {paises.map((p) => (
+    <option key={p.id} value={String(p.id)}>{p.nombre}</option>
+  ))}
+</select>
                     </div>
                   </Field>
 
@@ -525,8 +544,8 @@ function PropertyCard({ active, onClick, icon, label }) {
     <div
       onClick={onClick}
       className={`flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border-2 cursor-pointer transition-all hover:-translate-y-1 ${active
-          ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-500/20"
-          : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"
+        ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-500/20"
+        : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"
         }`}
     >
       <div className={`p-3 rounded-xl ${active ? "bg-blue-600 text-white shadow-inner" : "bg-slate-50 text-slate-400"}`}>

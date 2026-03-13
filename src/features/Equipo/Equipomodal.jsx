@@ -1,6 +1,21 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Loader2, AlertCircle, Calendar, Package, User, MapPin, Wrench, Plus, ShoppingCart, Building2, Globe, CheckCircle2, Search, Image as ImageIcon, UploadCloud } from "lucide-react";
+import { 
+  X, Loader2, AlertCircle, Calendar, Package, User, MapPin, 
+  Wrench, Plus, ShoppingCart, Building2, Globe, CheckCircle2, 
+  Search, Image as ImageIcon, UploadCloud 
+} from "lucide-react";
 import { planMantenimientoService } from "../PlanMantenimiento/services/planMantenimientoService";
+
+// 👇 AYUDANTES PARA LIMPIAR DATOS Y EVITAR ERRORES
+const normalizeStr = (v) => {
+  const s = String(v ?? "").trim();
+  return s === "" ? null : s;
+};
+
+const extractDate = (dateStr) => {
+  if (!dateStr) return "";
+  return String(dateStr).split('T')[0];
+};
 
 export default function EquipoModal({ isOpen, onClose, onSave, initialData, clientes = [], familias = [], paises = [] }) {
 
@@ -40,8 +55,11 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("general");
+  
+  // 👇 ESTADOS PARA LA NUEVA FAMILIA
   const [showNewFamilia, setShowNewFamilia] = useState(false);
   const [newFamilia, setNewFamilia] = useState({ nombre: "", descripcion: "" });
+  
   const [planes, setPlanes] = useState([]);
   const [loadingPlanes, setLoadingPlanes] = useState(false);
   const [busquedaPlan, setBusquedaPlan] = useState("");
@@ -74,7 +92,6 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
     if (!isOpen) return;
 
     if (initialData) {
-      // EXTRACCIÓN CORRECTA DE UUIDs COMO TEXTO
       const planesAsignados = initialData.planesMantenimiento || initialData.planes || [];
       const idsExtraidos = planesAsignados.length > 0 
         ? planesAsignados.map(p => String(p.id)) 
@@ -83,11 +100,18 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
       setForm({
         ...DEFAULT_FORM,
         ...initialData,
-        // Aseguramos que clienteId y paisId se capturen sin importar cómo vengan
-        clienteId: initialData.clienteId || initialData.cliente?.id || "",
-        paisId: initialData.paisId || initialData.pais?.id || "",
-        familiaId: initialData.familiaId || initialData.familia?.id || "",
+        // Limpieza y forzado de Strings
+        clienteId: String(initialData.clienteId || initialData.cliente?.id || ""),
+        paisId: String(initialData.paisId || initialData.pais?.id || ""),
+        familiaId: String(initialData.familiaId || initialData.familia?.id || ""),
         planesMantenimientoIds: idsExtraidos,
+        
+        // Limpieza de Fechas
+        fechaOV: extractDate(initialData.fechaOV),
+        fechaOrdenCliente: extractDate(initialData.fechaOrdenCliente),
+        fechaEntregaPrevista: extractDate(initialData.fechaEntregaPrevista),
+        fechaEntregaReal: extractDate(initialData.fechaEntregaReal),
+        finGarantia: extractDate(initialData.finGarantia),
       });
     } else {
       setForm(DEFAULT_FORM);
@@ -120,18 +144,57 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
       return;
     }
 
+    // Validación si decide crear una familia nueva
+    if (showNewFamilia && !newFamilia.nombre.trim()) {
+      setError("Debes escribir el nombre de la nueva familia");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const dataToSave = {
-        ...form,
-        newFamilia: showNewFamilia && newFamilia.nombre ? newFamilia : null,
-        // Mantenemos los UUIDs tal cual como Strings
-        planesMantenimientoIds: form.planesMantenimientoIds, 
+      // CONSTRUIMOS EL PAYLOAD LIMPIO Y SEGURO
+      const payload = {
+        codigo: normalizeStr(form.codigo),
+        nombre: normalizeStr(form.nombre),
+        numeroOV: normalizeStr(form.numeroOV),
+        clienteId: normalizeStr(form.clienteId),
+        id_cliente: normalizeStr(form.id_cliente),
+        paisId: normalizeStr(form.paisId),
+        tipoEquipoPropiedad: normalizeStr(form.tipoEquipoPropiedad),
+        sede: normalizeStr(form.sede),
+        almacen: normalizeStr(form.almacen),
+        operadorLogistico: normalizeStr(form.operadorLogistico),
+        status: normalizeStr(form.status),
+        idPlaca: normalizeStr(form.idPlaca),
+        descripcion: normalizeStr(form.descripcion),
+        marca: normalizeStr(form.marca),
+        modelo: normalizeStr(form.modelo),
+        serie: normalizeStr(form.serie),
+        estado: normalizeStr(form.estado),
+        
+        // Si crea una nueva, enviamos null en familiaId
+        familiaId: showNewFamilia ? null : normalizeStr(form.familiaId), 
+        
+        tipoEquipo: normalizeStr(form.tipoEquipo),
+        linea: normalizeStr(form.linea),
+        lineaOtroTexto: normalizeStr(form.lineaOtroTexto),
+        creticidad: normalizeStr(form.creticidad),
+        
+        fechaOV: normalizeStr(form.fechaOV),
+        fechaOrdenCliente: normalizeStr(form.fechaOrdenCliente),
+        fechaEntregaPrevista: normalizeStr(form.fechaEntregaPrevista),
+        fechaEntregaReal: normalizeStr(form.fechaEntregaReal),
+        finGarantia: normalizeStr(form.finGarantia),
+
+        planesMantenimientoIds: form.planesMantenimientoIds,
+        
+        // 👇 AQUÍ ENVIAMOS LA NUEVA FAMILIA AL COMPONENTE PADRE
+        newFamilia: showNewFamilia && newFamilia.nombre.trim() ? newFamilia : null,
       };
 
-      await onSave(dataToSave);
+      await onSave(payload);
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Error al guardar el equipo");
@@ -214,17 +277,17 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-1">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Código <span className="text-red-500">*</span></label>
-                <input type="text" placeholder="Ej: EQ-001" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" disabled={loading} />
+                <input type="text" placeholder="Ej: EQ-001" value={form.codigo || ""} onChange={(e) => setForm({ ...form, codigo: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" disabled={loading} />
               </div>
 
               <div className="lg:col-span-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre del Equipo <span className="text-red-500">*</span></label>
-                <input type="text" placeholder="Ej: Control de acceso vehicular principal" maxLength={60} value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" disabled={loading} />
+                <input type="text" placeholder="Ej: Control de acceso vehicular principal" maxLength={60} value={form.nombre || ""} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" disabled={loading} />
               </div>
 
               <div className="lg:col-span-3">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Cliente <span className="text-red-500">*</span></label>
-                <select value={form.clienteId} onChange={(e) => setForm({ ...form, clienteId: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" disabled={loading}>
+                <select value={form.clienteId || ""} onChange={(e) => setForm({ ...form, clienteId: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" disabled={loading}>
                   <option value="">Seleccionar cliente...</option>
                   {clientes.map((cliente) => (
                     <option key={cliente.id} value={cliente.id}>{cliente.razonSocial || cliente.nombre} - {cliente.ruc}</option>
@@ -248,7 +311,7 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
                 <label className="block text-sm font-semibold text-gray-700 mb-2">País <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <select value={form.paisId} onChange={(e) => setForm({ ...form, paisId: e.target.value })} className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" disabled={loading}>
+                  <select value={form.paisId || ""} onChange={(e) => setForm({ ...form, paisId: e.target.value })} className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" disabled={loading}>
                     <option value="">Seleccionar país...</option>
                     {paises.map((pais) => (
                       <option key={pais.id} value={pais.id}>{pais.nombre} ({pais.codigo})</option>
@@ -258,12 +321,13 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
               </div>
 
               {/* Extras */}
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Sede</label><input type="text" value={form.sede} onChange={(e) => setForm({ ...form, sede: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Almacén</label><input type="text" value={form.almacen} onChange={(e) => setForm({ ...form, almacen: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Operador Logístico</label><input type="text" value={form.operadorLogistico} onChange={(e) => setForm({ ...form, operadorLogistico: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Sede</label><input type="text" value={form.sede || ""} onChange={(e) => setForm({ ...form, sede: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Almacén</label><input type="text" value={form.almacen || ""} onChange={(e) => setForm({ ...form, almacen: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Operador Logístico</label><input type="text" value={form.operadorLogistico || ""} onChange={(e) => setForm({ ...form, operadorLogistico: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
-                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading}>
+                <select value={form.status || "Almacen"} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading}>
                   <option value="Almacen">Almacén</option>
                   <option value="En compra">En compra</option>
                   <option value="Entregado">Entregado</option>
@@ -271,39 +335,84 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Estado</label>
-                <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading}>
+                <select value={form.estado || "No instalado"} onChange={(e) => setForm({ ...form, estado: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading}>
                   <option value="No instalado">No instalado</option>
                   <option value="Operativo">Operativo</option>
                   <option value="Inoperativo">Inoperativo</option>
                 </select>
               </div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">ID Placa</label><input type="text" value={form.idPlaca} onChange={(e) => setForm({ ...form, idPlaca: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">ID Placa</label><input type="text" value={form.idPlaca || ""} onChange={(e) => setForm({ ...form, idPlaca: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
               
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 lg:col-span-3">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Descripción del Equipo</label>
-                <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} rows={3} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none resize-none" disabled={loading} />
+                <textarea value={form.descripcion || ""} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} rows={3} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none resize-none" disabled={loading} />
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Familia</label>
-                <select value={form.familiaId} onChange={(e) => setForm({ ...form, familiaId: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading}>
-                  <option value="">Seleccionar familia...</option>
-                  {familias.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
-                </select>
+              
+              {/* 👇 SECCIÓN DE FAMILIA MEJORADA 👇 */}
+              <div className="md:col-span-2 lg:col-span-3 bg-slate-50 border border-slate-200 p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-semibold text-gray-700">Familia del Equipo</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowNewFamilia(!showNewFamilia)}
+                    className="text-sm font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    {showNewFamilia ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    {showNewFamilia ? "Cancelar Nueva" : "Crear Nueva Familia"}
+                  </button>
+                </div>
+
+                {showNewFamilia ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input 
+                      type="text" 
+                      placeholder="Nombre de la nueva familia *" 
+                      value={newFamilia.nombre} 
+                      onChange={(e) => setNewFamilia({ ...newFamilia, nombre: e.target.value })} 
+                      className="w-full px-4 py-3 border-2 border-blue-200 focus:border-blue-500 rounded-xl outline-none bg-white" 
+                      disabled={loading} 
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Descripción (Opcional)" 
+                      value={newFamilia.descripcion} 
+                      onChange={(e) => setNewFamilia({ ...newFamilia, descripcion: e.target.value })} 
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none bg-white" 
+                      disabled={loading} 
+                    />
+                  </div>
+                ) : (
+                  <select 
+                    value={form.familiaId || ""} 
+                    onChange={(e) => setForm({ ...form, familiaId: e.target.value })} 
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none bg-white focus:ring-2 focus:ring-blue-500" 
+                    disabled={loading}
+                  >
+                    <option value="">Seleccionar familia existente...</option>
+                    {familias.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+                  </select>
+                )}
               </div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Equipo</label><input type="text" value={form.tipoEquipo} onChange={(e) => setForm({ ...form, tipoEquipo: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Marca</label><input type="text" value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Modelo</label><input type="text" value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Serie</label><input type="text" value={form.serie} onChange={(e) => setForm({ ...form, serie: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              {/* 👆 FIN SECCIÓN DE FAMILIA 👆 */}
+
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Equipo</label><input type="text" value={form.tipoEquipo || ""} onChange={(e) => setForm({ ...form, tipoEquipo: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Marca</label><input type="text" value={form.marca || ""} onChange={(e) => setForm({ ...form, marca: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Modelo</label><input type="text" value={form.modelo || ""} onChange={(e) => setForm({ ...form, modelo: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Serie</label><input type="text" value={form.serie || ""} onChange={(e) => setForm({ ...form, serie: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Línea</label>
-                <select value={form.linea} onChange={(e) => setForm({ ...form, linea: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading}>
-                  <option value="Acceso">Acceso</option><option value="Autosat">Autosat</option><option value="Vehiculos">Vehículos</option><option value="Otros">Otros</option>
+                <select value={form.linea || "Acceso"} onChange={(e) => setForm({ ...form, linea: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading}>
+                  <option value="Acceso">Acceso</option>
+                  <option value="Autosat">Autosat</option>
+                  <option value="Vehiculos">Vehículos</option>
+                  <option value="Otros">Otros</option>
                 </select>
               </div>
               {form.linea === "Otros" && (
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Especificar otra línea <span className="text-red-500">*</span></label>
-                  <input type="text" value={form.lineaOtroTexto || ""} onChange={(e) => setForm({ ...form, lineaOtroTexto: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} />
+                  <input type="text" value={form.lineaOtroTexto || ""} onChange={(e) => setForm({ ...form, lineaOtroTexto: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" disabled={loading} />
                 </div>
               )}
             </div>
@@ -312,19 +421,19 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
           {/* TAB: Orden de Venta */}
           {activeTab === "orden" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Número OV <span className="text-red-500">*</span></label><input type="text" value={form.numeroOV} onChange={(e) => setForm({ ...form, numeroOV: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Fecha OV</label><input type="date" value={form.fechaOV} onChange={(e) => setForm({ ...form, fechaOV: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Número Orden Cliente</label><input type="text" value={form.numeroOrdenCliente} onChange={(e) => setForm({ ...form, numeroOrdenCliente: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Fecha Orden Cliente</label><input type="date" value={form.fechaOrdenCliente} onChange={(e) => setForm({ ...form, fechaOrdenCliente: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Número OV <span className="text-red-500">*</span></label><input type="text" value={form.numeroOV || ""} onChange={(e) => setForm({ ...form, numeroOV: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Fecha OV</label><input type="date" value={form.fechaOV || ""} onChange={(e) => setForm({ ...form, fechaOV: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Número Orden Cliente</label><input type="text" value={form.numeroOrdenCliente || ""} onChange={(e) => setForm({ ...form, numeroOrdenCliente: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Fecha Orden Cliente</label><input type="date" value={form.fechaOrdenCliente || ""} onChange={(e) => setForm({ ...form, fechaOrdenCliente: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
             </div>
           )}
 
           {/* TAB: Fechas y Garantía */}
           {activeTab === "fechas" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Fecha Entrega Prevista</label><input type="date" value={form.fechaEntregaPrevista} onChange={(e) => setForm({ ...form, fechaEntregaPrevista: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div><label className="block text-sm font-semibold text-gray-700 mb-2">Fecha Entrega Prevista</label><input type="date" value={form.fechaEntregaPrevista || ""} onChange={(e) => setForm({ ...form, fechaEntregaPrevista: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
               <div><label className="block text-sm font-semibold text-gray-700 mb-2">Fecha Entrega Real</label><input type="date" value={form.fechaEntregaReal || ""} onChange={(e) => setForm({ ...form, fechaEntregaReal: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
-              <div className="md:col-span-2"><label className="block text-sm font-semibold text-gray-700 mb-2">Fin de Garantía</label><input type="date" value={form.finGarantia} onChange={(e) => setForm({ ...form, finGarantia: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
+              <div className="md:col-span-2"><label className="block text-sm font-semibold text-gray-700 mb-2">Fin de Garantía</label><input type="date" value={form.finGarantia || ""} onChange={(e) => setForm({ ...form, finGarantia: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none" disabled={loading} /></div>
             </div>
           )}
 

@@ -107,26 +107,28 @@ function EquiposPageContent() {
     }
   };
 
-  const handleSave = async (dataWithNewFamilia) => {
-    try {
-      let familiaId = dataWithNewFamilia.familiaId;
+  const handleSave = async (payload) => {
+  try {
+    let familiaIdFinal = payload.familiaId;
 
-      if (dataWithNewFamilia.newFamilia && dataWithNewFamilia.newFamilia.nombre) {
-        const nuevaFamilia = await equipoService.createFamilia({
-          nombre: dataWithNewFamilia.newFamilia.nombre,
-          descripcion: dataWithNewFamilia.newFamilia.descripcion || null,
-        });
-        familiaId = nuevaFamilia.id;
-      }
+    // Si el modal nos mandó una familia nueva, la creamos primero:
+    if (payload.newFamilia) {
+      const familiaCreada = await familiaService.createFamilia(payload.newFamilia);
+      familiaIdFinal = familiaCreada.id;
+    }
 
-      const { newFamilia, ...equipoData } = dataWithNewFamilia;
-      equipoData.familiaId = familiaId;
+    // Armamos los datos definitivos del equipo
+    const datosEquipo = {
+      ...payload,
+      familiaId: familiaIdFinal 
+    };
+    delete datosEquipo.newFamilia;
 
-      if (editing) {
-        await equipoService.updateEquipo(editing.id, equipoData);
-      } else {
-        await equipoService.createEquipo(equipoData);
-      }
+    if (editing) {
+      await equipoService.updateEquipo(editing.id, datosEquipo);
+    } else {
+      await equipoService.createEquipo(datosEquipo);
+    }
 
       await loadData();
       setModalOpen(false);
