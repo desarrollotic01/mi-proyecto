@@ -8,7 +8,7 @@ import Mantenimiento from "./features/mantenimiento/pages/Mantenimiento";
 import OrdenTrabajo from "./pages/OrdenTrabajo";
 import EquiposPage from "../src/features/Equipo/Equipo";
 import UbicacionesTecnicasPage from "./features/UbicacionTecnica/Pages/UbicacionesTecnicasPage";
-import ClientesPage from "./pages/ClientesPage";
+import ClientesPage from "./features/Cliente/Pages/ClientesPage";
 import PlanesMantenimiento from "./features/PlanMantenimiento/pages/planesMantenimiento";
 import TrabajadoresPage from "./features/Trabajores/pages/TrabajadorPage";
 import MaintenanceGuides from "./features/GuiaMantenimiento/GuiaMantenimiento";

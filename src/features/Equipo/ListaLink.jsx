@@ -6,9 +6,11 @@ import {
   MapPin,
   Package,
   AlertCircle,
+  Paperclip,
 } from "lucide-react";
 
 import { portalClienteService } from "../mantenimiento/services/portalClienteService";
+import AdjuntosEquipoModal from "./Components/AdjuntosEquipoModal";
 
 export default function ListaLink() {
   const { token } = useParams();
@@ -23,6 +25,9 @@ export default function ListaLink() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("TODOS");
   const [tabActiva, setTabActiva] = useState("");
+
+  const [modalAdjuntosOpen, setModalAdjuntosOpen] = useState(false);
+  const [equipoAdjuntosSeleccionado, setEquipoAdjuntosSeleccionado] = useState(null);
 
   useEffect(() => {
     const fetchPortal = async () => {
@@ -51,7 +56,7 @@ export default function ListaLink() {
       } catch (err) {
         console.error("Fallo la conexión:", err);
         setError(
-          err?.response?.data?.error || "No se pudo cargar el portal del cliente."
+          err?.response?.data?.error || err?.response?.data?.message || "No se pudo cargar el portal del cliente."
         );
         setCliente(null);
         setSedes([]);
@@ -66,6 +71,16 @@ export default function ListaLink() {
       fetchPortal();
     }
   }, [token]);
+
+  const abrirModalAdjuntos = (equipo) => {
+    setEquipoAdjuntosSeleccionado(equipo);
+    setModalAdjuntosOpen(true);
+  };
+
+  const cerrarModalAdjuntos = () => {
+    setModalAdjuntosOpen(false);
+    setEquipoAdjuntosSeleccionado(null);
+  };
 
   const normalizarTexto = (valor) => String(valor || "").toLowerCase().trim();
 
@@ -211,7 +226,7 @@ export default function ListaLink() {
 
   const renderTablaEquipos = (equipos = []) => (
     <div className="overflow-x-auto rounded-2xl border border-slate-200">
-      <table className="w-full text-left min-w-[1000px]">
+      <table className="w-full text-left min-w-[1150px]">
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
             <th className="px-4 py-4">Foto</th>
@@ -222,55 +237,74 @@ export default function ListaLink() {
             <th className="px-4 py-4">Marca</th>
             <th className="px-4 py-4">Modelo</th>
             <th className="px-4 py-4">País</th>
+            <th className="px-4 py-4">Adjuntos</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {equipos.length ? (
-            equipos.map((item) => (
-              <tr key={item.id} className="hover:bg-blue-50/30 transition-all">
-                <td className="px-4 py-3">
-                  <img
-                    src={item.foto || "https://via.placeholder.com/100"}
-                    className="w-10 h-10 rounded-lg border border-slate-200 object-cover"
-                    alt={item.nombre || "Equipo"}
-                  />
-                </td>
-                <td className="px-4 py-3 font-black text-[11px] text-blue-600">
-                  {item.codigo || "-"}
-                </td>
-                <td className="px-4 py-3 font-black text-slate-700 text-sm uppercase">
-                  {item.nombre || "-"}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`px-3 py-1 rounded-full text-[9px] font-black border ${
-                      item.estado?.toUpperCase() === "OPERATIVO"
-                        ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                        : item.estado?.toUpperCase() === "INOPERATIVO"
-                        ? "bg-red-50 text-red-600 border-red-100"
-                        : "bg-orange-50 text-orange-600 border-orange-100"
-                    }`}
-                  >
-                    {item.estado || "SIN ESTADO"}
-                  </span>
-                </td>
-                <td className="px-4 py-3 font-mono text-[10px] font-bold text-slate-400">
-                  {item.serie || "-"}
-                </td>
-                <td className="px-4 py-3 text-[10px] font-bold uppercase">
-                  {item.marca || "-"}
-                </td>
-                <td className="px-4 py-3 text-[10px] font-bold uppercase">
-                  {item.modelo || "-"}
-                </td>
-                <td className="px-4 py-3 text-[10px] font-bold uppercase">
-                  {item.pais?.nombre || "-"}
-                </td>
-              </tr>
-            ))
+            equipos.map((item) => {
+              const cantidadAdjuntos = Array.isArray(item?.adjuntos)
+                ? item.adjuntos.length
+                : 0;
+
+              return (
+                <tr key={item.id} className="hover:bg-blue-50/30 transition-all">
+                  <td className="px-4 py-3">
+                    <img
+                      src={item.foto || "https://via.placeholder.com/100"}
+                      className="w-10 h-10 rounded-lg border border-slate-200 object-cover"
+                      alt={item.nombre || "Equipo"}
+                    />
+                  </td>
+                  <td className="px-4 py-3 font-black text-[11px] text-blue-600">
+                    {item.codigo || "-"}
+                  </td>
+                  <td className="px-4 py-3 font-black text-slate-700 text-sm uppercase">
+                    {item.nombre || "-"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`px-3 py-1 rounded-full text-[9px] font-black border ${
+                        item.estado?.toUpperCase() === "OPERATIVO"
+                          ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                          : item.estado?.toUpperCase() === "INOPERATIVO"
+                          ? "bg-red-50 text-red-600 border-red-100"
+                          : "bg-orange-50 text-orange-600 border-orange-100"
+                      }`}
+                    >
+                      {item.estado || "SIN ESTADO"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-[10px] font-bold text-slate-400">
+                    {item.serie || "-"}
+                  </td>
+                  <td className="px-4 py-3 text-[10px] font-bold uppercase">
+                    {item.marca || "-"}
+                  </td>
+                  <td className="px-4 py-3 text-[10px] font-bold uppercase">
+                    {item.modelo || "-"}
+                  </td>
+                  <td className="px-4 py-3 text-[10px] font-bold uppercase">
+                    {item.pais?.nombre || "-"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => abrirModalAdjuntos(item)}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-[10px] font-black uppercase text-slate-700 transition-all"
+                    >
+                      <Paperclip size={14} />
+                      {cantidadAdjuntos > 0
+                        ? `Ver adjuntos (${cantidadAdjuntos})`
+                        : "Sin adjuntos"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })
           ) : (
             <tr>
-              <td colSpan={8} className="px-4 py-8 text-center text-slate-500 font-semibold">
+              <td colSpan={9} className="px-4 py-8 text-center text-slate-500 font-semibold">
                 No hay equipos para mostrar.
               </td>
             </tr>
@@ -322,7 +356,7 @@ export default function ListaLink() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10 p-4 shadow-sm">
         <div className="max-w-[1400px] mx-auto flex justify-between items-center gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+            <div className="w-10 h-10 bg-gray-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-gray-200">
               <Building2 size={20} />
             </div>
             <div>
@@ -388,7 +422,7 @@ export default function ListaLink() {
             <input
               type="text"
               placeholder="Buscar por sede, equipo, código, serie o ubicación técnica..."
-              className="w-full pl-12 pr-6 py-3.5 bg-white border-2 border-transparent rounded-2xl shadow-sm focus:border-blue-500 outline-none transition-all font-semibold"
+              className="w-full pl-12 pr-6 py-3.5 bg-white border-2 border-transparent rounded-2xl shadow-sm focus:border-gray-500 outline-none transition-all font-semibold"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
@@ -401,7 +435,7 @@ export default function ListaLink() {
                 onClick={() => setFiltroEstado(estado)}
                 className={`px-5 py-2.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap ${
                   filtroEstado === estado
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-100"
+                    ? "bg-gray-600 text-white shadow-md shadow-gray-100"
                     : "text-slate-400 hover:bg-slate-50"
                 }`}
               >
@@ -420,7 +454,7 @@ export default function ListaLink() {
                   onClick={() => setTabActiva(tab.id)}
                   className={`px-4 py-3 rounded-xl text-[11px] font-black transition-all whitespace-nowrap ${
                     tabActiva === tab.id
-                      ? "bg-blue-600 text-white shadow-md shadow-blue-100"
+                      ? "bg-gray-600 text-white shadow-md shadow-gray-100"
                       : "bg-slate-50 text-slate-500 hover:bg-slate-100"
                   }`}
                 >
@@ -507,6 +541,13 @@ export default function ListaLink() {
           </div>
         </div>
       </main>
+
+      <AdjuntosEquipoModal
+        isOpen={modalAdjuntosOpen}
+        onClose={cerrarModalAdjuntos}
+        equipo={equipoAdjuntosSeleccionado}
+        adjuntos={equipoAdjuntosSeleccionado?.adjuntos || []}
+      />
     </div>
   );
 }

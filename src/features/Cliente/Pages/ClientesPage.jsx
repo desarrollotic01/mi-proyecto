@@ -6,309 +6,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Link as LinkIcon,
-  Copy,
-  Ban,
   RefreshCw,
   FileSpreadsheet,
   Users,
-  Phone,
-  Mail,
   Building2,
-  X,
-  User,
 } from "lucide-react";
 
-import { clienteService } from "../features/mantenimiento/services/clienteService.js";
-import { portalClienteService } from "../features/mantenimiento/services/portalClienteService.js";
+import { clienteService } from "../../mantenimiento/services/clienteService.js";
 
-/* ================= MODAL CONTACTOS ================= */
-function ContactosModal({ isOpen, onClose, cliente }) {
-  if (!isOpen || !cliente) return null;
+import ContactosModal from "../Components/ContactosModal.jsx";
+import PortalModal from "../Components/PortalModal.jsx";
+import GestionarSedeModal from "../Components/GestionarSedeModal.jsx";
 
-  const contactos = Array.isArray(cliente.contactos) ? cliente.contactos : [];
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <div>
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Users className="text-blue-600" />
-              Contactos del Cliente
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              <b>{cliente?.razonSocial}</b>
-            </p>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            type="button"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
-
-        <div className="p-6 overflow-y-auto flex-1">
-          {contactos.length === 0 ? (
-            <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-xl border border-dashed">
-              Este cliente no tiene contactos registrados.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {contactos.map((contacto, index) => (
-                <div
-                  key={contacto.id || index}
-                  className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div>
-                      <h4 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                        <User className="w-4 h-4 text-blue-600" />
-                        {contacto.nombre || "Sin nombre"}
-                      </h4>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {contacto.cargo || "Sin cargo"}
-                      </p>
-                    </div>
-
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                        contacto.activo
-                          ? "bg-green-100 text-green-700 border-green-200"
-                          : "bg-gray-100 text-gray-700 border-gray-200"
-                      }`}
-                    >
-                      {contacto.activo ? "Activo" : "Inactivo"}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div className="flex items-center gap-3 text-sm text-gray-700">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <span>{contacto.correo || "-"}</span>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-sm text-gray-700">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      <span>{contacto.telefono || "-"}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ================= MODAL PORTAL CLIENTE ================= */
-function PortalModal({ isOpen, onClose, cliente }) {
-  const [links, setLinks] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (isOpen && cliente) {
-      cargarLinks();
-    }
-  }, [isOpen, cliente]);
-
-  const cargarLinks = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await portalClienteService.listarLinks(cliente.id);
-      setLinks(Array.isArray(data) ? data : data.links || data.data || []);
-    } catch (err) {
-      setError(err.response?.data?.error || "No se pudieron cargar los enlaces.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGenerarLink = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await portalClienteService.generarLink(cliente.id);
-      await cargarLinks();
-    } catch (err) {
-      setError(
-        err.response?.data?.error ||
-          err.response?.statusText ||
-          "Error al generar el enlace."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDesactivar = async (linkId) => {
-    setLoading(true);
-    try {
-      await portalClienteService.desactivarLink(linkId);
-      await cargarLinks();
-    } catch (err) {
-      alert(err.response?.data?.error || "Error al cambiar el estado del enlace");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const copiarAlPortapapeles = async (token) => {
-    const urlExterna = `${window.location.origin}/portal/cliente/${token}`;
-
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(urlExterna);
-        alert(`¡Enlace copiado!\n\n${urlExterna}`);
-        return;
-      }
-
-      const textArea = document.createElement("textarea");
-      textArea.value = urlExterna;
-      textArea.style.position = "fixed";
-      textArea.style.left = "-9999px";
-      textArea.style.top = "0";
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-
-      const ok = document.execCommand("copy");
-      document.body.removeChild(textArea);
-
-      if (ok) {
-        alert(`¡Enlace copiado!\n\n${urlExterna}`);
-      } else {
-        alert(`No se pudo copiar automáticamente.\n\nCopia este enlace:\n${urlExterna}`);
-      }
-    } catch (error) {
-      console.error("Error copiando al portapapeles:", error);
-      alert(`No se pudo copiar automáticamente.\n\nCopia este enlace:\n${urlExterna}`);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  const tieneLink = links.length > 0;
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <div>
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <LinkIcon className="text-blue-600" /> Portal del Cliente
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Gestiona el acceso al visor para <b>{cliente?.razonSocial}</b>
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            type="button"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
-
-        <div className="p-6 overflow-y-auto flex-1">
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-700">
-              <AlertCircle className="w-5 h-5" />
-              <p className="text-sm font-medium">{error}</p>
-            </div>
-          )}
-
-          {!tieneLink && (
-            <button
-              onClick={handleGenerarLink}
-              disabled={loading}
-              className="w-full mb-6 py-3 bg-blue-50 border border-blue-200 text-blue-700 font-bold rounded-xl hover:bg-blue-100 transition-colors flex justify-center items-center gap-2"
-              type="button"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LinkIcon size={18} />}
-              Generar Enlace Único
-            </button>
-          )}
-
-          <h4 className="font-semibold text-gray-700 mb-3">Enlace Permanente</h4>
-
-          {!tieneLink && !loading ? (
-            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-xl border border-dashed">
-              Aún no has generado el enlace para este cliente.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {links.map((link) => (
-                <div
-                  key={link.id}
-                  className={`p-5 border-2 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all ${
-                    link.activo
-                      ? "border-blue-300 bg-blue-50/30"
-                      : "border-gray-200 bg-gray-100 opacity-75"
-                  }`}
-                >
-                  <div className="flex-1 overflow-hidden">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span
-                        className={`text-[10px] uppercase font-black px-2.5 py-1 rounded-full ${
-                          link.activo
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {link.activo ? "ACCESO PERMITIDO" : "ACCESO DENEGADO"}
-                      </span>
-                      <span className="text-xs text-gray-500 font-medium">
-                        Creado: {new Date(link.createdAt).toLocaleDateString("es-PE")}
-                      </span>
-                    </div>
-
-                    <p className="text-sm font-mono text-gray-600 truncate bg-white px-3 py-2 rounded-lg border border-gray-200">
-                      /portal/cliente/{link.token}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    {link.activo && (
-                      <button
-                        onClick={() => handleDesactivar(link.id)}
-                        disabled={loading}
-                        className="flex-1 sm:flex-none px-4 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-colors bg-red-50 text-red-600 hover:bg-red-100"
-                        type="button"
-                      >
-                        {loading ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
-                        Desactivar
-                      </button>
-                    )}
-
-                    {link.activo && (
-                      <button
-                        onClick={() => copiarAlPortapapeles(link.token)}
-                        className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
-                        type="button"
-                      >
-                        <Copy size={16} /> Copiar
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ================= MAIN PAGE ================= */
 export default function ClientesPage() {
   const [clientes, setClientes] = useState([]);
   const [portalModalOpen, setPortalModalOpen] = useState(false);
@@ -316,6 +25,9 @@ export default function ClientesPage() {
 
   const [contactosModalOpen, setContactosModalOpen] = useState(false);
   const [selectedClienteContactos, setSelectedClienteContactos] = useState(null);
+
+  const [sedesModalOpen, setSedesModalOpen] = useState(false);
+  const [selectedClienteSedes, setSelectedClienteSedes] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterEstado, setFilterEstado] = useState("Todos");
@@ -454,34 +166,6 @@ export default function ClientesPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Total clientes</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{clientes.length}</p>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Activos</p>
-            <p className="text-3xl font-bold text-green-700 mt-2">
-              {clientes.filter((c) => c.estado === "Activo").length}
-            </p>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Inactivos</p>
-            <p className="text-3xl font-bold text-gray-700 mt-2">
-              {clientes.filter((c) => c.estado === "Inactivo").length}
-            </p>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Activos en SAP</p>
-            <p className="text-3xl font-bold text-blue-700 mt-2">
-              {clientes.filter((c) => c.activoSAP).length}
-            </p>
-          </div>
-        </div>
-
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-6">
           <div className="flex flex-col xl:flex-row gap-4">
             <div className="flex-1 relative">
@@ -526,11 +210,7 @@ export default function ClientesPage() {
                 title="Actualizar lista"
                 type="button"
               >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 Recargar
               </button>
             </div>
@@ -539,7 +219,7 @@ export default function ClientesPage() {
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-auto max-h-[70vh]">
-            <table className="min-w-[1700px] w-full text-sm">
+            <table className="min-w-[1800px] w-full text-sm">
               <thead className="sticky top-0 z-10 bg-gray-100 border-b border-gray-200">
                 <tr>
                   <th className="text-left px-4 py-3 font-bold text-gray-700 border-r border-gray-200">#</th>
@@ -555,7 +235,8 @@ export default function ClientesPage() {
                   <th className="text-left px-4 py-3 font-bold text-gray-700 border-r border-gray-200">Contactos</th>
                   <th className="text-left px-4 py-3 font-bold text-gray-700 border-r border-gray-200">Creado</th>
                   <th className="text-left px-4 py-3 font-bold text-gray-700 border-r border-gray-200">Actualizado</th>
-                  <th className="text-center px-4 py-3 font-bold text-gray-700 border-r border-gray-200">Ver contactos</th>
+                  <th className="text-center px-4 py-3 font-bold text-gray-700 border-r border-gray-200">Contactos</th>
+                  <th className="text-center px-4 py-3 font-bold text-gray-700 border-r border-gray-200">Sedes</th>
                   <th className="text-center px-4 py-3 font-bold text-gray-700">Portal</th>
                 </tr>
               </thead>
@@ -563,7 +244,7 @@ export default function ClientesPage() {
               <tbody>
                 {currentItems.length === 0 ? (
                   <tr>
-                    <td colSpan="15" className="text-center py-14 text-gray-500">
+                    <td colSpan="16" className="text-center py-14 text-gray-500">
                       <p className="font-semibold text-base">No se encontraron clientes</p>
                       <p className="text-sm mt-1">Prueba con otros filtros o términos de búsqueda</p>
                     </td>
@@ -577,66 +258,32 @@ export default function ClientesPage() {
                       <td className="px-4 py-3 border-r border-gray-100 text-gray-500">
                         {indexOfFirstItem + index + 1}
                       </td>
-
                       <td className="px-4 py-3 border-r border-gray-100 font-mono text-xs text-gray-700 whitespace-nowrap">
                         {c.sapCode || "-"}
                       </td>
-
                       <td className="px-4 py-3 border-r border-gray-100 font-medium text-gray-900 min-w-[260px]">
                         {c.razonSocial || "-"}
                       </td>
-
+                      <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap">{c.ruc || "-"}</td>
+                      <td className="px-4 py-3 border-r border-gray-100 min-w-[320px] text-gray-700">{c.direccion || "-"}</td>
+                      <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap">{c.telefono || "-"}</td>
+                      <td className="px-4 py-3 border-r border-gray-100 min-w-[220px]">{c.correo || "-"}</td>
+                      <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap">{c.tipoCliente || "-"}</td>
                       <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap">
-                        {c.ruc || "-"}
-                      </td>
-
-                      <td className="px-4 py-3 border-r border-gray-100 min-w-[320px] text-gray-700">
-                        {c.direccion || "-"}
-                      </td>
-
-                      <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap">
-                        {c.telefono || "-"}
-                      </td>
-
-                      <td className="px-4 py-3 border-r border-gray-100 min-w-[220px]">
-                        {c.correo || "-"}
-                      </td>
-
-                      <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap">
-                        {c.tipoCliente || "-"}
-                      </td>
-
-                      <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold border ${getEstadoBadge(
-                            c.estado
-                          )}`}
-                        >
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getEstadoBadge(c.estado)}`}>
                           {c.estado || "-"}
                         </span>
                       </td>
-
                       <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold border ${getActivoSapBadge(
-                            c.activoSAP
-                          )}`}
-                        >
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getActivoSapBadge(c.activoSAP)}`}>
                           {c.activoSAP ? "Sí" : "No"}
                         </span>
                       </td>
-
                       <td className="px-4 py-3 border-r border-gray-100 text-center">
                         {Array.isArray(c.contactos) ? c.contactos.length : 0}
                       </td>
-
-                      <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap text-gray-600">
-                        {formatDate(c.createdAt)}
-                      </td>
-
-                      <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap text-gray-600">
-                        {formatDate(c.updatedAt)}
-                      </td>
+                      <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap text-gray-600">{formatDate(c.createdAt)}</td>
+                      <td className="px-4 py-3 border-r border-gray-100 whitespace-nowrap text-gray-600">{formatDate(c.updatedAt)}</td>
 
                       <td className="px-4 py-3 border-r border-gray-100 text-center">
                         <button
@@ -645,11 +292,24 @@ export default function ClientesPage() {
                             setContactosModalOpen(true);
                           }}
                           className="inline-flex items-center justify-center px-3 py-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors font-semibold gap-2"
-                          title="Ver contactos"
                           type="button"
                         >
                           <Users size={16} />
                           Ver
+                        </button>
+                      </td>
+
+                      <td className="px-4 py-3 border-r border-gray-100 text-center">
+                        <button
+                          onClick={() => {
+                            setSelectedClienteSedes(c);
+                            setSedesModalOpen(true);
+                          }}
+                          className="inline-flex items-center justify-center px-3 py-2 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors font-semibold gap-2"
+                          type="button"
+                        >
+                          <Building2 size={16} />
+                          Sedes
                         </button>
                       </td>
 
@@ -660,7 +320,6 @@ export default function ClientesPage() {
                             setPortalModalOpen(true);
                           }}
                           className="inline-flex items-center justify-center p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
-                          title="Portal del cliente"
                           type="button"
                         >
                           <LinkIcon size={16} />
@@ -772,6 +431,12 @@ export default function ClientesPage() {
         isOpen={contactosModalOpen}
         onClose={() => setContactosModalOpen(false)}
         cliente={selectedClienteContactos}
+      />
+
+      <GestionarSedeModal
+        isOpen={sedesModalOpen}
+        onClose={() => setSedesModalOpen(false)}
+        cliente={selectedClienteSedes}
       />
     </div>
   );

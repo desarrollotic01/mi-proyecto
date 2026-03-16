@@ -5,11 +5,22 @@ export const UbicacionTecnicaService = {
   createUbicacionTecnica,
   updateUbicacionTecnica,
   deleteUbicacionTecnica,
+  getUbicacionesByClienteId,
 };
 
 function getUbicacionTecnicas() {
   return api.get("/ubicacion-tecnica").then(res => {
     return Array.isArray(res.data) ? res.data : [];
+  });
+}
+
+function getUbicacionesByClienteId(clienteId) {
+  return api.get(`/ubicacion-tecnica/cliente/${clienteId}`).then((res) => {
+    return Array.isArray(res.data?.data)
+      ? res.data.data
+      : Array.isArray(res.data)
+      ? res.data
+      : [];
   });
 }
 
