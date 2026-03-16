@@ -9,6 +9,10 @@ import { UbicacionTecnicaService } from "../../mantenimiento/services/ubicacionS
 import { paisService } from "../../mantenimiento/services/paisService";
 import { clienteService } from "../../mantenimiento/services/clienteService";
 
+// 🆕 Importamos el Modal Global y el Diseño del PDF
+import { GlobalPDFModal } from "../../../components/GlobalPDFModal";
+import { UbicacionPDF } from "../components/UbicacionPDF";
+
 const val = (x) => (x === null || x === undefined || x === "" ? "-" : String(x));
 
 const fmtDate = (d) => {
@@ -24,6 +28,11 @@ export default function UbicacionesTecnicasPage() {
   const [items, setItems] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  
+  // 🆕 Estados para el PDF
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfData, setPdfData] = useState(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
@@ -79,14 +88,30 @@ export default function UbicacionesTecnicasPage() {
     finally { setBusyId(null); }
   };
 
+// 🆕 Función para abrir el PDF y enviarle los nombres reales (no solo los IDs)
+  const handleOpenPDF = (item) => {
+    // Buscamos el nombre del cliente y país para que salgan bien en el PDF
+    const cli = clientes.find(c => String(c.id) === String(item.clienteId));
+    const pFound = paises.find(p => String(p.id) === String(item.paisId));
+    
+    // Adjuntamos esos nombres al objeto que le pasamos al PDF
+    const dataEnriquecida = {
+      ...item,
+      nombreClienteEnriquecido: cli?.nombre || cli?.razonSocial || "Sin Cliente",
+      nombrePaisEnriquecido: pFound?.nombre || "-"
+    };
+
+    setPdfData(dataEnriquecida);
+    setPdfOpen(true);
+  };
+
   if (loading && items.length === 0) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
 
   return (
-    // 1. Padding responsivo en el contenedor principal (p-3 en móvil, p-6 en PC)
     <div className="min-h-screen bg-[#f8fafc] p-3 sm:p-6 font-sans text-slate-800 w-full overflow-x-hidden">
       <div className="max-w-[1600px] mx-auto space-y-4 sm:space-y-5">
         
-        {/* 2. Header Responsivo: Se apila en móvil (flex-col) y se alinea en PC (sm:flex-row) */}
+        {/* Header Responsivo */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white px-4 sm:px-6 py-4 rounded-2xl border border-slate-200 shadow-sm gap-4">
           <h1 className="text-[16px] sm:text-[17px] font-black text-slate-800 flex items-center gap-2.5 tracking-tight w-full sm:w-auto">
             <MapPin size={20} className="text-blue-600 stroke-[2.5] shrink-0"/> Gestión de Activos
@@ -103,7 +128,7 @@ export default function UbicacionesTecnicasPage() {
           </div>
         </div>
 
-        {/* 3. Contadores: Grid responsivo, 1 columna móvil, 3 en PC */}
+        {/* Contadores */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-5">
           <StatCard icon={Box} label="Total Activos" value={stats.total} color="blue" />
           <StatCard icon={Globe} label="Países Activos" value={stats.paises} color="indigo" />
@@ -120,7 +145,7 @@ export default function UbicacionesTecnicasPage() {
           />
         </div>
 
-        {/* 4. TABLA RESPONSIVA: overflow-x-auto + min-w-[1024px] */}
+        {/* TABLA RESPONSIVA */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm w-full overflow-hidden">
           <div className="overflow-x-auto w-full">
             <table className="w-full text-left text-[11px] border-collapse min-w-[1024px]">
@@ -196,13 +221,39 @@ export default function UbicacionesTecnicasPage() {
                         </div>
                       </td>
 
-                      {/* ACCIONES */}
+                    {/* ACCIONES */}
                       <td className="px-4 py-5 align-middle text-right pr-6">
-                        <div className="flex justify-end gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setEditing(item); setModalOpen(true); }} className="p-2 sm:p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors bg-blue-50/50 sm:bg-transparent"><Edit2 size={16}/></button>
-                          <button onClick={() => handleDelete(item.id)} disabled={busyId === item.id} className="p-2 sm:p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors bg-red-50/50 sm:bg-transparent">
+                        {/* 🆕 Quité opacity-0 y group-hover:opacity-100 para que SIEMPRE se vean */}
+                        <div className="flex justify-end gap-2">
+                          
+                          {/* BOTÓN DE PDF */}
+                          <button 
+                            onClick={() => handleOpenPDF(item)} 
+                            className="p-2 sm:p-1.5 text-indigo-600 hover:bg-indigo-100 bg-indigo-50 rounded-lg transition-colors border border-indigo-100 shadow-sm"
+                            title="PDF"
+                          >
+                            <FileText size={16}/>
+                          </button>
+                          
+                          {/* BOTÓN EDITAR */}
+                          <button 
+                            onClick={() => { setEditing(item); setModalOpen(true); }} 
+                            className="p-2 sm:p-1.5 text-blue-600 hover:bg-blue-100 bg-blue-50 rounded-lg transition-colors border border-blue-100 shadow-sm" 
+                            title="Editar"
+                          >
+                            <Edit2 size={16}/>
+                          </button>
+                          
+                          {/* BOTÓN ELIMINAR */}
+                          <button 
+                            onClick={() => handleDelete(item.id)} 
+                            disabled={busyId === item.id} 
+                            className="p-2 sm:p-1.5 text-red-600 hover:bg-red-100 bg-red-50 rounded-lg transition-colors border border-red-100 shadow-sm" 
+                            title="Eliminar"
+                          >
                             {busyId === item.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                           </button>
+                          
                         </div>
                       </td>
 
@@ -216,11 +267,21 @@ export default function UbicacionesTecnicasPage() {
       </div>
 
       <UbicacionTecnicaModal isOpen={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={handleSave} initialData={editing} />
+      
+      {/* 🆕 MODAL DE PDF RENDERIZADO AL FINAL */}
+      <GlobalPDFModal
+        isOpen={pdfOpen}
+        onClose={() => { setPdfOpen(false); setPdfData(null); }}
+        title={`Reporte de Activo: ${pdfData?.codigo || 'Documento'}`}
+      >
+        {/* Le pasamos la data seleccionada al diseño del PDF */}
+        {pdfData && <UbicacionPDF data={pdfData} />}
+      </GlobalPDFModal>
+
     </div>
   );
 }
 
-// 5. StatCard adaptado para móviles (menos padding)
 function StatCard({ icon: Icon, label, value, color }) {
   const colors = { 
     blue: "text-blue-600 bg-blue-50", 

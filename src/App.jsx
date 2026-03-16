@@ -33,6 +33,7 @@ export default function App() {
       {/* RUTAS PÚBLICAS */}
       <Route path="/portal/cliente/:token" element={<ListaLink />} />
       <Route path="/visor-cliente/:token" element={<ListaLink />} />
+      
 
       {/* RUTAS PRIVADAS */}
       <Route path="/" element={<AppLayout />}>

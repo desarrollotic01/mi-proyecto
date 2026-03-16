@@ -43,8 +43,8 @@ class ErrorBoundary extends React.Component {
             <pre className="bg-slate-900 text-red-400 p-4 rounded-xl overflow-x-auto text-sm font-mono shadow-inner">
               {this.state.error?.toString()}
             </pre>
-            <button 
-              onClick={() => window.location.reload()} 
+            <button
+              onClick={() => window.location.reload()}
               className="mt-6 bg-red-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-red-700 transition-colors"
             >
               Recargar la página
@@ -108,27 +108,27 @@ function EquiposPageContent() {
   };
 
   const handleSave = async (payload) => {
-  try {
-    let familiaIdFinal = payload.familiaId;
+    try {
+      let familiaIdFinal = payload.familiaId;
 
-    // Si el modal nos mandó una familia nueva, la creamos primero:
-    if (payload.newFamilia) {
-      const familiaCreada = await familiaService.createFamilia(payload.newFamilia);
-      familiaIdFinal = familiaCreada.id;
-    }
+      // Si el modal nos mandó una familia nueva, la creamos primero:
+      if (payload.newFamilia) {
+        const familiaCreada = await familiaService.createFamilia(payload.newFamilia);
+        familiaIdFinal = familiaCreada.id;
+      }
 
-    // Armamos los datos definitivos del equipo
-    const datosEquipo = {
-      ...payload,
-      familiaId: familiaIdFinal 
-    };
-    delete datosEquipo.newFamilia;
+      // Armamos los datos definitivos del equipo
+      const datosEquipo = {
+        ...payload,
+        familiaId: familiaIdFinal
+      };
+      delete datosEquipo.newFamilia;
 
-    if (editing) {
-      await equipoService.updateEquipo(editing.id, datosEquipo);
-    } else {
-      await equipoService.createEquipo(datosEquipo);
-    }
+      if (editing) {
+        await equipoService.updateEquipo(editing.id, datosEquipo);
+      } else {
+        await equipoService.createEquipo(datosEquipo);
+      }
 
       await loadData();
       setModalOpen(false);
