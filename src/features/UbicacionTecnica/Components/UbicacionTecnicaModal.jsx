@@ -76,14 +76,14 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
     setError(null);
 
     if (initialData) {
-      const planesRaw = initialData.planes || initialData.planesMantenimiento || initialData.Planes || [];
+const planesRaw = initialData.planes || initialData.planesMantenimiento || initialData.Planes || [];
       const idsRaw = initialData.planesIds || initialData.planesMantenimientoIds || [];
 
       let idsIniciales = [];
-      if (Array.isArray(planesRaw) && planesRaw.length > 0 && typeof planesRaw[0] === 'object') {
-        idsIniciales = planesRaw.map(p => String(p.id));
+      if (Array.isArray(planesRaw) && planesRaw.length > 0) {
+        idsIniciales = planesRaw.map(p => String(p.id)); // Extrae IDs si vienen como objetos
       } else if (Array.isArray(idsRaw)) {
-        idsIniciales = idsRaw.map(String);
+        idsIniciales = idsRaw.map(String); // Convierte a String si vienen directos
       }
 
       setForm({
@@ -92,6 +92,7 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
         ClienteId: String(initialData.ClienteId || initialData.clienteId || initialData?.cliente?.id || ""),
         paisId: String(initialData.paisId || initialData?.pais?.id || ""),
         planesMantenimientoIds: idsIniciales,
+        
         codigo: String(initialData.codigo ?? ""),
         nombre: String(initialData.nombre ?? ""),
         numeroOV: String(initialData.numeroOV ?? ""),
@@ -115,23 +116,24 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
   }, [isOpen, initialData]);
 
   // 2. CONSULTAR PLANES AL BACKEND
+  // Efecto para buscar los planes al EDITAR
   useEffect(() => {
     if (isOpen && mode === "edit" && initialData?.id) {
-      const fetchPlanesAsignados = async () => {
-        setLoadingPlanes(true);
+      const fetchPlanes = async () => {
         try {
-          const planesDelBackend = await planMantenimientoService.getPlanesByUbicacionTecnica(initialData.id);
-          if (Array.isArray(planesDelBackend) && planesDelBackend.length > 0) {
-            const idsDelBackend = planesDelBackend.map(p => String(p.id));
-            setForm(prev => ({ ...prev, planesMantenimientoIds: idsDelBackend }));
+          // Ajusta esta ruta a tu servicio real
+          const res = await planMantenimientoService.getPlanesByUbicacionTecnica(initialData.id);
+          const planesDelBackend = Array.isArray(res) ? res : (res?.data || []);
+          
+          if (planesDelBackend.length > 0) {
+            const ids = planesDelBackend.map(p => String(p.id));
+            setForm(prev => ({ ...prev, planesMantenimientoIds: ids })); // ¡Aquí actualiza y marca los checks!
           }
         } catch (err) {
-          console.warn("No se pudieron cargar los planes asignados.", err);
-        } finally {
-          setLoadingPlanes(false);
+          console.error("No se pudieron cargar los planes", err);
         }
       };
-      fetchPlanesAsignados();
+      fetchPlanes();
     }
   }, [isOpen, mode, initialData?.id]);
 
@@ -189,7 +191,7 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
   };
 
   const buildPayload = () => {
-    const planesNumericos = form.planesMantenimientoIds.map(Number);
+const planesLimpios = form.planesMantenimientoIds.map(String);
     return {
       codigo: String(form.codigo).trim(),
       nombre: String(form.nombre).trim(),
@@ -210,8 +212,11 @@ export default function UbicacionTecnicaModal({ isOpen, onClose, onSave, initial
       fechaEntregaReal: normalizeDate(form.fechaEntregaReal),
       finGarantia: normalizeDate(form.finGarantia),
       especialidad: normalizeStr(form.especialidad),
-      planesMantenimientoIds: planesNumericos,
-      planesIds: planesNumericos
+
+
+// 👇 Usamos la variable corregida
+      planesMantenimientoIds: planesLimpios,
+      planesIds: planesLimpios
     };
   };
 
