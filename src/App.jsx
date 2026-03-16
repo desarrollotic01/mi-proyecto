@@ -14,6 +14,7 @@ import TrabajadoresPage from "./features/Trabajores/pages/TrabajadorPage";
 import MaintenanceGuides from "./features/GuiaMantenimiento/GuiaMantenimiento";
 import GuiasKanban from "./pages/GuiaMantenimientoKanban";
 import ListaLink from "./features/Equipo/ListaLink";
+import ItemsPage from "./pages/itemPage";
 
 function AppLayout() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="trabajadores" element={<TrabajadoresPage />} />
         <Route path="guiaMantenimiento" element={<MaintenanceGuides />} />
         <Route path="GuiasKanban" element={<GuiasKanban />} />
+        <Route path="items" element={<ItemsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/login" />} />

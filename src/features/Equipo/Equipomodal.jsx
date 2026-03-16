@@ -114,6 +114,10 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
       setError(`Faltan completar campos obligatorios: ${faltantes.join(", ")}`);
       return;
     }
+    if (showNewFamilia && !newFamilia.nombre?.trim()) {
+  setError("Debes ingresar el nombre de la nueva familia");
+  return;
+}
 
     // Validar "Otros" en línea
     if (form.linea === "Otros" && !form.lineaOtroTexto) {
@@ -130,10 +134,15 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
     try {
       // 2. Preparamos los datos básicos SIN el campo de imágenes
       const dataToSave = {
-        ...form,
-        newFamilia: showNewFamilia && newFamilia.nombre ? newFamilia : null,
-        // imagenes: []  <-- Simplemente no lo incluimos o lo mandamos vacío
-      };
+  ...form,
+  newFamilia:
+    showNewFamilia && newFamilia.nombre?.trim()
+      ? {
+          nombre: newFamilia.nombre.trim(),
+          descripcion: newFamilia.descripcion?.trim() || "",
+        }
+      : null,
+};
 
       // 3. Enviamos solo la data de texto
       await onSave(dataToSave);
@@ -223,220 +232,353 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
 
           {/* TAB: General */}
           {activeTab === "general" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-1">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Código <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: EQ-001"
-                  value={form.codigo}
-                  onChange={(e) => setForm({ ...form, codigo: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                />
-              </div>
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="lg:col-span-1">
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Código <span className="text-red-500">*</span>
+      </label>
+      <input
+        type="text"
+        placeholder="Ej: EQ-001"
+        value={form.codigo}
+        onChange={(e) => setForm({ ...form, codigo: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+    </div>
 
-              <div className="lg:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Nombre del Equipo <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: Control de acceso vehicular principal"
-                  maxLength={60}
-                  value={form.nombre}
-                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                />
-                <p className="text-xs text-gray-500 mt-1">{form.nombre.length}/60 caracteres</p>
-              </div>
+    <div className="lg:col-span-2">
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Nombre del Equipo <span className="text-red-500">*</span>
+      </label>
+      <input
+        type="text"
+        placeholder="Ej: Control de acceso vehicular principal"
+        maxLength={60}
+        value={form.nombre}
+        onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+      <p className="text-xs text-gray-500 mt-1">{form.nombre.length}/60 caracteres</p>
+    </div>
 
-              <div className="lg:col-span-3">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Cliente <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={form.clienteId}
-                  onChange={(e) => setForm({ ...form, clienteId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                >
-                  <option value="">Seleccionar cliente...</option>
-                  {clientes.map((cliente) => (
-                    <option key={cliente.id} value={cliente.id}>
-                      {cliente.razonSocial} - {cliente.ruc}
-                    </option>
-                  ))}
-                </select>
-              </div>
+    <div className="lg:col-span-3">
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Cliente <span className="text-red-500">*</span>
+      </label>
+      <select
+        value={form.clienteId}
+        onChange={(e) => setForm({ ...form, clienteId: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      >
+        <option value="">Seleccionar cliente...</option>
+        {clientes.map((cliente) => (
+          <option key={cliente.id} value={cliente.id}>
+            {cliente.razonSocial} - {cliente.ruc}
+          </option>
+        ))}
+      </select>
+    </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  ID Cliente
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: Lima"
-                  value={form.id_cliente}
-                  onChange={(e) => setForm({ ...form, id_cliente: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                />
-              </div>
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        ID Cliente
+      </label>
+      <input
+        type="text"
+        placeholder="ID interno del cliente"
+        value={form.id_cliente}
+        onChange={(e) => setForm({ ...form, id_cliente: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+    </div>
 
-              <div className="lg:col-span-3">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Tipo de Propiedad <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {["Vendido", "Propio", "Atendido"].map((tipo) => (
-                    <button
-                      key={tipo}
-                      type="button"
-                      onClick={() => setForm({ ...form, tipoEquipoPropiedad: tipo })}
-                      className={`p-4 border-2 rounded-xl transition-all flex flex-col items-center gap-2 ${form.tipoEquipoPropiedad === tipo
-                          ? "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-gray-200 hover:border-gray-300 text-gray-600"
-                        }`}
-                      disabled={loading}
-                    >
-                      {getTipoPropiedadIcon(tipo)}
-                      <span className="font-medium text-sm">{tipo}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+    <div className="lg:col-span-2">
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        País <span className="text-red-500">*</span>
+      </label>
+      <div className="relative">
+        <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <select
+          value={form.paisId}
+          onChange={(e) => setForm({ ...form, paisId: e.target.value })}
+          className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+          disabled={loading}
+        >
+          <option value="">Seleccionar país...</option>
+          {paises.map((pais) => (
+            <option key={pais.id} value={pais.id}>
+              {pais.nombre} ({pais.codigo})
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
 
-              <div className="lg:col-span-3">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  País <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <select
-                    value={form.paisId}
-                    onChange={(e) => setForm({ ...form, paisId: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                    disabled={loading}
-                  >
-                    <option value="">Seleccionar país...</option>
-                    {paises.map((pais) => (
-                      <option key={pais.id} value={pais.id}>
-                        {pais.nombre} ({pais.codigo})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+    <div className="lg:col-span-3">
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Tipo de Propiedad <span className="text-red-500">*</span>
+      </label>
+      <div className="grid grid-cols-3 gap-3">
+        {["Vendido", "Propio", "Atendido"].map((tipo) => (
+          <button
+            key={tipo}
+            type="button"
+            onClick={() => setForm({ ...form, tipoEquipoPropiedad: tipo })}
+            className={`p-4 border-2 rounded-xl transition-all flex flex-col items-center gap-2 ${
+              form.tipoEquipoPropiedad === tipo
+                ? "border-blue-500 bg-blue-50 text-blue-700"
+                : "border-gray-200 hover:border-gray-300 text-gray-600"
+            }`}
+            disabled={loading}
+          >
+            {getTipoPropiedadIcon(tipo)}
+            <span className="font-medium text-sm">{tipo}</span>
+          </button>
+        ))}
+      </div>
+    </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Sede
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: Lima"
-                  value={form.sede}
-                  onChange={(e) => setForm({ ...form, sede: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                />
-              </div>
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Sede
+      </label>
+      <input
+        type="text"
+        placeholder="Ej: Lima"
+        value={form.sede}
+        onChange={(e) => setForm({ ...form, sede: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+    </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Almacén
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: Almacén Central"
-                  value={form.almacen}
-                  onChange={(e) => setForm({ ...form, almacen: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                />
-              </div>
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Almacén
+      </label>
+      <input
+        type="text"
+        placeholder="Ej: Almacén Central"
+        value={form.almacen}
+        onChange={(e) => setForm({ ...form, almacen: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+    </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Operador Logístico
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: DHL, Shalom"
-                  value={form.operadorLogistico}
-                  onChange={(e) => setForm({ ...form, operadorLogistico: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                />
-              </div>
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Operador Logístico
+      </label>
+      <input
+        type="text"
+        placeholder="Ej: DHL, Shalom"
+        value={form.operadorLogistico}
+        onChange={(e) => setForm({ ...form, operadorLogistico: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+    </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                >
-                  <option value="Almacen">Almacén</option>
-                  <option value="En compra">En compra</option>
-                  <option value="Entregado">Entregado</option>
-                </select>
-              </div>
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Status
+      </label>
+      <select
+        value={form.status}
+        onChange={(e) => setForm({ ...form, status: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      >
+        <option value="Almacen">Almacén</option>
+        <option value="En compra">En compra</option>
+        <option value="Entregado">Entregado</option>
+      </select>
+    </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Creticidad
-                </label>
-                <select
-                  value={form.creticidad}
-                  onChange={(e) => setForm({ ...form, creticidad: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                >
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                  <option value="C">C</option>
-                </select>
-              </div>
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Creticidad
+      </label>
+      <select
+        value={form.creticidad}
+        onChange={(e) => setForm({ ...form, creticidad: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      >
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+      </select>
+    </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Estado
-                </label>
-                <select
-                  value={form.estado}
-                  onChange={(e) => setForm({ ...form, estado: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                >
-                  <option value="No instalado">No instalado</option>
-                  <option value="Operativo">Operativo</option>
-                  <option value="Inoperativo">Inoperativo</option>
-                </select>
-              </div>
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Estado
+      </label>
+      <select
+        value={form.estado}
+        onChange={(e) => setForm({ ...form, estado: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      >
+        <option value="No instalado">No instalado</option>
+        <option value="Operativo">Operativo</option>
+        <option value="Inoperativo">Inoperativo</option>
+      </select>
+    </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  ID Placa
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: ABC-123"
-                  value={form.idPlaca}
-                  onChange={(e) => setForm({ ...form, idPlaca: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  disabled={loading}
-                />
-              </div>
-            </div>
-          )}
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        ID Placa
+      </label>
+      <input
+        type="text"
+        placeholder="Ej: ABC-123"
+        value={form.idPlaca}
+        onChange={(e) => setForm({ ...form, idPlaca: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+    </div>
+
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Familia
+      </label>
+
+      <div className="flex gap-2">
+        <select
+          value={showNewFamilia ? "nueva" : form.familiaId}
+          onChange={(e) => {
+            if (e.target.value === "nueva") {
+              setShowNewFamilia(true);
+              setForm({ ...form, familiaId: "" });
+            } else {
+              setShowNewFamilia(false);
+              setNewFamilia({ nombre: "", descripcion: "" });
+              setForm({ ...form, familiaId: e.target.value });
+            }
+          }}
+          className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+          disabled={loading}
+        >
+          <option value="">Seleccionar familia...</option>
+          {familias.map((familia) => (
+            <option key={familia.id} value={familia.id}>
+              {familia.nombre}
+            </option>
+          ))}
+          <option value="nueva">+ Crear nueva familia</option>
+        </select>
+      </div>
+
+      {showNewFamilia && (
+        <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-blue-900">Nueva Familia</p>
+            <button
+              type="button"
+              onClick={() => {
+                setShowNewFamilia(false);
+                setNewFamilia({ nombre: "", descripcion: "" });
+              }}
+              className="text-blue-700 hover:text-blue-900"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <input
+              type="text"
+              placeholder="Nombre de la familia"
+              value={newFamilia.nombre}
+              onChange={(e) =>
+                setNewFamilia({ ...newFamilia, nombre: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+            />
+
+            <input
+              type="text"
+              placeholder="Descripción de la familia"
+              value={newFamilia.descripcion}
+              onChange={(e) =>
+                setNewFamilia({ ...newFamilia, descripcion: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+            />
+
+            <p className="text-xs text-blue-700">
+              La familia se creará cuando guardes el equipo.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Tipo de Equipo
+      </label>
+      <input
+        type="text"
+        placeholder="Ej: Controlador, Rastreador"
+        value={form.tipoEquipo}
+        onChange={(e) => setForm({ ...form, tipoEquipo: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+    </div>
+
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Marca
+      </label>
+      <input
+        type="text"
+        placeholder="Ej: ZKTeco, Teltonika"
+        value={form.marca}
+        onChange={(e) => setForm({ ...form, marca: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+    </div>
+
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Modelo
+      </label>
+      <input
+        type="text"
+        placeholder="Ej: ProAccess X, FMB920"
+        value={form.modelo}
+        onChange={(e) => setForm({ ...form, modelo: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+    </div>
+
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Serie
+      </label>
+      <input
+        type="text"
+        placeholder="Ej: SERIE-0001"
+        value={form.serie}
+        onChange={(e) => setForm({ ...form, serie: e.target.value })}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+        disabled={loading}
+      />
+    </div>
+  </div>
+)}
 
           {/* TAB: Orden de Venta */}
           {activeTab === "orden" && (
