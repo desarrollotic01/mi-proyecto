@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // 👉 URL DEL BACKEND (ej: http://localhost:4000)
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const API_URL = import.meta.env.VITE_API_URL || "http://76.13.68.123:4000";
 
 const api = axios.create({
   baseURL: API_URL,

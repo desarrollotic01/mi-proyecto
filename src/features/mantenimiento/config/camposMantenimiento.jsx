@@ -1,4 +1,4 @@
-// Estados VISUALES (UI)
+// 1. Estados VISUALES (UI)
 export const ESTADOS_AV = {
   CREADO: {
     label: "Creado",
@@ -44,7 +44,7 @@ export const ESTADOS_AV = {
   },
 };
 
-// MAPEO BACKEND → UI (ESTO ES CLAVE)
+// 2. MAPEO BACKEND → UI
 export const ESTADO_KEY_MAP = {
   creado: "CREADO",
   tratado: "TRATADO",
@@ -54,3 +54,8 @@ export const ESTADO_KEY_MAP = {
   facturado: "FACTURADO",
   "finalizado sin facturacion": "FINALIZADO_SIN_FACTURACION",
 };
+
+// 3. MAPEO UI → BACKEND (Para actualizaciones)
+export const ESTADO_BACK_MAP = Object.fromEntries(
+  Object.entries(ESTADO_KEY_MAP).map(([k, v]) => [v, k])
+);
