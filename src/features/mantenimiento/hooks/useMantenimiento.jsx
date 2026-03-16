@@ -94,7 +94,7 @@ const DEFAULT_ORDER = [
   "documentoFinal",
 ];
 
-export const useMantenimiento = () => {
+export function useMantenimiento() {
   const calendarRef = useRef(null);
 
   /* ================= NAV ================= */
