@@ -5,6 +5,8 @@ export const equipoService = {
   createEquipo,
   updateEquipo,
   deleteEquipo,
+  getEquiposByClienteId,
+  actualizarAdjuntosPortal,
 };
 
 function getEquipos() {
@@ -12,6 +14,17 @@ function getEquipos() {
     return Array.isArray(res.data) ? res.data : [];
   });
 }
+
+function getEquiposByClienteId(clienteId) {
+  return api.get(`/equipo/cliente/${clienteId}`).then((res) => {
+    return Array.isArray(res.data?.data)
+      ? res.data.data
+      : Array.isArray(res.data)
+      ? res.data
+      : [];
+  });
+}
+
   
 
 function createEquipo(payload) {
@@ -24,4 +37,12 @@ function updateEquipo(id, payload) {
 
 function deleteEquipo(id) {
   return api.delete(`/equipo/${id}`).then(res => res.data);
+}
+
+
+async function actualizarAdjuntosPortal(equipoId, adjuntosPortal) {
+  const res = await api.put(`/equipo/${equipoId}/adjuntos-portal`, {
+    adjuntosPortal,
+  });
+  return res.data?.data || res.data;
 }

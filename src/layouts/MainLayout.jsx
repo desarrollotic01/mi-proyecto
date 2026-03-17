@@ -15,7 +15,8 @@ const catalogos = [
   { name: "Equipos", path: "/equipos" },
   { name: "Ubicaciones Técnicas", path: "/ubicaciones-tecnicas" },
   { name: "Clientes", path: "/clientes" },
-  { name: "Trabajadores", path: "/trabajadores" }
+  { name: "Trabajadores", path: "/trabajadores" },
+  { name: "Items", path: "/items" }
 ];
 
 export default function MainLayout({ children }) {
