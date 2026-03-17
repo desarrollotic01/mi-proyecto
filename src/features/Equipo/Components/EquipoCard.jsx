@@ -5,7 +5,11 @@ import {
   Globe, Shield, FileText, ChevronDown 
 } from "lucide-react";
 
-export default function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, moveCategory }) {
+
+
+
+//Cartas de equipos en el dashboard
+export default function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, onOpenPDF, moveCategory }) {
   // ESCUDO PROTECTOR: Evita pantalla en blanco si el equipo viene nulo
   if (!equipo) return null;
 
@@ -37,6 +41,7 @@ export default function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, o
           {equipo?.codigo || "S/C"}
         </span>
         <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg p-1 shadow-sm border">
+          <button onClick={() => onOpenPDF && onOpenPDF(equipo)} title="PDF" className="p-1 text-slate-400 hover:text-indigo-600"><FileText size={14}/></button>
           <button onClick={() => onCreatePlan(equipo)} title="Plan" className="p-1 text-slate-400 hover:text-emerald-600"><Wrench size={14}/></button>
           <button onClick={() => onView(equipo)} title="Ver" className="p-1 text-slate-400 hover:text-blue-600"><Eye size={14}/></button>
           <button onClick={() => onEdit(equipo)} title="Editar" className="p-1 text-slate-400 hover:text-amber-600"><Edit2 size={14}/></button>

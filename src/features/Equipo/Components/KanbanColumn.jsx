@@ -1,7 +1,9 @@
 import { Box } from "lucide-react";
 import EquipoCard from "./EquipoCard";
 
-export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onView, onMove, onCreatePlan, moveCategory }) {
+
+//kanban de equipos en el dashboard
+export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onView, onMove, onCreatePlan, onOpenPDF, moveCategory }) {
   const colorStyles = {
     blue: "bg-[#3b82f6]",
     orange: "bg-[#f59e0b]",
@@ -47,6 +49,7 @@ export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit
               onView={onView}
               onMove={onMove}
               onCreatePlan={onCreatePlan}
+              onOpenPDF={onOpenPDF}
               moveCategory={moveCategory}
             />
           ))

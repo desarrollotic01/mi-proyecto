@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   Search, Plus, AlertCircle, Loader2, Filter, ChevronDown,
   RefreshCw, List, Box, ShoppingCart, Building2, Wrench,
-  Package, CreditCard, Truck, Shield, Globe, Eye, Edit2, Trash2, CheckCircle
+  Package, CreditCard, Truck, Shield, Globe, Eye, Edit2, Trash2, CheckCircle, FileText
 } from "lucide-react";
 
 import { equipoService } from "../mantenimiento/services/equipoService";
@@ -16,6 +16,9 @@ import ModalCrearPlan from "../PlanMantenimiento/components/ModalCrearPlan";
 // Componentes limpios
 import KanbanColumn from "./Components/KanbanColumn";
 import EquipoDetailModal from "./Components/EquipoDetailModal";
+import { GlobalPDFModal } from "../../components/GlobalPDFModal.jsx";
+import { UbicacionPDF } from "../UbicacionTecnica/Components/UbicacionPDF.jsx";
+import { usePDFReport } from "../../hooks/usePDFReport.js";
 
 // =========================================================================
 // ATRAPADOR DE ERRORES: Evita la pantalla en blanco y muestra el error
@@ -65,6 +68,8 @@ function EquiposPageContent() {
   const [clientes, setClientes] = useState([]);
   const [familias, setFamilias] = useState([]);
   const [paises, setPaises] = useState([]);
+
+  const { pdfOpen, pdfData, setPdfOpen, handleOpenPDF } = usePDFReport(clientes, paises);
 
   const [viewMode, setViewMode] = useState("propiedad");
   const [modalOpen, setModalOpen] = useState(false);
@@ -388,7 +393,8 @@ function EquiposPageContent() {
                         </div>
                       </td>
                       <td className="p-4 align-middle">
-                        <div className="flex items-center justify-center gap-1">
+                          <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => handleOpenPDF(equipo)} className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg" title="Generar PDF"><FileText size={16} strokeWidth={2.5} /></button>
                           <button onClick={() => { setEquipoParaPlan(equipo); setPlanModalOpen(true); }} className="p-2 text-slate-400 hover:text-emerald-600 rounded-lg" title="Plan"><Wrench size={16} strokeWidth={2.5} /></button>
                           <button onClick={() => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} className="p-2 text-slate-400 hover:text-blue-600 rounded-lg" title="Detalle"><Eye size={16} strokeWidth={2.5} /></button>
                           <button onClick={() => { setEditing(equipo); setModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 rounded-lg" title="Editar"><Edit2 size={16} strokeWidth={2.5} /></button>
@@ -403,17 +409,17 @@ function EquiposPageContent() {
           </div>
         ) : (
           <div className="flex gap-4 overflow-x-auto pb-8 pt-2 no-scrollbar min-h-[600px] animate-in fade-in duration-300 items-start">
-            {viewMode === "propiedad" ? (
+                {viewMode === "propiedad" ? (
               <>
-                <KanbanColumn title="Vendidos" icon={ShoppingCart} color="blue" equipos={vendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad" />
-                <KanbanColumn title="Propios" icon={Building2} color="orange" equipos={propios} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad" />
-                <KanbanColumn title="Atendidos" icon={Wrench} color="purple" equipos={atendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="propiedad" />
+                <KanbanColumn title="Vendidos" icon={ShoppingCart} color="blue" equipos={vendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
+                <KanbanColumn title="Propios" icon={Building2} color="orange" equipos={propios} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
+                <KanbanColumn title="Atendidos" icon={Wrench} color="purple" equipos={atendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
               </>
             ) : (
               <>
-                <KanbanColumn title="Almacén" icon={Package} color="indigo" equipos={almacen} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica" />
-                <KanbanColumn title="En compra" icon={CreditCard} color="orange" equipos={enCompra} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica" />
-                <KanbanColumn title="Entregado" icon={CheckCircle} color="green" equipos={entregado} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} moveCategory="logistica" />
+                <KanbanColumn title="Almacén" icon={Package} color="indigo" equipos={almacen} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="logistica" />
+                <KanbanColumn title="En compra" icon={CreditCard} color="orange" equipos={enCompra} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="logistica" />
+                <KanbanColumn title="Entregado" icon={CheckCircle} color="green" equipos={entregado} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="logistica" />
               </>
             )}
           </div>
@@ -422,6 +428,9 @@ function EquiposPageContent() {
 
       <EquipoModal isOpen={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={handleSave} initialData={editing} clientes={clientes} familias={familias} paises={paises} />
       <EquipoDetailModal isOpen={detailModalOpen} onClose={() => { setDetailModalOpen(false); setSelectedEquipo(null); }} equipo={selectedEquipo} />
+      <GlobalPDFModal isOpen={pdfOpen} onClose={() => { setPdfOpen(false); }} title="Ficha Técnica de Equipo">
+        {pdfData && <UbicacionPDF data={pdfData} />}
+      </GlobalPDFModal>
       {planModalOpen && <ModalCrearPlan onClose={() => { setPlanModalOpen(false); setEquipoParaPlan(null); }} onCreated={handlePlanCreated} equipoPreseleccionado={equipoParaPlan} />}
     </div>
   );

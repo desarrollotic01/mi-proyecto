@@ -1,5 +1,9 @@
 import { Package, X, MapPin, Globe, Truck, FileText } from "lucide-react";
 
+
+
+
+//Modal de info Equipos
 export default function EquipoDetailModal({ isOpen, onClose, equipo }) {
   if (!isOpen || !equipo) return null;
 
