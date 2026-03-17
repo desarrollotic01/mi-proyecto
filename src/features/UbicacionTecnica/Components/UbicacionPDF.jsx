@@ -1,8 +1,6 @@
 import { Document, Page, Text, View } from '@react-pdf/renderer';
-
-// 🆕 Importamos nuestros componentes globales
-import { pdfStyles as styles } from '../../components/pdf/PDFStyles';
-import { PDFHeader, PDFFooter } from '../../components/pdf/PDFLayout';
+import { pdfStyles as styles } from '../../../components/pdf/PDFStyles';
+import { PDFHeader, PDFFooter } from '../../../components/pdf/PDFLayout';
 
 // Helpers para formatear datos
 const val = (x) => (x === null || x === undefined || x === "" ? "-" : String(x));

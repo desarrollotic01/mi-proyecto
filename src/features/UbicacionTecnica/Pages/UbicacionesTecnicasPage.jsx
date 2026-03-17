@@ -11,7 +11,7 @@ import { clienteService } from "../../mantenimiento/services/clienteService";
 
 // 🆕 Importamos el Modal Global y el Diseño del PDF
 import { GlobalPDFModal } from "../../../components/GlobalPDFModal";
-import { UbicacionPDF } from "../components/UbicacionPDF";
+import { UbicacionPDF } from "../Components/UbicacionPDF";
 
 const val = (x) => (x === null || x === undefined || x === "" ? "-" : String(x));
 
