@@ -84,118 +84,123 @@ export default function MantenimientoKanban({
   };
 
   const getTargetKey = (obj) => {
-  if (obj?.equipoId) return `E:${String(obj.equipoId)}`;
-  if (obj?.ubicacionTecnicaId) return `U:${String(obj.ubicacionTecnicaId)}`;
-  if (obj?.ubicacionId) return `U:${String(obj.ubicacionId)}`;
-  return null;
-};
+    if (obj?.equipoId) return `E:${String(obj.equipoId)}`;
+    if (obj?.ubicacionTecnicaId) return `U:${String(obj.ubicacionTecnicaId)}`;
+    if (obj?.ubicacionId) return `U:${String(obj.ubicacionId)}`;
+    return null;
+  };
 
-const reorganizarColumnasPorOTs = (columns) => {
-  const nuevasColumnas = {};
+  const reorganizarColumnasPorOTs = (columns) => {
+    const nuevasColumnas = {};
 
-  Object.keys(columns).forEach((colId) => {
-    nuevasColumnas[colId] = { items: [] };
-  });
+    Object.keys(columns).forEach((colId) => {
+      nuevasColumnas[colId] = { items: [] };
+    });
 
-  Object.values(columns).forEach((col) => {
-    col.items.forEach((item) => {
-      const otsDelAviso = ordenesTrabajoData.filter(
-        (ot) => String(ot.avisoId) === String(item.id)
-      );
+    Object.values(columns).forEach((col) => {
+      col.items.forEach((item) => {
+        const otsDelAviso = ordenesTrabajoData.filter(
+          (ot) => String(ot.avisoId) === String(item.id)
+        );
 
-      // Targets reales del aviso
-      const targetsAviso = new Set();
+        // Targets reales del aviso
+        const targetsAviso = new Set();
 
-      (item.equiposRelacion || []).forEach((rel) => {
-        const key = getTargetKey(rel);
-        if (key) targetsAviso.add(key);
-      });
+        (item.equiposRelacion || []).forEach((rel) => {
+          const key = getTargetKey(rel);
+          if (key) targetsAviso.add(key);
+        });
 
-      (item.ubicacionesRelacion || []).forEach((rel) => {
-        const key = getTargetKey(rel);
-        if (key) targetsAviso.add(key);
-      });
+        (item.ubicacionesRelacion || []).forEach((rel) => {
+          const key = getTargetKey(rel);
+          if (key) targetsAviso.add(key);
+        });
 
-      // Si no tiene OTs, se queda en su estado real
-      if (!otsDelAviso.length) {
-        nuevasColumnas[item.estado]?.items.push({
+        // Si no tiene OTs, se queda en su estado real
+        if (!otsDelAviso.length) {
+          nuevasColumnas[item.estado]?.items.push({
+            ...item,
+            _estadoReal: item.estado,
+            _estadoOriginal: item.estado,
+            _tieneOTs: false,
+            _esParcial: false,
+            _equiposPendientes: 0,
+            _cantidadOTs: 0,
+            _desglose: null,
+          });
+          return;
+        }
+
+        // Targets cubiertos por las OTs
+        const targetsConOT = new Set();
+
+        otsDelAviso.forEach((ot) => {
+          (ot.equipos || []).forEach((targetOT) => {
+            const key = getTargetKey(targetOT);
+            if (key) targetsConOT.add(key);
+          });
+        });
+
+        const totalTargetsAviso = targetsAviso.size;
+        const cantidadTargetsConOT = targetsConOT.size;
+        const equiposPendientes = Math.max(0, totalTargetsAviso - cantidadTargetsConOT);
+
+        const estaCompleto =
+          totalTargetsAviso > 0 && cantidadTargetsConOT >= totalTargetsAviso;
+
+        const esParcial =
+          cantidadTargetsConOT > 0 && cantidadTargetsConOT < totalTargetsAviso;
+
+        const porEstado = {};
+        otsDelAviso.forEach((ot) => {
+          const estadoOT = ot.estado || "CREADO";
+          porEstado[estadoOT] = (porEstado[estadoOT] || 0) + 1;
+        });
+
+        // Si hay al menos una OT y cubre todos los targets => CON_OT
+        // Si hay OT parcial => TRATADO
+        // Si por alguna razón no se pudo calcular targets del aviso, al menos mostrar CON_OT
+        let columnaDestino = "TRATADO";
+
+        if (totalTargetsAviso === 0) {
+          columnaDestino = "CON_OT";
+        } else if (estaCompleto) {
+          columnaDestino = "CON_OT";
+        } else if (esParcial) {
+          columnaDestino = "TRATADO";
+        }
+
+        nuevasColumnas[columnaDestino]?.items.push({
           ...item,
-          _estadoReal: item.estado,
           _estadoOriginal: item.estado,
-          _tieneOTs: false,
-          _esParcial: false,
-          _equiposPendientes: 0,
-          _cantidadOTs: 0,
-          _desglose: null,
+          _estadoReal: columnaDestino,
+          _tieneOTs: true,
+          _esParcial: esParcial,
+          _equiposPendientes: equiposPendientes,
+          _cantidadOTs: otsDelAviso.length,
+          _desglose: {
+            total: otsDelAviso.length,
+            porEstado,
+            equiposConOT: cantidadTargetsConOT,
+            equiposTotales: totalTargetsAviso,
+            esMultiple: otsDelAviso.length > 1,
+          },
         });
-        return;
-      }
-
-      // Targets cubiertos por las OTs
-      const targetsConOT = new Set();
-
-      otsDelAviso.forEach((ot) => {
-        (ot.equipos || []).forEach((targetOT) => {
-          const key = getTargetKey(targetOT);
-          if (key) targetsConOT.add(key);
-        });
-      });
-
-      const totalTargetsAviso = targetsAviso.size;
-      const cantidadTargetsConOT = targetsConOT.size;
-      const equiposPendientes = Math.max(0, totalTargetsAviso - cantidadTargetsConOT);
-
-      const estaCompleto =
-        totalTargetsAviso > 0 && cantidadTargetsConOT >= totalTargetsAviso;
-
-      const esParcial =
-        cantidadTargetsConOT > 0 && cantidadTargetsConOT < totalTargetsAviso;
-
-      const porEstado = {};
-      otsDelAviso.forEach((ot) => {
-        const estadoOT = ot.estado || "CREADO";
-        porEstado[estadoOT] = (porEstado[estadoOT] || 0) + 1;
-      });
-
-      // Si hay al menos una OT y cubre todos los targets => CON_OT
-      // Si hay OT parcial => TRATADO
-      // Si por alguna razón no se pudo calcular targets del aviso, al menos mostrar CON_OT
-      let columnaDestino = "TRATADO";
-
-      if (totalTargetsAviso === 0) {
-        columnaDestino = "CON_OT";
-      } else if (estaCompleto) {
-        columnaDestino = "CON_OT";
-      } else if (esParcial) {
-        columnaDestino = "TRATADO";
-      }
-
-      nuevasColumnas[columnaDestino]?.items.push({
-        ...item,
-        _estadoOriginal: item.estado,
-        _estadoReal: columnaDestino,
-        _tieneOTs: true,
-        _esParcial: esParcial,
-        _equiposPendientes: equiposPendientes,
-        _cantidadOTs: otsDelAviso.length,
-        _desglose: {
-          total: otsDelAviso.length,
-          porEstado,
-          equiposConOT: cantidadTargetsConOT,
-          equiposTotales: totalTargetsAviso,
-          esMultiple: otsDelAviso.length > 1,
-        },
       });
     });
-  });
 
-  return nuevasColumnas;
-};
+    return nuevasColumnas;
+  };
+
   const columnasReorganizadas = reorganizarColumnasPorOTs(filteredColumns);
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 h-[calc(100vh-200px)] items-start gap-4 h-[calc(100vh-200px)]">
+      {/* CORRECCIÓN RESPONSIVE AQUÍ:
+        Se reemplazó el grid por flex con scroll horizontal (overflow-x-auto) 
+        y alturas basadas en dvh para evitar el desborde en móviles.
+      */}
+      <div className="flex items-start overflow-x-auto overflow-y-hidden gap-4 pb-4 px-2 w-full h-[calc(100dvh-160px)] md:h-[calc(100vh-200px)] snap-x snap-mandatory">
         {Object.entries(columnasReorganizadas).map(([colId, col]) => {
           const Icon = getColumnIcon(colId);
           const gradient = getColumnColor(colId);
@@ -206,20 +211,21 @@ const reorganizarColumnasPorOTs = (columns) => {
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`flex flex-col rounded-2xl transition-all shadow-lg h-full ${
+                  // Se asigna un ancho relativo en móvil (85vw) y fijo en desktop (320px)
+                  className={`flex flex-col rounded-2xl transition-all shadow-lg max-h-full w-[85vw] sm:w-[320px] lg:w-[340px] flex-shrink-0 snap-center md:snap-align-none ${
                     snapshot.isDraggingOver
                       ? "bg-blue-50 ring-2 ring-blue-400"
                       : "bg-white border-2 border-slate-200"
                   }`}
                 >
-                  {/* HEADER DE COLUMNA */}
-                  <div className={`p-5 rounded-t-2xl bg-gradient-to-br ${gradient} text-white shadow-md flex-shrink-0`}>
+                  {/* HEADER DE COLUMNA INTACTO */}
+                  <div className={`p-5 rounded-t-xl bg-gradient-to-br ${gradient} text-white shadow-md flex-shrink-0 sticky top-0 z-10`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
                         <div className="p-2.5 bg-white/25 rounded-xl backdrop-blur-sm border border-white/30">
                           <Icon className="w-5 h-5" strokeWidth={2.5} />
                         </div>
-                        <h3 className="font-bold text-base">
+                        <h3 className="font-bold text-base truncate pr-2">
                           {ESTADOS_AV[colId]?.label}
                         </h3>
                       </div>
@@ -230,7 +236,7 @@ const reorganizarColumnasPorOTs = (columns) => {
                   </div>
 
                   {/* TARJETAS */}
-                  <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50 to-white">
+                  <div className="flex-1 min-h-0 p-4 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50 to-white">
                     {col.items.map((item, i) => {
                       const tieneDesglose = item._desglose && item._desglose.total > 1;
                       const esParcial = item._esParcial;
@@ -254,7 +260,7 @@ const reorganizarColumnasPorOTs = (columns) => {
                               }}
                               className={`bg-white rounded-xl border-2 shadow-md transition-all duration-200 cursor-pointer group relative flex flex-col ${
                                 snapshot.isDragging
-                                  ? "border-blue-500 shadow-2xl scale-105 rotate-1 ring-4 ring-blue-200"
+                                  ? "border-blue-500 shadow-2xl scale-[1.02] rotate-1 ring-4 ring-blue-200 z-50"
                                   : tieneDesglose
                                   ? "border-purple-300 hover:border-purple-400 hover:shadow-xl"
                                   : esParcial
@@ -264,13 +270,13 @@ const reorganizarColumnasPorOTs = (columns) => {
                             >
                               {/* Indicador de OT múltiple */}
                               {tieneDesglose && (
-                                <div className="absolute -top-2 -right-2 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-full px-2.5 py-1 text-xs font-bold shadow-lg border-2 border-white flex items-center gap-1">
+                                <div className="absolute -top-2 -right-2 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-full px-2.5 py-1 text-xs font-bold shadow-lg border-2 border-white flex items-center gap-1 z-10">
                                   <Layers className="w-3 h-3" />
                                   {item._desglose.total} OTs
                                 </div>
                               )}
 
-                              {/* CARD CONTENT */}
+                              {/* CARD CONTENT INTACTO */}
                               <div className="flex-1 p-4 space-y-3">
                                 {/* CONTENIDO DINÁMICO */}
                                 {columnOrder.map((key) => {
@@ -341,16 +347,16 @@ const reorganizarColumnasPorOTs = (columns) => {
                                     case "solicitante":
                                       return item.solicitante ? (
                                         <div key={key} className="text-xs text-slate-600 flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
-                                          <User className="w-3 h-3" />
-                                          {item.solicitante}
+                                          <User className="w-3 h-3 flex-shrink-0" />
+                                          <span className="truncate">{item.solicitante}</span>
                                         </div>
                                       ) : null;
 
                                     case "tipoMantenimiento":
                                       return item.tipoMantenimiento ? (
                                         <div key={key} className="flex items-center gap-1.5">
-                                          <Wrench className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-700 font-medium">
+                                          <Wrench className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                          <span className="text-xs text-slate-700 font-medium truncate">
                                             {item.tipoMantenimiento}
                                           </span>
                                         </div>
@@ -360,7 +366,7 @@ const reorganizarColumnasPorOTs = (columns) => {
                                       return (
                                         <div key={key} className="flex items-center gap-1">
                                           <span
-                                            className={`text-xs font-bold px-2.5 py-1 rounded-lg border-2 ${
+                                            className={`text-xs font-bold px-2.5 py-1 rounded-lg border-2 flex-shrink-0 ${
                                               item.tipoAviso === "mantenimiento"
                                                 ? "bg-blue-50 text-blue-700 border-blue-300"
                                                 : "bg-green-50 text-green-700 border-green-300"
@@ -379,12 +385,12 @@ const reorganizarColumnasPorOTs = (columns) => {
                                       
                                       return primerEquipo ? (
                                         <div key={key} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1.5 rounded-lg">
-                                          <Package className="w-3.5 h-3.5 text-slate-500" />
+                                          <Package className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
                                           <span className="text-xs text-slate-700 font-medium line-clamp-1">
                                             {primerEquipo.nombre}
                                           </span>
                                           {item.equiposRelacion.length > 1 && (
-                                            <span className="text-xs text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded-full ml-auto font-bold">
+                                            <span className="text-xs text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded-full ml-auto font-bold flex-shrink-0">
                                               +{item.equiposRelacion.length - 1}
                                             </span>
                                           )}
@@ -394,8 +400,8 @@ const reorganizarColumnasPorOTs = (columns) => {
                                     case "ordenVenta":
                                       return item.ordenVenta ? (
                                         <div key={key} className="flex items-center gap-1.5">
-                                          <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-600">
+                                          <Briefcase className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                          <span className="text-xs text-slate-600 truncate">
                                             <span className="font-bold">OV:</span> {item.ordenVenta}
                                           </span>
                                         </div>
@@ -404,8 +410,8 @@ const reorganizarColumnasPorOTs = (columns) => {
                                     case "centroCosto":
                                       return item.centroCosto ? (
                                         <div key={key} className="flex items-center gap-1.5">
-                                          <DollarSign className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-600">
+                                          <DollarSign className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                          <span className="text-xs text-slate-600 truncate">
                                             <span className="font-bold">CC:</span> {item.centroCosto}
                                           </span>
                                         </div>
@@ -414,7 +420,7 @@ const reorganizarColumnasPorOTs = (columns) => {
                                     case "producto":
                                       return item.producto ? (
                                         <div key={key} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
-                                          <Package className="w-3.5 h-3.5 text-slate-400" />
+                                          <Package className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                                           <span className="text-xs text-slate-700 line-clamp-1">
                                             {item.producto}
                                           </span>
@@ -431,7 +437,7 @@ const reorganizarColumnasPorOTs = (columns) => {
                                     case "ubicacionTecnica":
                                       return item.ubicacionTecnica ? (
                                         <div key={key} className="flex items-center gap-1.5">
-                                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                                          <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                                           <span className="text-xs text-slate-600 line-clamp-1">
                                             {item.ubicacionTecnica}
                                           </span>
@@ -441,8 +447,8 @@ const reorganizarColumnasPorOTs = (columns) => {
                                     case "nombreContacto":
                                       return item.nombreContacto ? (
                                         <div key={key} className="flex items-center gap-1.5">
-                                          <User className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-600">
+                                          <User className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                          <span className="text-xs text-slate-600 truncate">
                                             {item.nombreContacto}
                                           </span>
                                         </div>
@@ -451,7 +457,7 @@ const reorganizarColumnasPorOTs = (columns) => {
                                     case "correoContacto":
                                       return item.correoContacto ? (
                                         <div key={key} className="flex items-center gap-1.5">
-                                          <Mail className="w-3.5 h-3.5 text-slate-400" />
+                                          <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                                           <span className="text-xs text-slate-600 truncate">
                                             {item.correoContacto}
                                           </span>
@@ -461,8 +467,8 @@ const reorganizarColumnasPorOTs = (columns) => {
                                     case "numeroContacto":
                                       return item.numeroContacto ? (
                                         <div key={key} className="flex items-center gap-1.5">
-                                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-600">
+                                          <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                          <span className="text-xs text-slate-600 truncate">
                                             {item.numeroContacto}
                                           </span>
                                         </div>
@@ -470,28 +476,28 @@ const reorganizarColumnasPorOTs = (columns) => {
 
                                     default:
                                       return item[key] ? (
-                                        <div key={key} className="text-xs text-slate-600">
+                                        <div key={key} className="text-xs text-slate-600 truncate">
                                           {item[key]}
                                         </div>
                                       ) : null;
                                   }
                                 })}
 
-                                {/* DESGLOSE DE ESTADOS */}
+                                {/* DESGLOSE DE ESTADOS INTACTO */}
                                 <DesgloseEstados desglose={item._desglose} />
 
                                 {/* BADGE DE ORDEN PARCIAL con barra de progreso */}
                                 {esParcial && (
                                   <div className="pt-3 border-t border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 -mx-4 -mb-4 px-4 pb-3 rounded-b-xl mt-auto">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div className="flex items-center gap-2">
-                                        <AlertTriangle className="w-4 h-4 text-orange-600" />
-                                        <span className="text-xs font-bold text-orange-800">
+                                    <div className="flex items-center justify-between mb-2 gap-2">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0" />
+                                        <span className="text-[11px] sm:text-xs font-bold text-orange-800 truncate">
                                           Orden de Trabajo Parcial
                                         </span>
                                       </div>
-                                      <span className="px-2 py-1 bg-orange-200 text-orange-800 rounded-full text-xs font-bold">
-                                        {item._equiposPendientes} pendiente{item._equiposPendientes !== 1 ? 's' : ''}
+                                      <span className="px-2 py-1 bg-orange-200 text-orange-800 rounded-full text-xs font-bold whitespace-nowrap">
+                                        {item._equiposPendientes} pdtes.
                                       </span>
                                     </div>
                                     <div className="w-full bg-orange-200 rounded-full h-2 overflow-hidden">
@@ -509,16 +515,16 @@ const reorganizarColumnasPorOTs = (columns) => {
                                 )}
                               </div>
 
-                              {/* BOTONES DE ACCIÓN */}
+                              {/* BOTONES DE ACCIÓN: flex-wrap añadido para evitar que colapsen en pantallas chicas */}
                               <div
-                                className="px-4 pb-4 flex gap-2 flex-shrink-0"
+                                className="px-4 pb-4 flex flex-wrap sm:flex-nowrap gap-2 flex-shrink-0"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {estadoReal === "CREADO" && (
                                   <>
                                     <button
                                       onClick={() => abrirTratamiento(item)}
-                                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs font-bold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
+                                      className="flex-1 min-w-[120px] px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs font-bold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
                                     >
                                       <Wrench className="w-4 h-4" />
                                       Tratar
@@ -526,7 +532,7 @@ const reorganizarColumnasPorOTs = (columns) => {
 
                                     <button
                                       onClick={() => cambiarEstado(item, "RECHAZADO")}
-                                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
+                                      className="flex-1 min-w-[120px] px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
                                     >
                                       <XCircle className="w-4 h-4" />
                                       Rechazar
@@ -548,7 +554,7 @@ const reorganizarColumnasPorOTs = (columns) => {
                                   <>
                                     <button
                                       onClick={() => cambiarEstado(item, "FINALIZADO")}
-                                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs font-bold rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
+                                      className="flex-1 min-w-[120px] px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs font-bold rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
                                     >
                                       <CheckCircle className="w-4 h-4" />
                                       Finalizar
@@ -556,7 +562,7 @@ const reorganizarColumnasPorOTs = (columns) => {
 
                                     <button
                                       onClick={() => cambiarEstado(item, "FINALIZADO_SIN_FACTURACION")}
-                                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-slate-500 to-slate-600 text-white text-xs font-bold rounded-lg hover:from-slate-600 hover:to-slate-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
+                                      className="flex-1 min-w-[120px] px-4 py-2.5 bg-gradient-to-r from-slate-500 to-slate-600 text-white text-xs font-bold rounded-lg hover:from-slate-600 hover:to-slate-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
                                     >
                                       <FileCheck className="w-4 h-4" />
                                       Sin Fact.
@@ -572,7 +578,7 @@ const reorganizarColumnasPorOTs = (columns) => {
 
                     {provided.placeholder}
 
-                    {/* EMPTY STATE */}
+                    {/* EMPTY STATE INTACTO */}
                     {col.items.length === 0 && !snapshot.isDraggingOver && (
                       <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                         <div className="bg-slate-100 rounded-2xl p-6 mb-4">

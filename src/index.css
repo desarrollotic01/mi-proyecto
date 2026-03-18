@@ -22,3 +22,14 @@
 .animate-slide-up {
   animation: slide-up 0.25s ease-out;
 }
+
+
+/* compoentes/ MantemientoKaban */
+/* Oculta la barra de desplazamiento visualmente, pero permite scrollear */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}
