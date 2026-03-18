@@ -66,13 +66,11 @@ const TrabajadoresPage = () => {
       if (modalMode === 'create') {
         await trabajadorService.createTrabajador(payloadLimpio);
       } else {
-        // payloadLimpio ya viene sanitizado desde el modal, se lo pasamos directo
         await trabajadorService.updateTrabajador(selectedTrabajador.id, payloadLimpio);
       }
       loadTrabajadores();
       handleModalClose();
     } catch (err) {
-      // Relanzamos el error para que el modal lo capture y lo muestre en rojo
       throw err; 
     }
   };
@@ -153,10 +151,10 @@ const TrabajadoresPage = () => {
           <thead>
             <tr>
               <th width="5%">#</th>
-              <th width="20%">IDENTIFICACIÓN</th>
-              <th width="25%">DATOS DEL TRABAJADOR</th>
-              <th width="25%">EMPRESA / UBICACIÓN</th>
-              <th width="15%">ROL / ESTADO</th>
+              <th width="25%">DATOS PERSONALES</th>
+              <th width="25%">DATOS LABORALES</th>
+              <th width="25%">UBICACIÓN & FECHAS</th>
+              <th width="10%">ESTADO</th>
               <th width="10%" className="text-right">ACCIONES</th>
             </tr>
           </thead>
@@ -167,29 +165,45 @@ const TrabajadoresPage = () => {
               filteredTrabajadores.map((trabajador, index) => (
                 <tr key={trabajador.id}>
                   <td className="row-number">{index + 1}</td>
-                  <td>
-                    <div className="cell-group">
-                      <span className="data-label">DNI: <strong className="text-blue">{trabajador.dni}</strong></span>
-                    </div>
-                  </td>
+                  
+                  {/* DATOS PERSONALES: Nombre, Apellido, DNI */}
                   <td>
                     <div className="cell-group">
                       <span className="data-title text-black">{trabajador.nombre.toUpperCase()}</span>
                       <span className="data-label">APELLIDO: <strong>{trabajador.apellido}</strong></span>
+                      <span className="data-label">DNI: <strong className="text-blue">{trabajador.dni}</strong></span>
                     </div>
                   </td>
+                  
+                  {/* DATOS LABORALES: Empresa, Rol */}
                   <td>
                     <div className="cell-group">
-                      <span className="data-title text-black">{trabajador.empresa.toUpperCase()}</span>
-                      <span className="data-label">SEDE: <strong>Central</strong></span>
+                      <span className="data-title text-black">{trabajador.empresa ? trabajador.empresa.toUpperCase() : 'N/A'}</span>
+                      <span className="data-label">ROL: <strong>{getRolLabel(trabajador.rol)}</strong></span>
                     </div>
                   </td>
+
+                  {/* UBICACIÓN & FECHAS: Zona, Dirección, Fecha de Nacimiento */}
                   <td>
                     <div className="cell-group">
-                      <span className="data-label">PUESTO: <strong>{getRolLabel(trabajador.rol)}</strong></span>
-                      <span className="data-label">ESTADO: <strong className={trabajador.activo ? 'text-green' : 'text-red'}>{trabajador.activo ? 'Activo' : 'Inactivo'}</strong></span>
+                      <span className="data-label">ZONA: <strong>{trabajador.zona || 'N/A'}</strong></span>
+                      <span className="data-label">DIRECCIÓN: <strong>{trabajador.direccion || 'N/A'}</strong></span>
+                      <span className="data-label">F. NACIMIENTO: <strong>{trabajador.fechaNacimiento || 'N/A'}</strong></span>
                     </div>
                   </td>
+
+                  {/* ESTADO: Activo o Inactivo */}
+                  <td>
+                    <div className="cell-group">
+                      <span className="data-label">
+                        <strong className={trabajador.activo ? 'text-green' : 'text-red'}>
+                           {trabajador.activo ? '● Activo' : '● Inactivo'}
+                        </strong>
+                      </span>
+                    </div>
+                  </td>
+                  
+                  {/* ACCIONES */}
                   <td>
                     <div className="actions-group">
                       <button className="btn-action view" title="Ver detalle">
@@ -198,7 +212,7 @@ const TrabajadoresPage = () => {
                       <button onClick={() => handleEdit(trabajador)} className="btn-action edit" title="Editar">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                       </button>
-                      <button onClick={() => handleDelete(trabajador.id)} className="btn-action delete" title="Eliminar">
+                      <button onClick={() => handleDelete(trabajador.id)} className="btn-action delete" title="Desactivar">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                       </button>
                     </div>
