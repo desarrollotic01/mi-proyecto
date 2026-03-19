@@ -65,7 +65,7 @@ export default function ClientesPage() {
       setError("Error al cargar los clientes. Verifica que el backend esté corriendo.");
       console.error(err);
     } finally {
-      setLoading(false);
+      loading(false);
     }
   };
 
@@ -284,9 +284,25 @@ export default function ClientesPage() {
                         {c.razonSocial || "-"}
                       </td>
                       <td className="px-4 py-3 border-r border-gray-100">{c.ruc || "-"}</td>
-                      <td className="px-4 py-3 border-r border-gray-100 min-w-[320px]">{c.direccion || "-"}</td>
-                      <td className="px-4 py-3 border-r border-gray-100">{c.telefono || "-"}</td>
-                      <td className="px-4 py-3 border-r border-gray-100 min-w-[220px]">{c.correo || "-"}</td>
+                      <td className="px-4 py-3 border-r border-gray-100 min-w-[320px] max-w-[320px] truncate" title={c.direccion}>
+                        {c.direccion || "-"}
+                      </td>
+                      
+                      {/* CORRECCIÓN DE LA COLUMNA DE TELÉFONO AQUÍ */}
+                      <td 
+                        className="px-4 py-3 border-r border-gray-100 max-w-[180px] truncate text-gray-700" 
+                        title={c.telefono}
+                      >
+                        {c.telefono ? (
+                          c.telefono.includes(',') 
+                            ? `${c.telefono.split(',')[0].trim()} (+${c.telefono.split(',').length - 1})` 
+                            : c.telefono
+                        ) : "-"}
+                      </td>
+
+                      <td className="px-4 py-3 border-r border-gray-100 min-w-[220px] max-w-[220px] truncate" title={c.correo}>
+                        {c.correo || "-"}
+                      </td>
                       <td className="px-4 py-3 border-r border-gray-100">{c.tipoCliente || "-"}</td>
                       <td className="px-4 py-3 border-r border-gray-100">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getEstadoBadge(c.estado)}`}>
