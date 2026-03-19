@@ -11,7 +11,9 @@ import {
   ShoppingCart,
   Boxes,
   Loader2,
+  Edit,
 } from "lucide-react";
+
 import { getSolicitudesTratamientoPorOrdenTrabajo } from "../../mantenimiento/services/ordenTrabajoService";
 import { equipoService } from "../../mantenimiento/services/equipoService";
 
@@ -20,8 +22,19 @@ import ModalSolicitudAlmacen from "../../../components/inputs/ModalSolicitudAlma
 
 import { createSolicitudCompra } from "../../OrdenTrabajo/services/SolicitudCompraService";
 import { createSolicitudAlmacen } from "../../OrdenTrabajo/services/solicitudAlmacenService";
+import { updateOrdenTrabajoCompleta } from "../../mantenimiento/services/ordenTrabajoService";
 
-export default function ModalOrdenTrabajoView({ isOpen, orden, onClose }) {
+import ModalOTGrupal from "../../OrdenTrabajo/ModalOTGrupal";
+
+export default function ModalOrdenTrabajoView({
+  isOpen,
+  orden,
+  onClose,
+  onUpdateEstado,
+  onLiberar,
+  onAbrirCierreTecnico,
+  onOrdenActualizada, // opcional para refrescar lista en el padre
+}) {
   const [tab, setTab] = useState("informacion");
   const [detalleSolicitudes, setDetalleSolicitudes] = useState(null);
   const [loadingSolicitudes, setLoadingSolicitudes] = useState(false);
@@ -33,6 +46,9 @@ export default function ModalOrdenTrabajoView({ isOpen, orden, onClose }) {
 
   const [equiposDetalleMap, setEquiposDetalleMap] = useState({});
   const [loadingEquiposDetalle, setLoadingEquiposDetalle] = useState(false);
+
+  const [openEditarOT, setOpenEditarOT] = useState(false);
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
   const recargarSolicitudes = async () => {
     if (!orden?.id) return;
@@ -127,39 +143,41 @@ export default function ModalOrdenTrabajoView({ isOpen, orden, onClose }) {
   };
 
   const tonosEquipo = [
-  {
-    card: "bg-sky-50 border-sky-200",
-    header: "bg-sky-100 border-sky-200 text-sky-900",
-    badge: "bg-sky-100 text-sky-700 border-sky-200",
-    section: "bg-white border-sky-100",
-  },
-  {
-    card: "bg-emerald-50 border-emerald-200",
-    header: "bg-emerald-100 border-emerald-200 text-emerald-900",
-    badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
-    section: "bg-white border-emerald-100",
-  },
-  {
-    card: "bg-violet-50 border-violet-200",
-    header: "bg-violet-100 border-violet-200 text-violet-900",
-    badge: "bg-violet-100 text-violet-700 border-violet-200",
-    section: "bg-white border-violet-100",
-  },
-  {
-    card: "bg-amber-50 border-amber-200",
-    header: "bg-amber-100 border-amber-200 text-amber-900",
-    badge: "bg-amber-100 text-amber-700 border-amber-200",
-    section: "bg-white border-amber-100",
-  },
-];
+    {
+      card: "bg-sky-50 border-sky-200",
+      header: "bg-sky-100 border-sky-200 text-sky-900",
+      badge: "bg-sky-100 text-sky-700 border-sky-200",
+      section: "bg-white border-sky-100",
+    },
+    {
+      card: "bg-emerald-50 border-emerald-200",
+      header: "bg-emerald-100 border-emerald-200 text-emerald-900",
+      badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
+      section: "bg-white border-emerald-100",
+    },
+    {
+      card: "bg-violet-50 border-violet-200",
+      header: "bg-violet-100 border-violet-200 text-violet-900",
+      badge: "bg-violet-100 text-violet-700 border-violet-200",
+      section: "bg-white border-violet-100",
+    },
+    {
+      card: "bg-amber-50 border-amber-200",
+      header: "bg-amber-100 border-amber-200 text-amber-900",
+      badge: "bg-amber-100 text-amber-700 border-amber-200",
+      section: "bg-white border-amber-100",
+    },
+  ];
 
-const getTonoEquipo = (index) => tonosEquipo[index % tonosEquipo.length];
+  const getTonoEquipo = (index) => tonosEquipo[index % tonosEquipo.length];
 
   const estadoColor = {
     CREADO: "bg-slate-100 text-slate-700 border-slate-300",
-    EN_PROCESO: "bg-amber-50 text-amber-700 border-amber-200",
+    LIBERADO: "bg-violet-50 text-violet-700 border-violet-200",
+    CIERRE_TECNICO: "bg-amber-50 text-amber-700 border-amber-200",
+    CERRADO: "bg-green-50 text-green-700 border-green-200",
     FINALIZADO: "bg-green-50 text-green-700 border-green-200",
-    LIBERADO: "bg-slate-100 text-slate-800 border-slate-300",
+    EN_PROCESO: "bg-amber-50 text-amber-700 border-amber-200",
     CANCELADO: "bg-red-50 text-red-700 border-red-200",
   };
 
@@ -175,11 +193,11 @@ const getTonoEquipo = (index) => tonosEquipo[index % tonosEquipo.length];
   };
 
   const SectionTitle = ({ icon: Icon, title }) => (
-  <h4 className="font-semibold text-sm text-slate-800 mb-3 flex items-center gap-2">
-    <Icon className="w-4 h-4 text-slate-500" />
-    {title}
-  </h4>
-);
+    <h4 className="font-semibold text-sm text-slate-800 mb-3 flex items-center gap-2">
+      <Icon className="w-4 h-4 text-slate-500" />
+      {title}
+    </h4>
+  );
 
   const tratamiento = detalleSolicitudes?.tratamiento || null;
 
@@ -276,9 +294,7 @@ const getTonoEquipo = (index) => tonosEquipo[index % tonosEquipo.length];
   const tieneLineasValidas = (solicitud) =>
     Array.isArray(solicitud?.lineas) &&
     solicitud.lineas.some(
-      (l) =>
-        (l.itemCode?.trim() || l.description?.trim()) &&
-        Number(l.quantity) > 0
+      (l) => (l.itemCode?.trim() || l.description?.trim()) && Number(l.quantity) > 0
     );
 
   const getEquipoDetalle = (eq) => {
@@ -315,45 +331,160 @@ const getTonoEquipo = (index) => tonosEquipo[index % tonosEquipo.length];
     );
   };
 
+  const estadoActual = orden?.estado || "";
+
+  const handleLiberarOrden = async () => {
+    try {
+      await onLiberar?.(orden.id);
+      onClose?.();
+    } catch (error) {
+      console.error("Error al liberar OT:", error);
+    }
+  };
+
+  const handleAbrirCierre = async () => {
+    try {
+      await onAbrirCierreTecnico?.(orden);
+      onClose?.();
+    } catch (error) {
+      console.error("Error al abrir cierre técnico:", error);
+    }
+  };
+
+  const handleCambiarEstadoOrden = async (nuevoEstado) => {
+    try {
+      await onUpdateEstado?.(orden.id, nuevoEstado);
+      onClose?.();
+    } catch (error) {
+      console.error("Error al cambiar estado de OT:", error);
+    }
+  };
+
+  const handleEditarOT = async (payload) => {
+    try {
+      setGuardandoEdicion(true);
+
+      const response = await updateOrdenTrabajoCompleta(orden.id, payload);
+      const ordenActualizada = response?.data || response;
+
+      setOpenEditarOT(false);
+
+      if (typeof onOrdenActualizada === "function") {
+        await onOrdenActualizada(ordenActualizada);
+      }
+
+      onClose?.();
+    } catch (error) {
+      console.error("Error al editar la OT:", error);
+      alert(
+        error?.response?.data?.message ||
+          error?.message ||
+          "No se pudo actualizar la orden de trabajo"
+      );
+    } finally {
+      setGuardandoEdicion(false);
+    }
+  };
+
+  const renderActionButtons = () => {
+    if (!orden) return null;
+
+    return (
+      <div className="flex gap-2 flex-wrap justify-end">
+        <button
+          onClick={() => setOpenEditarOT(true)}
+          className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+          disabled={guardandoEdicion}
+        >
+          <Edit className="w-4 h-4" />
+          {guardandoEdicion ? "Guardando..." : "Editar"}
+        </button>
+
+        {estadoActual === "CREADO" && (
+          <>
+            <button
+              onClick={handleLiberarOrden}
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              Liberar
+            </button>
+
+            <button
+              onClick={() => handleCambiarEstadoOrden("CANCELADO")}
+              className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              Cancelar
+            </button>
+          </>
+        )}
+
+        {estadoActual === "LIBERADO" && (
+          <>
+            <button
+              onClick={handleAbrirCierre}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              Cierre Técnico
+            </button>
+
+            <button
+              onClick={() => handleCambiarEstadoOrden("CANCELADO")}
+              className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              Cancelar
+            </button>
+          </>
+        )}
+
+        {estadoActual === "CIERRE_TECNICO" && (
+          <button
+            onClick={() => handleCambiarEstadoOrden("CERRADO")}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+            Cerrar OT
+          </button>
+        )}
+      </div>
+    );
+  };
+
   const getSolicitudesCompraDeEquipo = (eq) => {
-  const equipoId = eq.equipoId ? String(eq.equipoId) : null;
-  const ubicacionTecnicaId = eq.ubicacionTecnicaId
-    ? String(eq.ubicacionTecnicaId)
-    : null;
-
-  return (solicitudesCompra.especificas || []).filter((s) => {
-    const solicitudEquipoId = s.equipo_id ? String(s.equipo_id) : null;
-    const solicitudUbicacionId = s.ubicacion_tecnica_id
-      ? String(s.ubicacion_tecnica_id)
+    const equipoId = eq.equipoId ? String(eq.equipoId) : null;
+    const ubicacionTecnicaId = eq.ubicacionTecnicaId
+      ? String(eq.ubicacionTecnicaId)
       : null;
 
-    if (equipoId && solicitudEquipoId === equipoId) return true;
-    if (ubicacionTecnicaId && solicitudUbicacionId === ubicacionTecnicaId)
-      return true;
+    return (solicitudesCompra.especificas || []).filter((s) => {
+      const solicitudEquipoId = s.equipo_id ? String(s.equipo_id) : null;
+      const solicitudUbicacionId = s.ubicacion_tecnica_id
+        ? String(s.ubicacion_tecnica_id)
+        : null;
 
-    return false;
-  });
-};
+      if (equipoId && solicitudEquipoId === equipoId) return true;
+      if (ubicacionTecnicaId && solicitudUbicacionId === ubicacionTecnicaId) return true;
 
-const getSolicitudesAlmacenDeEquipo = (eq) => {
-  const equipoId = eq.equipoId ? String(eq.equipoId) : null;
-  const ubicacionTecnicaId = eq.ubicacionTecnicaId
-    ? String(eq.ubicacionTecnicaId)
-    : null;
+      return false;
+    });
+  };
 
-  return (solicitudesAlmacen.especificas || []).filter((s) => {
-    const solicitudEquipoId = s.equipo_id ? String(s.equipo_id) : null;
-    const solicitudUbicacionId = s.ubicacion_tecnica_id
-      ? String(s.ubicacion_tecnica_id)
+  const getSolicitudesAlmacenDeEquipo = (eq) => {
+    const equipoId = eq.equipoId ? String(eq.equipoId) : null;
+    const ubicacionTecnicaId = eq.ubicacionTecnicaId
+      ? String(eq.ubicacionTecnicaId)
       : null;
 
-    if (equipoId && solicitudEquipoId === equipoId) return true;
-    if (ubicacionTecnicaId && solicitudUbicacionId === ubicacionTecnicaId)
-      return true;
+    return (solicitudesAlmacen.especificas || []).filter((s) => {
+      const solicitudEquipoId = s.equipo_id ? String(s.equipo_id) : null;
+      const solicitudUbicacionId = s.ubicacion_tecnica_id
+        ? String(s.ubicacion_tecnica_id)
+        : null;
 
-    return false;
-  });
-};
+      if (equipoId && solicitudEquipoId === equipoId) return true;
+      if (ubicacionTecnicaId && solicitudUbicacionId === ubicacionTecnicaId) return true;
+
+      return false;
+    });
+  };
 
   const getEncargado = (eq) =>
     (eq.trabajadores || []).find((t) => t.esEncargado)?.trabajador || null;
@@ -436,201 +567,200 @@ const getSolicitudesAlmacenDeEquipo = (eq) => {
     );
   };
 
-
   const getEquipoLabelBySolicitud = (solicitud) => {
-  if (!solicitud) return "—";
+    if (!solicitud) return "—";
 
-  if (solicitud.equipo_id) {
-    const detalle = equiposDetalleMap[solicitud.equipo_id];
-    if (detalle) {
-      return `${detalle.nombre || "Equipo"} · ${detalle.codigo || "—"}`;
+    if (solicitud.equipo_id) {
+      const detalle = equiposDetalleMap[solicitud.equipo_id];
+      if (detalle) {
+        return `${detalle.nombre || "Equipo"} · ${detalle.codigo || "—"}`;
+      }
+
+      const eqOrden = (orden?.equipos || []).find(
+        (eq) => String(eq.equipoId) === String(solicitud.equipo_id)
+      );
+
+      if (eqOrden) {
+        return `${eqOrden.equipo?.nombre || eqOrden.ubicacionTecnica?.nombre || "Equipo"} · ${
+          eqOrden.equipo?.codigo || eqOrden.ubicacionTecnica?.codigo || "—"
+        }`;
+      }
+
+      return "Equipo específico";
     }
 
-    const eqOrden = (orden?.equipos || []).find(
-      (eq) => String(eq.equipoId) === String(solicitud.equipo_id)
-    );
+    if (solicitud.ubicacion_tecnica_id) {
+      const utOrden = (orden?.equipos || []).find(
+        (eq) =>
+          String(eq.ubicacionTecnicaId) === String(solicitud.ubicacion_tecnica_id)
+      );
 
-    if (eqOrden) {
-      return `${eqOrden.equipo?.nombre || eqOrden.ubicacionTecnica?.nombre || "Equipo"} · ${
-        eqOrden.equipo?.codigo || eqOrden.ubicacionTecnica?.codigo || "—"
-      }`;
+      if (utOrden) {
+        return `${utOrden.ubicacionTecnica?.nombre || "Ubicación técnica"} · ${
+          utOrden.ubicacionTecnica?.codigo || "—"
+        }`;
+      }
+
+      return "Ubicación técnica específica";
     }
 
-    return "Equipo específico";
-  }
+    if (solicitud.esGeneral) return "General para la orden";
 
-  if (solicitud.ubicacion_tecnica_id) {
-    const utOrden = (orden?.equipos || []).find(
-      (eq) =>
-        String(eq.ubicacionTecnicaId) ===
-        String(solicitud.ubicacion_tecnica_id)
-    );
+    return "—";
+  };
 
-    if (utOrden) {
-      return `${utOrden.ubicacionTecnica?.nombre || "Ubicación técnica"} · ${
-        utOrden.ubicacionTecnica?.codigo || "—"
-      }`;
-    }
-
-    return "Ubicación técnica específica";
-  }
-
-  if (solicitud.esGeneral) return "General para la orden";
-
-  return "—";
-};
   const renderSolicitudDetalle = (solicitud, tipo = "compra", equipoLabel = "") => {
-  const lineas = Array.isArray(solicitud?.lineas) ? solicitud.lineas : [];
+    const lineas = Array.isArray(solicitud?.lineas) ? solicitud.lineas : [];
 
-  return (
-    <div
-      key={solicitud.id}
-      className="rounded-xl border border-slate-200 bg-white p-4 space-y-3"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${
-                solicitud.esGeneral
-                  ? "bg-slate-100 text-slate-700 border-slate-200"
-                  : "bg-blue-100 text-blue-700 border-blue-200"
-              }`}
-            >
-              {solicitud.esGeneral ? "Solicitud General" : "Solicitud Específica"}
-            </span>
+    return (
+      <div
+        key={solicitud.id}
+        className="rounded-xl border border-slate-200 bg-white p-4 space-y-3"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${
+                  solicitud.esGeneral
+                    ? "bg-slate-100 text-slate-700 border-slate-200"
+                    : "bg-blue-100 text-blue-700 border-blue-200"
+                }`}
+              >
+                {solicitud.esGeneral ? "Solicitud General" : "Solicitud Específica"}
+              </span>
 
-            <span className="px-2.5 py-1 rounded-md text-xs font-semibold border bg-white text-slate-700 border-slate-200">
-              {tipo === "compra" ? "Compra" : "Almacén"}
-            </span>
+              <span className="px-2.5 py-1 rounded-md text-xs font-semibold border bg-white text-slate-700 border-slate-200">
+                {tipo === "compra" ? "Compra" : "Almacén"}
+              </span>
+            </div>
+
+            <p className="text-sm font-semibold text-slate-900">
+              {solicitud.esGeneral
+                ? "Solicitud general de toda la orden"
+                : `Pertenece a ${equipoLabel || getEquipoLabelBySolicitud(solicitud)}`}
+            </p>
           </div>
 
-          <p className="text-sm font-semibold text-slate-900">
-  {solicitud.esGeneral
-    ? "Solicitud general de toda la orden"
-    : `Pertenece a ${equipoLabel || getEquipoLabelBySolicitud(solicitud)}`}
-</p>
+          <div className="text-xs text-slate-500 text-right space-y-1">
+            <p>
+              <span className="font-medium text-slate-700">Documento:</span>{" "}
+              {formatTexto(solicitud.docNum || solicitud.numeroDocumento)}
+            </p>
+            <p>
+              <span className="font-medium text-slate-700">Fecha:</span>{" "}
+              {formatFecha(solicitud.docDate || solicitud.createdAt)}
+            </p>
+          </div>
         </div>
 
-        <div className="text-xs text-slate-500 text-right space-y-1">
-          <p>
-            <span className="font-medium text-slate-700">Documento:</span>{" "}
-            {formatTexto(solicitud.docNum || solicitud.numeroDocumento)}
-          </p>
-          <p>
-            <span className="font-medium text-slate-700">Fecha:</span>{" "}
-            {formatFecha(solicitud.docDate || solicitud.createdAt)}
-          </p>
-        </div>
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-slate-500 font-medium">Departamento</p>
+            <p>{formatTexto(solicitud.department)}</p>
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-slate-500 font-medium">Solicitante</p>
+            <p>{formatTexto(solicitud.requester)}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 font-medium">Email</p>
+            <p>{formatTexto(solicitud.email)}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 font-medium">Fecha requerida</p>
+            <p>{formatTexto(solicitud.requiredDate)}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 font-medium">Pertenece a</p>
+            <p>{formatTexto(getEquipoLabelBySolicitud(solicitud))}</p>
+          </div>
+
+          <div>
+            <p className="text-slate-500 font-medium">Tipo de relación</p>
+            <p>
+              {solicitud.esGeneral
+                ? "General"
+                : solicitud.equipo_id
+                ? "Equipo"
+                : solicitud.ubicacion_tecnica_id
+                ? "Ubicación técnica"
+                : "—"}
+            </p>
+          </div>
+
+          <div className="md:col-span-2">
+            <p className="text-slate-500 font-medium">Comentarios</p>
+            <p>{formatTexto(solicitud.comments)}</p>
+          </div>
+        </div>
+
         <div>
-          <p className="text-slate-500 font-medium">Departamento</p>
-          <p>{formatTexto(solicitud.department)}</p>
-        </div>
+          <h5 className="text-sm font-semibold text-slate-800 mb-2">
+            Detalle de líneas ({lineas.length})
+          </h5>
 
-        <div>
-          <p className="text-slate-500 font-medium">Solicitante</p>
-          <p>{formatTexto(solicitud.requester)}</p>
-        </div>
-
-        <div>
-          <p className="text-slate-500 font-medium">Email</p>
-          <p>{formatTexto(solicitud.email)}</p>
-        </div>
-
-        <div>
-          <p className="text-slate-500 font-medium">Fecha requerida</p>
-          <p>{formatTexto(solicitud.requiredDate)}</p>
-        </div>
-
-        <div>
-  <p className="text-slate-500 font-medium">Pertenece a</p>
-  <p>{formatTexto(getEquipoLabelBySolicitud(solicitud))}</p>
-</div>
-
-<div>
-  <p className="text-slate-500 font-medium">Tipo de relación</p>
-  <p>
-    {solicitud.esGeneral
-      ? "General"
-      : solicitud.equipo_id
-      ? "Equipo"
-      : solicitud.ubicacion_tecnica_id
-      ? "Ubicación técnica"
-      : "—"}
-  </p>
-</div>
-
-        <div className="md:col-span-2">
-          <p className="text-slate-500 font-medium">Comentarios</p>
-          <p>{formatTexto(solicitud.comments)}</p>
-        </div>
-      </div>
-
-      <div>
-        <h5 className="text-sm font-semibold text-slate-800 mb-2">
-          Detalle de líneas ({lineas.length})
-        </h5>
-
-        {lineas.length > 0 ? (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-            <table className="min-w-full text-sm border-collapse">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="text-left p-2 border-b whitespace-nowrap">Item</th>
-                  <th className="text-left p-2 border-b min-w-[220px]">Descripción</th>
-                  <th className="text-left p-2 border-b whitespace-nowrap">Cantidad</th>
-                  <th className="text-left p-2 border-b whitespace-nowrap">Almacén</th>
-                  <th className="text-left p-2 border-b whitespace-nowrap">Centro costo</th>
-                  <th className="text-left p-2 border-b whitespace-nowrap">Proyecto</th>
-                  <th className="text-left p-2 border-b whitespace-nowrap">Rubro</th>
-                  <th className="text-left p-2 border-b whitespace-nowrap">Paquete</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lineas.map((linea, index) => (
-                  <tr
-                    key={linea.id || index}
-                    className={index % 2 === 0 ? "bg-white" : "bg-slate-50/50"}
-                  >
-                    <td className="p-2 border-b whitespace-nowrap font-medium">
-                      {formatTexto(linea.itemCode)}
-                    </td>
-                    <td className="p-2 border-b">{formatTexto(linea.description)}</td>
-                    <td className="p-2 border-b whitespace-nowrap">
-                      {formatTexto(linea.quantity)}
-                    </td>
-                    <td className="p-2 border-b whitespace-nowrap">
-                      {formatTexto(linea.warehouseCode)}
-                    </td>
-                    <td className="p-2 border-b whitespace-nowrap">
-                      {formatTexto(linea.costingCode)}
-                    </td>
-                    <td className="p-2 border-b whitespace-nowrap">
-                      {formatTexto(linea.projectCode)}
-                    </td>
-                    <td className="p-2 border-b whitespace-nowrap">
-                      {formatTexto(linea.rubroSapCode || linea.rubro)}
-                    </td>
-                    <td className="p-2 border-b whitespace-nowrap">
-                      {formatTexto(linea.paqueteTrabajo)}
-                    </td>
+          {lineas.length > 0 ? (
+            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+              <table className="min-w-full text-sm border-collapse">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="text-left p-2 border-b whitespace-nowrap">Item</th>
+                    <th className="text-left p-2 border-b min-w-[220px]">Descripción</th>
+                    <th className="text-left p-2 border-b whitespace-nowrap">Cantidad</th>
+                    <th className="text-left p-2 border-b whitespace-nowrap">Almacén</th>
+                    <th className="text-left p-2 border-b whitespace-nowrap">Centro costo</th>
+                    <th className="text-left p-2 border-b whitespace-nowrap">Proyecto</th>
+                    <th className="text-left p-2 border-b whitespace-nowrap">Rubro</th>
+                    <th className="text-left p-2 border-b whitespace-nowrap">Paquete</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-slate-50 p-3">
-            Sin líneas registradas.
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {lineas.map((linea, index) => (
+                    <tr
+                      key={linea.id || index}
+                      className={index % 2 === 0 ? "bg-white" : "bg-slate-50/50"}
+                    >
+                      <td className="p-2 border-b whitespace-nowrap font-medium">
+                        {formatTexto(linea.itemCode)}
+                      </td>
+                      <td className="p-2 border-b">{formatTexto(linea.description)}</td>
+                      <td className="p-2 border-b whitespace-nowrap">
+                        {formatTexto(linea.quantity)}
+                      </td>
+                      <td className="p-2 border-b whitespace-nowrap">
+                        {formatTexto(linea.warehouseCode)}
+                      </td>
+                      <td className="p-2 border-b whitespace-nowrap">
+                        {formatTexto(linea.costingCode)}
+                      </td>
+                      <td className="p-2 border-b whitespace-nowrap">
+                        {formatTexto(linea.projectCode)}
+                      </td>
+                      <td className="p-2 border-b whitespace-nowrap">
+                        {formatTexto(linea.rubroSapCode || linea.rubro)}
+                      </td>
+                      <td className="p-2 border-b whitespace-nowrap">
+                        {formatTexto(linea.paqueteTrabajo)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-slate-50 p-3">
+              Sin líneas registradas.
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   const handleConfirmSolicitudCompra = async (data) => {
     try {
@@ -732,18 +862,40 @@ const getSolicitudesAlmacenDeEquipo = (eq) => {
     <>
       <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
         <div className="bg-white w-full max-w-[95vw] rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col max-h-[95vh]">
-          <div className="border-b border-slate-200 px-5 py-4 bg-white flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Orden de Trabajo
-              </h2>
-              <p className="text-sm text-slate-500 mt-1">{formatTexto(orden.numeroOT)}</p>
-            </div>
+          <div className="border-b border-slate-200 px-5 py-4 bg-white">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Orden de Trabajo
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  {formatTexto(orden.numeroOT)}
+                </p>
+              </div>
 
-            <button onClick={onClose} className="p-2 rounded-md hover:bg-slate-100 transition">
-              <X className="w-5 h-5 text-slate-700" />
-            </button>
+              <div className="flex flex-col items-end gap-3 ml-auto">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <span
+                    className={`px-3 py-1 rounded-md border text-xs font-semibold ${
+                      estadoColor[orden.estado] ||
+                      "bg-slate-100 text-slate-700 border-slate-300"
+                    }`}
+                  >
+                    {formatTexto(orden.estado)}
+                  </span>
+                </div>
+
+                {renderActionButtons()}
+              </div>
+
+              <button
+                onClick={onClose}
+                className="p-2 rounded-md hover:bg-slate-100 transition"
+              >
+                <X className="w-5 h-5 text-slate-700" />
+              </button>
+            </div>
           </div>
 
           <div className="border-b border-slate-200 bg-white px-5 py-3">
@@ -820,59 +972,59 @@ const getSolicitudesAlmacenDeEquipo = (eq) => {
                 </div>
 
                 <div className="bg-white rounded-xl border border-slate-200 p-4">
-  <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-    <ShoppingCart className="w-4 h-4 text-slate-600" />
-    Solicitudes Generales de la Orden
-  </h3>
+                  <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
+                    <ShoppingCart className="w-4 h-4 text-slate-600" />
+                    Solicitudes Generales de la Orden
+                  </h3>
 
-  <div className="space-y-4">
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="font-semibold text-sm text-slate-800">
-          Solicitud de compra general
-        </h4>
-        <span className="text-xs text-slate-500">
-          {(solicitudesCompra.generales || []).length} registros
-        </span>
-      </div>
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-sm text-slate-800">
+                          Solicitud de compra general
+                        </h4>
+                        <span className="text-xs text-slate-500">
+                          {(solicitudesCompra.generales || []).length} registros
+                        </span>
+                      </div>
 
-      {(solicitudesCompra.generales || []).length > 0 ? (
-        <div className="space-y-3">
-          {solicitudesCompra.generales.map((sol) =>
-            renderSolicitudDetalle(sol, "compra", "General para toda la orden")
-          )}
-        </div>
-      ) : (
-        <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-white p-3">
-          No hay solicitud de compra general.
-        </div>
-      )}
-    </div>
+                      {(solicitudesCompra.generales || []).length > 0 ? (
+                        <div className="space-y-3">
+                          {solicitudesCompra.generales.map((sol) =>
+                            renderSolicitudDetalle(sol, "compra", "General para toda la orden")
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-white p-3">
+                          No hay solicitud de compra general.
+                        </div>
+                      )}
+                    </div>
 
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="font-semibold text-sm text-slate-800">
-          Solicitud de almacén general
-        </h4>
-        <span className="text-xs text-slate-500">
-          {(solicitudesAlmacen.generales || []).length} registros
-        </span>
-      </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-sm text-slate-800">
+                          Solicitud de almacén general
+                        </h4>
+                        <span className="text-xs text-slate-500">
+                          {(solicitudesAlmacen.generales || []).length} registros
+                        </span>
+                      </div>
 
-      {(solicitudesAlmacen.generales || []).length > 0 ? (
-        <div className="space-y-3">
-          {solicitudesAlmacen.generales.map((sol) =>
-            renderSolicitudDetalle(sol, "almacen", "General para toda la orden")
-          )}
-        </div>
-      ) : (
-        <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-white p-3">
-          No hay solicitud de almacén general.
-        </div>
-      )}
-    </div>
-  </div>
-</div>
+                      {(solicitudesAlmacen.generales || []).length > 0 ? (
+                        <div className="space-y-3">
+                          {solicitudesAlmacen.generales.map((sol) =>
+                            renderSolicitudDetalle(sol, "almacen", "General para toda la orden")
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-white p-3">
+                          No hay solicitud de almacén general.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
                 <div className="bg-white rounded-xl border border-slate-200 p-4">
                   <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
@@ -882,296 +1034,291 @@ const getSolicitudesAlmacenDeEquipo = (eq) => {
 
                   <div className="space-y-4">
                     {(orden.equipos || []).map((eq, index) => {
-  const encargado = getEncargado(eq);
-  const solicitudesCompraEquipo = getSolicitudesCompraDeEquipo(eq);
-  const solicitudesAlmacenEquipo = getSolicitudesAlmacenDeEquipo(eq);
-  const tono = getTonoEquipo(index);
-  const nombreEquipo = getNombreObjetivo(eq);
-  const codigoEquipo = getCodigoObjetivo(eq);
-  const tipoEquipo = getTipoObjetivo(eq);
+                      const encargado = getEncargado(eq);
+                      const solicitudesCompraEquipo = getSolicitudesCompraDeEquipo(eq);
+                      const solicitudesAlmacenEquipo = getSolicitudesAlmacenDeEquipo(eq);
+                      const tono = getTonoEquipo(index);
+                      const nombreEquipo = getNombreObjetivo(eq);
+                      const codigoEquipo = getCodigoObjetivo(eq);
+                      const tipoEquipo = getTipoObjetivo(eq);
 
-  return (
-    <div
-      key={eq.id}
-      className={`border rounded-2xl p-4 ${tono.card}`}
-    >
-      <div
-        className={`rounded-xl border px-4 py-3 mb-4 flex flex-wrap items-start justify-between gap-3 ${tono.header}`}
-      >
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
-            Equipo {index + 1}
-          </p>
-          <p className="font-bold text-lg">
-            {formatTexto(nombreEquipo)}
-          </p>
-          <p className="text-sm opacity-90">
-            {formatTexto(codigoEquipo)} · {formatTexto(tipoEquipo)}
-          </p>
-        </div>
+                      return (
+                        <div key={eq.id} className={`border rounded-2xl p-4 ${tono.card}`}>
+                          <div
+                            className={`rounded-xl border px-4 py-3 mb-4 flex flex-wrap items-start justify-between gap-3 ${tono.header}`}
+                          >
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
+                                Equipo {index + 1}
+                              </p>
+                              <p className="font-bold text-lg">{formatTexto(nombreEquipo)}</p>
+                              <p className="text-sm opacity-90">
+                                {formatTexto(codigoEquipo)} · {formatTexto(tipoEquipo)}
+                              </p>
+                            </div>
 
-        <div className="flex flex-col items-end gap-2">
-          <span className={`text-xs px-2.5 py-1 rounded-md border font-semibold ${tono.badge}`}>
-            Estado: {formatTexto(eq.estadoEquipo)}
-          </span>
-          <span className="text-xs px-2.5 py-1 rounded-md border bg-white/80 text-slate-700 border-white/70">
-            Prioridad: {formatTexto(eq.prioridad)}
-          </span>
-        </div>
-      </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <span className={`text-xs px-2.5 py-1 rounded-md border font-semibold ${tono.badge}`}>
+                                Estado: {formatTexto(eq.estadoEquipo)}
+                              </span>
+                              <span className="text-xs px-2.5 py-1 rounded-md border bg-white/80 text-slate-700 border-white/70">
+                                Prioridad: {formatTexto(eq.prioridad)}
+                              </span>
+                            </div>
+                          </div>
 
-      {eq.equipoId && (
-        <div className={`mb-4 rounded-xl border p-4 ${tono.section}`}>
-          <SectionTitle icon={Package} title="Detalle del equipo" />
+                          {eq.equipoId && (
+                            <div className={`mb-4 rounded-xl border p-4 ${tono.section}`}>
+                              <SectionTitle icon={Package} title="Detalle del equipo" />
 
-          {loadingEquiposDetalle ? (
-            <div className="text-sm text-slate-500 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Cargando detalle del equipo...
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <div>
-                <p className="text-slate-500 font-medium">Nombre</p>
-                <p>{formatTexto(getEquipoDetalle(eq)?.nombre)}</p>
-              </div>
+                              {loadingEquiposDetalle ? (
+                                <div className="text-sm text-slate-500 flex items-center gap-2">
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Cargando detalle del equipo...
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Nombre</p>
+                                    <p>{formatTexto(getEquipoDetalle(eq)?.nombre)}</p>
+                                  </div>
 
-              <div>
-                <p className="text-slate-500 font-medium">Código</p>
-                <p>{formatTexto(getEquipoDetalle(eq)?.codigo)}</p>
-              </div>
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Código</p>
+                                    <p>{formatTexto(getEquipoDetalle(eq)?.codigo)}</p>
+                                  </div>
 
-              <div>
-                <p className="text-slate-500 font-medium">Tipo</p>
-                <p>{formatTexto(getEquipoDetalle(eq)?.tipoEquipo)}</p>
-              </div>
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Tipo</p>
+                                    <p>{formatTexto(getEquipoDetalle(eq)?.tipoEquipo)}</p>
+                                  </div>
 
-              <div>
-                <p className="text-slate-500 font-medium">Marca</p>
-                <p>{formatTexto(getEquipoDetalle(eq)?.marca)}</p>
-              </div>
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Marca</p>
+                                    <p>{formatTexto(getEquipoDetalle(eq)?.marca)}</p>
+                                  </div>
 
-              <div>
-                <p className="text-slate-500 font-medium">Modelo</p>
-                <p>{formatTexto(getEquipoDetalle(eq)?.modelo)}</p>
-              </div>
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Modelo</p>
+                                    <p>{formatTexto(getEquipoDetalle(eq)?.modelo)}</p>
+                                  </div>
 
-              <div>
-                <p className="text-slate-500 font-medium">Serie</p>
-                <p>{formatTexto(getEquipoDetalle(eq)?.serie)}</p>
-              </div>
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Serie</p>
+                                    <p>{formatTexto(getEquipoDetalle(eq)?.serie)}</p>
+                                  </div>
 
-              <div>
-                <p className="text-slate-500 font-medium">Inicio programado</p>
-                <p>{formatFecha(eq.fechaInicioProgramada)}</p>
-              </div>
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Inicio programado</p>
+                                    <p>{formatFecha(eq.fechaInicioProgramada)}</p>
+                                  </div>
 
-              <div>
-                <p className="text-slate-500 font-medium">Fin programado</p>
-                <p>{formatFecha(eq.fechaFinProgramada)}</p>
-              </div>
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Fin programado</p>
+                                    <p>{formatFecha(eq.fechaFinProgramada)}</p>
+                                  </div>
 
-              <div>
-                <p className="text-slate-500 font-medium">Plan</p>
-                <p>{formatTexto(eq.planMantenimiento?.nombre)}</p>
-              </div>
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Plan</p>
+                                    <p>{formatTexto(eq.planMantenimiento?.nombre)}</p>
+                                  </div>
 
-              <div>
-                <p className="text-slate-500 font-medium">Ubicación técnica</p>
-                <p>{formatTexto(eq.ubicacionTecnica?.nombre)}</p>
-              </div>
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Ubicación técnica</p>
+                                    <p>{formatTexto(eq.ubicacionTecnica?.nombre)}</p>
+                                  </div>
 
-              <div>
-                <p className="text-slate-500 font-medium">Encargado</p>
-                <p>
-                  {encargado
-                    ? `${formatTexto(encargado.nombre)} ${formatTexto(encargado.apellido)}`
-                    : "—"}
-                </p>
-              </div>
+                                  <div>
+                                    <p className="text-slate-500 font-medium">Encargado</p>
+                                    <p>
+                                      {encargado
+                                        ? `${formatTexto(encargado.nombre)} ${formatTexto(encargado.apellido)}`
+                                        : "—"}
+                                    </p>
+                                  </div>
 
-              <div className="md:col-span-3">
-                <p className="text-slate-500 font-medium">Descripción del trabajo</p>
-                <p>{formatTexto(eq.descripcionEquipo)}</p>
-              </div>
+                                  <div className="md:col-span-3">
+                                    <p className="text-slate-500 font-medium">Descripción del trabajo</p>
+                                    <p>{formatTexto(eq.descripcionEquipo)}</p>
+                                  </div>
 
-              <div className="md:col-span-3">
-                <p className="text-slate-500 font-medium">Descripción del equipo</p>
-                <p>{formatTexto(getEquipoDetalle(eq)?.descripcion)}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+                                  <div className="md:col-span-3">
+                                    <p className="text-slate-500 font-medium">Descripción del equipo</p>
+                                    <p>{formatTexto(getEquipoDetalle(eq)?.descripcion)}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
-      <div className={`mb-4 rounded-xl border p-4 ${tono.section}`}>
-        <SectionTitle
-          icon={CheckCircle2}
-          title={`Actividades (${eq.actividades?.length || 0})`}
-        />
+                          <div className={`mb-4 rounded-xl border p-4 ${tono.section}`}>
+                            <SectionTitle
+                              icon={CheckCircle2}
+                              title={`Actividades (${eq.actividades?.length || 0})`}
+                            />
 
-        {eq.actividades?.length > 0 ? (
-          <div className="space-y-3">
-            {eq.actividades.map((act, idx) => (
-              <div
-                key={act.id || idx}
-                className="rounded-lg border border-slate-200 bg-slate-50 p-3"
-              >
-                <p className="font-semibold text-slate-900 mb-2">
-                  {formatTexto(
-                    act.tarea || act.descripcion || `Actividad ${idx + 1}`
-                  )}
-                </p>
+                            {eq.actividades?.length > 0 ? (
+                              <div className="space-y-3">
+                                {eq.actividades.map((act, idx) => (
+                                  <div
+                                    key={act.id || idx}
+                                    className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                                  >
+                                    <p className="font-semibold text-slate-900 mb-2">
+                                      {formatTexto(
+                                        act.tarea || act.descripcion || `Actividad ${idx + 1}`
+                                      )}
+                                    </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                  <div>
-                    <p className="text-slate-500 font-medium">Tipo trabajo</p>
-                    <p>{formatTexto(act.tipoTrabajo)}</p>
-                  </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                      <div>
+                                        <p className="text-slate-500 font-medium">Tipo trabajo</p>
+                                        <p>{formatTexto(act.tipoTrabajo)}</p>
+                                      </div>
 
-                  <div>
-                    <p className="text-slate-500 font-medium">Estado</p>
-                    <p>{formatTexto(act.estado)}</p>
-                  </div>
+                                      <div>
+                                        <p className="text-slate-500 font-medium">Estado</p>
+                                        <p>{formatTexto(act.estado)}</p>
+                                      </div>
 
-                  <div>
-                    <p className="text-slate-500 font-medium">Origen</p>
-                    <p>{formatTexto(act.origen)}</p>
-                  </div>
+                                      <div>
+                                        <p className="text-slate-500 font-medium">Origen</p>
+                                        <p>{formatTexto(act.origen)}</p>
+                                      </div>
 
-                  <div>
-                    <p className="text-slate-500 font-medium">Sistema</p>
-                    <p>{formatTexto(act.sistema)}</p>
-                  </div>
+                                      <div>
+                                        <p className="text-slate-500 font-medium">Sistema</p>
+                                        <p>{formatTexto(act.sistema)}</p>
+                                      </div>
 
-                  <div>
-                    <p className="text-slate-500 font-medium">Subsistema</p>
-                    <p>{formatTexto(act.subsistema)}</p>
-                  </div>
+                                      <div>
+                                        <p className="text-slate-500 font-medium">Subsistema</p>
+                                        <p>{formatTexto(act.subsistema)}</p>
+                                      </div>
 
-                  <div>
-                    <p className="text-slate-500 font-medium">Componente</p>
-                    <p>{formatTexto(act.componente)}</p>
-                  </div>
+                                      <div>
+                                        <p className="text-slate-500 font-medium">Componente</p>
+                                        <p>{formatTexto(act.componente)}</p>
+                                      </div>
 
-                  <div>
-                    <p className="text-slate-500 font-medium">Duración estimada</p>
-                    <p>
-                      {formatTexto(act.duracionEstimadaValor)}{" "}
-                      {formatTexto(act.unidadDuracion)}
-                    </p>
-                  </div>
+                                      <div>
+                                        <p className="text-slate-500 font-medium">Duración estimada</p>
+                                        <p>
+                                          {formatTexto(act.duracionEstimadaValor)}{" "}
+                                          {formatTexto(act.unidadDuracion)}
+                                        </p>
+                                      </div>
 
-                  <div className="md:col-span-2">
-                    <p className="text-slate-500 font-medium">Observaciones</p>
-                    <p>{formatTexto(act.observaciones)}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-slate-50 p-3">
-            Sin actividades registradas.
-          </div>
-        )}
-      </div>
+                                      <div className="md:col-span-2">
+                                        <p className="text-slate-500 font-medium">Observaciones</p>
+                                        <p>{formatTexto(act.observaciones)}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-slate-50 p-3">
+                                Sin actividades registradas.
+                              </div>
+                            )}
+                          </div>
 
-      <div className={`mb-4 rounded-xl border p-4 ${tono.section}`}>
-        <SectionTitle
-          icon={Users}
-          title={`Trabajadores (${eq.trabajadores?.length || 0})`}
-        />
+                          <div className={`mb-4 rounded-xl border p-4 ${tono.section}`}>
+                            <SectionTitle
+                              icon={Users}
+                              title={`Trabajadores (${eq.trabajadores?.length || 0})`}
+                            />
 
-        {eq.trabajadores?.length > 0 ? (
-          <div className="space-y-2">
-            {eq.trabajadores.map((t) => {
-              const trabajador = t.trabajador || {};
+                            {eq.trabajadores?.length > 0 ? (
+                              <div className="space-y-2">
+                                {eq.trabajadores.map((t) => {
+                                  const trabajador = t.trabajador || {};
 
-              return (
-                <div
-                  key={t.id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3"
-                >
-                  <div>
-                    <p className="font-medium text-slate-900">
-                      {formatTexto(trabajador.nombre)} {formatTexto(trabajador.apellido)}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {formatTexto(
-                        trabajador.rol ? trabajador.rol.replaceAll("_", " ") : "—"
-                      )}{" "}
-                      · {formatTexto(trabajador.empresa)}
-                    </p>
-                  </div>
+                                  return (
+                                    <div
+                                      key={t.id}
+                                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3"
+                                    >
+                                      <div>
+                                        <p className="font-medium text-slate-900">
+                                          {formatTexto(trabajador.nombre)} {formatTexto(trabajador.apellido)}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                          {formatTexto(
+                                            trabajador.rol ? trabajador.rol.replaceAll("_", " ") : "—"
+                                          )}{" "}
+                                          · {formatTexto(trabajador.empresa)}
+                                        </p>
+                                      </div>
 
-                  {t.esEncargado && (
-                    <span className="flex items-center gap-1 text-xs text-slate-700 bg-white border border-slate-200 px-2 py-1 rounded-md">
-                      <Star className="w-3 h-3" />
-                      Encargado
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-slate-50 p-3">
-            Sin trabajadores asignados.
-          </div>
-        )}
-      </div>
+                                      {t.esEncargado && (
+                                        <span className="flex items-center gap-1 text-xs text-slate-700 bg-white border border-slate-200 px-2 py-1 rounded-md">
+                                          <Star className="w-3 h-3" />
+                                          Encargado
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-slate-50 p-3">
+                                Sin trabajadores asignados.
+                              </div>
+                            )}
+                          </div>
 
-      <div className={`mb-4 rounded-xl border p-4 ${tono.section}`}>
-        <div className="flex items-center justify-between mb-3">
-          <SectionTitle icon={ShoppingCart} title="Solicitud de compra de este equipo" />
-          <button
-            onClick={() => abrirSolicitudCompraParaEquipo(eq)}
-            className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50"
-          >
-            Agregar
-          </button>
-        </div>
+                          <div className={`mb-4 rounded-xl border p-4 ${tono.section}`}>
+                            <div className="flex items-center justify-between mb-3">
+                              <SectionTitle icon={ShoppingCart} title="Solicitud de compra de este equipo" />
+                              <button
+                                onClick={() => abrirSolicitudCompraParaEquipo(eq)}
+                                className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50"
+                              >
+                                Agregar
+                              </button>
+                            </div>
 
-        {solicitudesCompraEquipo.length > 0 ? (
-  <div className="space-y-3">
-    {solicitudesCompraEquipo.map((sol) =>
-      renderSolicitudDetalle(sol, "compra", nombreEquipo)
-    )}
-  </div>
-) : (
-  <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-slate-50 p-3">
-    Este equipo no tiene solicitud de compra específica.
-  </div>
-)}
-      </div>
+                            {solicitudesCompraEquipo.length > 0 ? (
+                              <div className="space-y-3">
+                                {solicitudesCompraEquipo.map((sol) =>
+                                  renderSolicitudDetalle(sol, "compra", nombreEquipo)
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-slate-50 p-3">
+                                Este equipo no tiene solicitud de compra específica.
+                              </div>
+                            )}
+                          </div>
 
-      <div className={`rounded-xl border p-4 ${tono.section}`}>
-        <div className="flex items-center justify-between mb-3">
-          <SectionTitle icon={Boxes} title="Solicitud de almacén de este equipo" />
-          <button
-            onClick={() => abrirSolicitudAlmacenParaEquipo(eq)}
-            className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50"
-          >
-            Agregar
-          </button>
-        </div>
+                          <div className={`rounded-xl border p-4 ${tono.section}`}>
+                            <div className="flex items-center justify-between mb-3">
+                              <SectionTitle icon={Boxes} title="Solicitud de almacén de este equipo" />
+                              <button
+                                onClick={() => abrirSolicitudAlmacenParaEquipo(eq)}
+                                className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50"
+                              >
+                                Agregar
+                              </button>
+                            </div>
 
-        {solicitudesAlmacenEquipo.length > 0 ? (
-  <div className="space-y-3">
-    {solicitudesAlmacenEquipo.map((sol) =>
-      renderSolicitudDetalle(sol, "almacen", nombreEquipo)
-    )}
-  </div>
-) : (
-  <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-slate-50 p-3">
-    Este equipo no tiene solicitud de almacén específica.
-  </div>
-)}
-      </div>
-    </div>
-  );
-})}
+                            {solicitudesAlmacenEquipo.length > 0 ? (
+                              <div className="space-y-3">
+                                {solicitudesAlmacenEquipo.map((sol) =>
+                                  renderSolicitudDetalle(sol, "almacen", nombreEquipo)
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-slate-500 border border-slate-200 rounded-md bg-slate-50 p-3">
+                                Este equipo no tiene solicitud de almacén específica.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1317,6 +1464,15 @@ const getSolicitudesAlmacenDeEquipo = (eq) => {
         targets={targetSeleccionado ? [targetSeleccionado] : contextoOt.targets}
         contextoOt={contextoOt}
         soloContextoOt={true}
+      />
+
+      <ModalOTGrupal
+        isOpen={openEditarOT}
+        onClose={() => setOpenEditarOT(false)}
+        aviso={orden?.aviso || { id: orden?.avisoId, tipoMantenimiento: orden?.tipoMantenimiento }}
+        mode="edit"
+        initialData={orden}
+        onGuardar={handleEditarOT}
       />
     </>
   );

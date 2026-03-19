@@ -41,6 +41,8 @@ export default function ModalMantenimientoView({
 
   if (!isOpen || !data) return null;
 
+  const estadoActual = data._estadoReal || data.estadoAviso || data.estado || "";
+
   const ViewField = ({ label, value, fullWidth = false }) => (
     <div className={`flex flex-col gap-1 ${fullWidth ? "col-span-full" : ""}`}>
       <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
@@ -93,6 +95,12 @@ export default function ModalMantenimientoView({
         return "info";
       case "pendiente":
         return "warning";
+      case "creado":
+        return "default";
+      case "rechazado":
+        return "danger";
+      case "finalizado":
+        return "success";
       default:
         return "default";
     }
@@ -100,7 +108,9 @@ export default function ModalMantenimientoView({
 
   const formatDate = (dateString) => {
     if (!dateString) return "—";
-    return new Date(dateString).toLocaleDateString("es-PE", {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleDateString("es-PE", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -109,7 +119,9 @@ export default function ModalMantenimientoView({
 
   const formatDateTime = (dateString) => {
     if (!dateString) return "—";
-    return new Date(dateString).toLocaleString("es-PE", {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleString("es-PE", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -137,15 +149,110 @@ export default function ModalMantenimientoView({
     );
   };
 
+  const getObjetivoSolicitud = (sol) => {
+    if (!sol) return "—";
+
+    if (sol.esGeneral) return "General";
+    if (sol.equipo?.nombre) {
+      return `${sol.equipo.nombre}${sol.equipo.codigo ? ` · ${sol.equipo.codigo}` : ""}`;
+    }
+    if (sol.ubicacionTecnica?.nombre) {
+      return `${sol.ubicacionTecnica.nombre}${
+        sol.ubicacionTecnica.codigo ? ` · ${sol.ubicacionTecnica.codigo}` : ""
+      }`;
+    }
+    if (sol.equipo_id) return `Equipo asociado`;
+    if (sol.ubicacion_tecnica_id) return `Ubicación técnica asociada`;
+
+    return "—";
+  };
+
+  const handleCambiarEstado = async (nuevoEstado) => {
+    try {
+      await cambiarEstado?.(data, nuevoEstado);
+      onClose?.();
+    } catch (error) {
+      console.error("Error al cambiar estado:", error);
+    }
+  };
+
+  const handleAbrirTratamiento = () => {
+    try {
+      abrirTratamiento?.(data);
+      onClose?.();
+    } catch (error) {
+      console.error("Error al abrir tratamiento:", error);
+    }
+  };
+
+  const renderActionButtons = () => {
+    if (!data) return null;
+
+    if (estadoActual === "CREADO") {
+      return (
+        <div className="flex gap-2 flex-wrap justify-end">
+          <button
+            onClick={handleAbrirTratamiento}
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+            Tratar
+          </button>
+
+          <button
+            onClick={() => handleCambiarEstado("RECHAZADO")}
+            className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+            Rechazar
+          </button>
+        </div>
+      );
+    }
+
+    if (estadoActual === "TRATADO") {
+      return (
+        <div className="flex gap-2 flex-wrap justify-end">
+          <button
+            onClick={() => handleCambiarEstado("CON_OT")}
+            className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+            Generar OT
+          </button>
+        </div>
+      );
+    }
+
+    if (estadoActual === "CON_OT") {
+      return (
+        <div className="flex gap-2 flex-wrap justify-end">
+          <button
+            onClick={() => handleCambiarEstado("FINALIZADO")}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+            Finalizar
+          </button>
+
+          <button
+            onClick={() => handleCambiarEstado("FINALIZADO_SIN_FACTURACION")}
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+            Sin Facturación
+          </button>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   const solicitudesCompra = tratamiento?.solicitudesCompra || [];
   const solicitudesAlmacen = tratamiento?.solicitudesAlmacen || [];
   const equiposTratamiento = tratamiento?.equipos || [];
 
   return (
     <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4">
-<div className="bg-white rounded-2xl shadow-2xl w-[98vw] max-w-[120rem] h-[96vh] flex flex-col overflow-hidden border border-slate-200">        {/* HEADER */}
+      <div className="bg-white rounded-2xl shadow-2xl w-[98vw] max-w-[120rem] h-[96vh] flex flex-col overflow-hidden border border-slate-200">
         <div className="px-5 py-3 border-b bg-slate-900">
-          <div className="flex justify-between items-start gap-4">
+          <div className="flex justify-between items-start gap-4 flex-wrap">
             <div>
               <h2 className="text-2xl font-bold text-white mb-1">
                 Aviso de Mantenimiento
@@ -154,13 +261,18 @@ export default function ModalMantenimientoView({
                 {data.numeroAviso || "Sin número de aviso"}
               </p>
             </div>
-            <div className="flex gap-2 flex-wrap justify-end">
-              <Badge variant={getPrioridadVariant(data.prioridad)}>
-                {data.prioridad || "Sin prioridad"}
-              </Badge>
-              <Badge variant={getEstadoVariant(data.estadoAviso)}>
-                {data.estadoAviso || "Sin estado"}
-              </Badge>
+
+            <div className="flex flex-col items-end gap-3">
+              <div className="flex gap-2 flex-wrap justify-end">
+                <Badge variant={getPrioridadVariant(data.prioridad)}>
+                  {data.prioridad || "Sin prioridad"}
+                </Badge>
+                <Badge variant={getEstadoVariant(estadoActual)}>
+                  {estadoActual || "Sin estado"}
+                </Badge>
+              </div>
+
+              {renderActionButtons()}
             </div>
           </div>
 
@@ -189,7 +301,6 @@ export default function ModalMantenimientoView({
           </p>
         </div>
 
-        {/* CONTENIDO */}
         <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
           {wizardStep === 1 && (
             <div className="space-y-6">
@@ -199,11 +310,17 @@ export default function ModalMantenimientoView({
                   <ViewField label="Centro de Costo" value={data.centroCosto} />
                   <ViewField label="Número de Aviso" value={data.numeroAviso} />
                   <ViewField label="Tipo de Aviso" value={data.tipoAviso} />
-                  <ViewField label="Tipo de Mantenimiento" value={data.tipoMantenimiento} />
+                  <ViewField
+                    label="Tipo de Mantenimiento"
+                    value={data.tipoMantenimiento}
+                  />
                   <ViewField label="Producto" value={data.producto} />
                   <ViewField label="Prioridad" value={data.prioridad} />
-                  <ViewField label="Estado del Aviso" value={data.estadoAviso} />
-                  <ViewField label="Fecha de Atención" value={formatDate(data.fechaAtencion)} />
+                  <ViewField label="Estado del Aviso" value={estadoActual} />
+                  <ViewField
+                    label="Fecha de Atención"
+                    value={formatDate(data.fechaAtencion)}
+                  />
                 </div>
               </Section>
 
@@ -224,8 +341,14 @@ export default function ModalMantenimientoView({
 
               <Section title="Ubicación">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField label="Ubicación Técnica" value={data.ubicacionTecnica} />
-                  <ViewField label="Dirección de Atención" value={data.direccionAtencion} />
+                  <ViewField
+                    label="Ubicación Técnica"
+                    value={data.ubicacionTecnica}
+                  />
+                  <ViewField
+                    label="Dirección de Atención"
+                    value={data.direccionAtencion}
+                  />
                 </div>
               </Section>
             </div>
@@ -236,7 +359,10 @@ export default function ModalMantenimientoView({
               <Section title="Datos del Cliente">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <ViewField label="ID Cliente" value={data.cliente} />
-                  <ViewField label="N° Orden Cliente" value={data.ordenCliente} />
+                  <ViewField
+                    label="N° Orden Cliente"
+                    value={data.ordenCliente}
+                  />
                   <ViewField label="Sede" value={data.sede} />
                   <ViewField label="Almacén" value={data.almacen} />
                 </div>
@@ -244,16 +370,31 @@ export default function ModalMantenimientoView({
 
               <Section title="Información de Contacto">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <ViewField label="Nombre del Contacto" value={data.nombreContacto} />
-                  <ViewField label="Correo Electrónico" value={data.correoContacto} />
-                  <ViewField label="Número de Teléfono" value={data.numeroContacto} />
+                  <ViewField
+                    label="Nombre del Contacto"
+                    value={data.nombreContacto}
+                  />
+                  <ViewField
+                    label="Correo Electrónico"
+                    value={data.correoContacto}
+                  />
+                  <ViewField
+                    label="Número de Teléfono"
+                    value={data.numeroContacto}
+                  />
                 </div>
               </Section>
 
               <Section title="Información del Solicitante">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField label="Solicitante" value={data.solicitante?.nombreApellido} />
-                  <ViewField label="Usuario" value={data.solicitante?.alias} />
+                  <ViewField
+                    label="Solicitante"
+                    value={data.solicitante?.nombreApellido}
+                  />
+                  <ViewField
+                    label="Usuario"
+                    value={data.solicitante?.alias}
+                  />
                 </div>
               </Section>
             </div>
@@ -263,8 +404,14 @@ export default function ModalMantenimientoView({
             <div className="space-y-6">
               <Section title="Asignación">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField label="Supervisor Asignado" value={data.supervisorAsignado} />
-                  <ViewField label="Creado Por" value={data.creador?.nombreApellido} />
+                  <ViewField
+                    label="Supervisor Asignado"
+                    value={data.supervisorAsignado}
+                  />
+                  <ViewField
+                    label="Creado Por"
+                    value={data.creador?.nombreApellido}
+                  />
                 </div>
               </Section>
 
@@ -274,7 +421,9 @@ export default function ModalMantenimientoView({
                   loadingTratamiento ? (
                     <Badge variant="default">Cargando...</Badge>
                   ) : tratamiento ? (
-                    <Badge variant="success">{tratamiento.estado || "Registrado"}</Badge>
+                    <Badge variant="success">
+                      {tratamiento.estado || "Registrado"}
+                    </Badge>
                   ) : (
                     <Badge variant="warning">Sin tratamiento</Badge>
                   )
@@ -283,8 +432,14 @@ export default function ModalMantenimientoView({
                 {tratamiento ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <ViewField label="Estado" value={tratamiento.estado} />
-                    <ViewField label="Fecha creación" value={formatDateTime(tratamiento.createdAt)} />
-                    <ViewField label="Última actualización" value={formatDateTime(tratamiento.updatedAt)} />
+                    <ViewField
+                      label="Fecha creación"
+                      value={formatDateTime(tratamiento.createdAt)}
+                    />
+                    <ViewField
+                      label="Última actualización"
+                      value={formatDateTime(tratamiento.updatedAt)}
+                    />
                   </div>
                 ) : (
                   <EmptyState text="No hay tratamiento registrado para este aviso." />
@@ -293,7 +448,9 @@ export default function ModalMantenimientoView({
 
               <Section
                 title="Solicitudes de Compra"
-                right={<Badge variant="info">{solicitudesCompra.length} registros</Badge>}
+                right={
+                  <Badge variant="info">{solicitudesCompra.length} registros</Badge>
+                }
               >
                 {solicitudesCompra.length > 0 ? (
                   <div className="space-y-4">
@@ -308,12 +465,7 @@ export default function ModalMantenimientoView({
                           ["Department", sol.department],
                           ["Requester", sol.requester],
                           ["Comentarios", sol.comments],
-                          [
-                            "Objetivo",
-                            sol.esGeneral
-                              ? "General"
-                              : sol.equipo_id || sol.ubicacion_tecnica_id || "—",
-                          ],
+                          ["Objetivo", getObjetivoSolicitud(sol)],
                         ]}
                         lineas={sol.lineas || []}
                       />
@@ -326,7 +478,11 @@ export default function ModalMantenimientoView({
 
               <Section
                 title="Solicitudes de Almacén"
-                right={<Badge variant="purple">{solicitudesAlmacen.length} registros</Badge>}
+                right={
+                  <Badge variant="purple">
+                    {solicitudesAlmacen.length} registros
+                  </Badge>
+                }
               >
                 {solicitudesAlmacen.length > 0 ? (
                   <div className="space-y-4">
@@ -341,12 +497,7 @@ export default function ModalMantenimientoView({
                           ["Department", sol.department],
                           ["Requester", sol.requester],
                           ["Comentarios", sol.comments],
-                          [
-                            "Objetivo",
-                            sol.esGeneral
-                              ? "General"
-                              : sol.equipo_id || sol.ubicacion_tecnica_id || "—",
-                          ],
+                          ["Objetivo", getObjetivoSolicitud(sol)],
                         ]}
                         lineas={sol.lineas || []}
                       />
@@ -359,7 +510,11 @@ export default function ModalMantenimientoView({
 
               <Section
                 title="Objetivos y Actividades del Tratamiento"
-                right={<Badge variant="indigo">{equiposTratamiento.length} objetivos</Badge>}
+                right={
+                  <Badge variant="indigo">
+                    {equiposTratamiento.length} objetivos
+                  </Badge>
+                }
               >
                 {equiposTratamiento.length > 0 ? (
                   <div className="space-y-5">
@@ -381,7 +536,9 @@ export default function ModalMantenimientoView({
                           <div className="flex gap-2 flex-wrap">
                             {te.planMantenimiento ? (
                               <Badge variant="success">
-                                Plan: {te.planMantenimiento.codigoPlan || te.planMantenimiento.nombre}
+                                Plan:{" "}
+                                {te.planMantenimiento.codigoPlan ||
+                                  te.planMantenimiento.nombre}
                               </Badge>
                             ) : (
                               <Badge variant="default">Sin plan</Badge>
@@ -405,27 +562,41 @@ export default function ModalMantenimientoView({
                                       {act.tarea || "Sin tarea"}
                                     </p>
                                     <p className="text-xs text-slate-500 mt-1">
-                                      {[
-                                        act.sistema,
-                                        act.subsistema,
-                                        act.componente,
-                                      ]
+                                      {[act.sistema, act.subsistema, act.componente]
                                         .filter(Boolean)
                                         .join(" / ") || "Sin clasificación"}
                                     </p>
                                   </div>
 
                                   <div className="flex gap-2 flex-wrap">
-                                    <Badge variant="default">{act.origen || "—"}</Badge>
-                                    <Badge variant="info">{act.estado || "—"}</Badge>
+                                    <Badge variant="default">
+                                      {act.origen || "—"}
+                                    </Badge>
+                                    <Badge variant="info">
+                                      {act.estado || "—"}
+                                    </Badge>
                                   </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-                                  <MiniField label="Tipo trabajo" value={act.tipoTrabajo} />
-                                  <MiniField label="Rol técnico" value={act.rolTecnico} />
-                                  <MiniField label="Cantidad técnicos" value={act.cantidadTecnicos} />
-                                  <MiniField label="Duración" value={`${act.duracionEstimadaValor || 0} ${act.unidadDuracion || "min"}`} />
+                                  <MiniField
+                                    label="Tipo trabajo"
+                                    value={act.tipoTrabajo}
+                                  />
+                                  <MiniField
+                                    label="Rol técnico"
+                                    value={act.rolTecnico}
+                                  />
+                                  <MiniField
+                                    label="Cantidad técnicos"
+                                    value={act.cantidadTecnicos}
+                                  />
+                                  <MiniField
+                                    label="Duración"
+                                    value={`${act.duracionEstimadaValor || 0} ${
+                                      act.unidadDuracion || "min"
+                                    }`}
+                                  />
                                 </div>
 
                                 {act.descripcion && (
@@ -433,7 +604,9 @@ export default function ModalMantenimientoView({
                                     <p className="text-xs font-semibold text-slate-500 uppercase mb-1">
                                       Descripción
                                     </p>
-                                    <p className="text-sm text-slate-700">{act.descripcion}</p>
+                                    <p className="text-sm text-slate-700">
+                                      {act.descripcion}
+                                    </p>
                                   </div>
                                 )}
 
@@ -442,13 +615,18 @@ export default function ModalMantenimientoView({
                                     <p className="text-xs font-semibold text-slate-500 uppercase mb-1">
                                       Observaciones
                                     </p>
-                                    <p className="text-sm text-slate-700">{act.observaciones}</p>
+                                    <p className="text-sm text-slate-700">
+                                      {act.observaciones}
+                                    </p>
                                   </div>
                                 )}
                               </div>
                             ))
                           ) : (
-                            <EmptyState text="No hay actividades registradas para este objetivo." small />
+                            <EmptyState
+                              text="No hay actividades registradas para este objetivo."
+                              small
+                            />
                           )}
                         </div>
                       </div>
@@ -461,15 +639,20 @@ export default function ModalMantenimientoView({
 
               <Section title="Información de Auditoría">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField label="Fecha de Creación" value={formatDateTime(data.createdAt)} />
-                  <ViewField label="Última Actualización" value={formatDateTime(data.updatedAt)} />
+                  <ViewField
+                    label="Fecha de Creación"
+                    value={formatDateTime(data.createdAt)}
+                  />
+                  <ViewField
+                    label="Última Actualización"
+                    value={formatDateTime(data.updatedAt)}
+                  />
                 </div>
               </Section>
             </div>
           )}
         </div>
 
-        {/* FOOTER */}
         <div className="p-4 border-t bg-white flex justify-between items-center">
           <button
             className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-semibold transition-colors"
@@ -529,7 +712,9 @@ function EmptyState({ text, small = false }) {
 function MiniField({ label, value }) {
   return (
     <div className="border border-slate-200 rounded-lg bg-white p-3">
-      <p className="text-[11px] font-semibold text-slate-500 uppercase mb-1">{label}</p>
+      <p className="text-[11px] font-semibold text-slate-500 uppercase mb-1">
+        {label}
+      </p>
       <p className="text-sm text-slate-800">{value || "—"}</p>
     </div>
   );
@@ -565,27 +750,62 @@ function SolicitudCard({ titulo, subtitulo, estado, fields = [], lineas = [] }) 
               <table className="w-full text-sm">
                 <thead className="bg-slate-100">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">ItemCode</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Descripción</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Cantidad</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Warehouse</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Costing</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Project</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Rubro SAP</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Paquete</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
+                      ItemCode
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
+                      Descripción
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
+                      Cantidad
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
+                      Warehouse
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
+                      Costing
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
+                      Project
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
+                      Rubro SAP
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
+                      Paquete
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {lineas.map((linea, idx) => (
-                    <tr key={linea.id || idx} className="border-t border-slate-200">
-                      <td className="px-3 py-2 text-slate-800">{linea.itemCode || "—"}</td>
-                      <td className="px-3 py-2 text-slate-800">{linea.description || "—"}</td>
-                      <td className="px-3 py-2 text-slate-800">{linea.quantity || "—"}</td>
-                      <td className="px-3 py-2 text-slate-800">{linea.warehouseCode || "—"}</td>
-                      <td className="px-3 py-2 text-slate-800">{linea.costingCode || "—"}</td>
-                      <td className="px-3 py-2 text-slate-800">{linea.projectCode || "—"}</td>
-                      <td className="px-3 py-2 text-slate-800">{linea.rubroSapCode || "—"}</td>
-                      <td className="px-3 py-2 text-slate-800">{linea.paqueteTrabajo || "—"}</td>
+                    <tr
+                      key={linea.id || idx}
+                      className="border-t border-slate-200"
+                    >
+                      <td className="px-3 py-2 text-slate-800">
+                        {linea.itemCode || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-800">
+                        {linea.description || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-800">
+                        {linea.quantity || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-800">
+                        {linea.warehouseCode || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-800">
+                        {linea.costingCode || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-800">
+                        {linea.projectCode || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-800">
+                        {linea.rubroSapCode || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-800">
+                        {linea.paqueteTrabajo || "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

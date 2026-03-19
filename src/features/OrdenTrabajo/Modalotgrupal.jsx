@@ -1,7 +1,6 @@
 import {
   X,
   FileText,
-  Calendar,
   Edit,
   AlertCircle,
   ClipboardCheck,
@@ -17,22 +16,264 @@ import { adjuntosService } from "../OrdenTrabajo/services/adjuntosService";
 import ModalInfoAviso from "../OrdenTrabajo/modals/ModalInfoAviso";
 import ModalDetallesEquipo from "../OrdenTrabajo/modals/ModalDetalleEquipo";
 import { getTratamientoByAviso } from "../mantenimiento/services/tratamientoService";
-import { updateSolicitudCompra,createSolicitudCompra} from "../OrdenTrabajo/services/SolicitudCompraService";
+import {
+  updateSolicitudCompra,
+  createSolicitudCompra,
+} from "../OrdenTrabajo/services/SolicitudCompraService";
 
 import OTRegistroCard from "./components/OTRegistroCard";
-import { buildOTPayload, getRegistroId, mkActOT } from "./helpers/otHelpers";
+import { getRegistroId, mkActOT } from "./helpers/otHelpers";
 import { validateOTForm } from "./helpers/otValidation";
 
 import ModalSolicitudAlmacen from "../../components/inputs/ModalSolicitudAlmacen";
-import { createSolicitudAlmacen,updateSolicitudAlmacen } from "./services/solicitudAlmacenService";
+import {
+  createSolicitudAlmacen,
+  updateSolicitudAlmacen,
+} from "./services/solicitudAlmacenService";
 import {
   mapSolicitudesAlmacenToModalValue,
   buildSolicitudAlmacenUpdatePayload,
   isSolicitudVacia,
-  buildSolicitudAlmacenCreatePayload
+  buildSolicitudAlmacenCreatePayload,
 } from "./helpers/solicitudAlmacenAdapter";
 
 import ModalSolicitudCompra from "../../components/inputs/ModalSolicitudCompra";
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function toDatetimeLocal(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
+function mapOrdenTrabajoToModalData(ot) {
+  return {
+    id: ot?.id || null,
+    numeroOT: ot?.numeroOT || "",
+    descripcionGeneral: ot?.descripcionGeneral || "",
+    descripcionDetallada: ot?.descripcionDetallada || "",
+    supervisorId: ot?.supervisorId || "",
+    fechaProgramadaInicio: ot?.fechaProgramadaInicio
+      ? toDatetimeLocal(ot.fechaProgramadaInicio)
+      : "",
+    fechaProgramadaFin: ot?.fechaProgramadaFin
+      ? toDatetimeLocal(ot.fechaProgramadaFin)
+      : "",
+    fechaInicioReal: ot?.fechaInicioReal ? toDatetimeLocal(ot.fechaInicioReal) : "",
+    fechaFinReal: ot?.fechaFinReal ? toDatetimeLocal(ot.fechaFinReal) : "",
+    fechaCierre: ot?.fechaCierre ? toDatetimeLocal(ot.fechaCierre) : "",
+    observaciones: ot?.observaciones || "",
+    tipoMantenimiento: ot?.tipoMantenimiento || "",
+    estado: ot?.estado || "CREADO",
+    avisoId: ot?.avisoId || null,
+    tratamientoId: ot?.tratamientoId || null,
+    archivosAdjuntos: Array.isArray(ot?.adjuntos) ? ot.adjuntos : [],
+    equipos: Array.isArray(ot?.equipos)
+      ? ot.equipos.map((eq) => {
+          const encargado = Array.isArray(eq?.trabajadores)
+            ? eq.trabajadores.find((t) => t?.esEncargado)
+            : null;
+
+          return {
+            id: eq?.id || null,
+            equipoId: eq?.equipoId || null,
+            ubicacionTecnicaId: eq?.ubicacionTecnicaId || null,
+            equipoNombre: eq?.equipo?.nombre || eq?.equipo?.codigo || "",
+            equipoTipo:
+              eq?.equipo?.tipoEquipo ||
+              eq?.equipo?.tipo ||
+              eq?.equipo?.tipoEquipoPropiedad ||
+              "",
+            ubicacionTecnicaNombre: eq?.ubicacionTecnica?.nombre || "",
+            ubicacionTecnicaCodigo: eq?.ubicacionTecnica?.codigo || "",
+            descripcionEquipo: eq?.descripcionEquipo || "",
+            descripcionUbicacion: eq?.descripcionUbicacion || "",
+            prioridad: eq?.prioridad || "MEDIA",
+            estado: eq?.estadoEquipo || "PENDIENTE",
+            fechaInicioProgramada: eq?.fechaInicioProgramada
+              ? toDatetimeLocal(eq.fechaInicioProgramada)
+              : "",
+            fechaFinProgramada: eq?.fechaFinProgramada
+              ? toDatetimeLocal(eq.fechaFinProgramada)
+              : "",
+            fechaInicioReal: eq?.fechaInicioReal
+              ? toDatetimeLocal(eq.fechaInicioReal)
+              : "",
+            fechaFinReal: eq?.fechaFinReal ? toDatetimeLocal(eq.fechaFinReal) : "",
+            observacionesEquipo: eq?.observacionesEquipo || "",
+            observaciones: eq?.observaciones || "",
+            trabajadoresAsignados: Array.isArray(eq?.trabajadores)
+              ? eq.trabajadores.map((t) => t?.trabajadorId).filter(Boolean)
+              : [],
+            trabajadoresData: Array.isArray(eq?.trabajadores)
+              ? eq.trabajadores.map((t) => ({
+                  id: t?.id || null,
+                  trabajadorId: t?.trabajadorId || null,
+                  esEncargado: !!t?.esEncargado,
+                }))
+              : [],
+            encargadoId: encargado?.trabajadorId || null,
+            planMantenimientoId: eq?.planMantenimientoId || null,
+            planMantenimiento: eq?.planMantenimiento || null,
+            actividadesOT: Array.isArray(eq?.actividades)
+              ? eq.actividades.map((a) => ({
+                  id: a?.id || null,
+                  planMantenimientoActividadId:
+                    a?.planMantenimientoActividadId || null,
+                  codigoActividad: a?.codigoActividad || "",
+                  sistema: a?.sistema || "",
+                  subsistema: a?.subsistema || "",
+                  componente: a?.componente || "",
+                  tarea: a?.tarea || "",
+                  descripcion: a?.descripcion || "",
+                  tipoTrabajo: a?.tipoTrabajo || "",
+                  rolTecnico: a?.rolTecnico || "",
+                  cantidadTecnicos: a?.cantidadTecnicos || 1,
+                  duracionEstimadaValor: a?.duracionEstimadaValor || "",
+                  unidadDuracion: a?.unidadDuracion || "min",
+                  duracionEstimadaMin: a?.duracionEstimadaMin || null,
+                  duracionRealValor: a?.duracionRealValor || "",
+                  unidadDuracionReal: a?.unidadDuracionReal || "min",
+                  duracionRealMin: a?.duracionRealMin || null,
+                  estado: a?.estado || "PENDIENTE",
+                  origen: a?.origen || "PLAN",
+                  tratamientoEquipoActividadId:
+                    a?.tratamientoEquipoActividadId || null,
+                  observaciones: a?.observaciones || "",
+                  selected: true,
+                }))
+              : [],
+            adjuntos: Array.isArray(eq?.adjuntos) ? eq.adjuntos : [],
+            subiendoAdjuntos: false,
+          };
+        })
+      : [],
+  };
+}
+
+function buildOTPayload({
+  numeroOT,
+  formData,
+  aviso,
+  tratamientoId,
+  equipos,
+  archivosAdjuntos,
+  esPreventivo,
+  mode = "create",
+  initialData = null,
+}) {
+  return {
+    ...(mode === "edit" && initialData?.id ? { id: initialData.id } : {}),
+    numeroOT,
+    tipoMantenimiento:
+      aviso?.tipoMantenimiento || initialData?.tipoMantenimiento || "Preventivo",
+    descripcionGeneral: formData.descripcionGeneral || "",
+    estado: initialData?.estado || "CREADO",
+    supervisorId: formData.supervisorId || null,
+    fechaProgramadaInicio: formData.fechaProgramadaInicio || null,
+    fechaProgramadaFin: formData.fechaProgramadaFin || null,
+    fechaInicioReal: initialData?.fechaInicioReal || null,
+    fechaFinReal: initialData?.fechaFinReal || null,
+    fechaCierre: initialData?.fechaCierre || null,
+    observaciones: formData.observaciones || null,
+    avisoId: aviso?.id || initialData?.avisoId || null,
+    tratamientoId: tratamientoId || null,
+
+    adjuntos: (archivosAdjuntos || []).map((a) => ({
+      id: a.id || undefined,
+      nombre: a.nombre || "",
+      url: a.url || "",
+      extension: a.extension || null,
+      categoria: a.categoria || "OTRO",
+      mostrarEnPortal: a.mostrarEnPortal ?? false,
+      tituloPortal: a.tituloPortal || null,
+      descripcionPortal: a.descripcionPortal || null,
+      ordenPortal: a.ordenPortal ?? 0,
+    })),
+
+    equipos: (equipos || []).map((eq) => {
+      const trabajadores = (eq.trabajadoresAsignados || []).map((trabajadorId) => {
+        const existente = Array.isArray(eq.trabajadoresData)
+          ? eq.trabajadoresData.find(
+              (t) => String(t.trabajadorId) === String(trabajadorId)
+            )
+          : null;
+
+        return {
+          id: existente?.id || undefined,
+          trabajadorId,
+          esEncargado: String(eq.encargadoId) === String(trabajadorId),
+        };
+      });
+
+      return {
+        id: eq.id || undefined,
+        equipoId: eq.equipoId || null,
+        ubicacionTecnicaId: eq.ubicacionTecnicaId || null,
+        descripcionEquipo: eq.descripcionEquipo || null,
+        planMantenimientoId: eq.planMantenimientoId || null,
+        prioridad: eq.prioridad || "MEDIA",
+        fechaInicioProgramada: eq.fechaInicioProgramada || null,
+        fechaFinProgramada: eq.fechaFinProgramada || null,
+        fechaInicioReal: eq.fechaInicioReal || null,
+        fechaFinReal: eq.fechaFinReal || null,
+        observacionesEquipo: eq.observacionesEquipo || null,
+        estadoEquipo: eq.estado || "PENDIENTE",
+        observaciones: eq.observaciones || null,
+
+        trabajadores,
+
+        actividades: (eq.actividadesOT || []).map((act) => ({
+          id: act.id || undefined,
+          planMantenimientoActividadId: act.planMantenimientoActividadId || null,
+          sistema: act.sistema || null,
+          subsistema: act.subsistema || null,
+          componente: act.componente || null,
+          tarea: act.tarea || "",
+          tipoTrabajo: act.tipoTrabajo || null,
+          duracionEstimadaValor:
+            act.duracionEstimadaValor === "" ? null : act.duracionEstimadaValor,
+          unidadDuracion: act.unidadDuracion || "min",
+          duracionEstimadaMin: act.duracionEstimadaMin ?? null,
+          duracionRealValor:
+            act.duracionRealValor === "" ? null : act.duracionRealValor,
+          unidadDuracionReal: act.unidadDuracionReal || "min",
+          duracionRealMin: act.duracionRealMin ?? null,
+          estado: act.estado || "PENDIENTE",
+          origen: act.origen || (esPreventivo ? "PLAN" : "MANUAL"),
+          descripcion: act.descripcion || null,
+          tratamientoEquipoActividadId: act.tratamientoEquipoActividadId || null,
+          observaciones: act.observaciones || null,
+        })),
+
+        adjuntos: (eq.adjuntos || []).map((adj) => ({
+          id: adj.id || undefined,
+          nombre: adj.nombre || "",
+          url: adj.url || "",
+          extension: adj.extension || null,
+          categoria: adj.categoria || "OTRO",
+          mostrarEnPortal: adj.mostrarEnPortal ?? false,
+          tituloPortal: adj.tituloPortal || null,
+          descripcionPortal: adj.descripcionPortal || null,
+          ordenPortal: adj.ordenPortal ?? 0,
+        })),
+      };
+    }),
+  };
+}
+
+/* =========================================================
+   COMPONENTE
+========================================================= */
 
 export default function ModalOTGrupal({
   isOpen,
@@ -40,6 +281,8 @@ export default function ModalOTGrupal({
   aviso,
   onGuardar,
   onGenerarNumeroOT,
+  mode = "create",
+  initialData = null,
 }) {
   const [numeroOTGenerado, setNumeroOTGenerado] = useState("");
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
@@ -64,362 +307,22 @@ export default function ModalOTGrupal({
 
   const tratamientoAplicadoRef = useRef(false);
 
-  const tipoMantenimiento = aviso?.tipoMantenimiento;
+  const tipoMantenimiento =
+    aviso?.tipoMantenimiento ||
+    initialData?.tipoMantenimiento ||
+    initialData?.aviso?.tipoMantenimiento;
+
   const esPreventivo = tipoMantenimiento === "Preventivo";
   const esCorrectivo = tipoMantenimiento === "Correctivo";
 
   const tratamiento = tratamientoData?.tratamiento || tratamientoData || null;
 
-
   const [showSolicitudAlmacenModal, setShowSolicitudAlmacenModal] = useState(false);
-const [guardandoSolicitudAlmacen, setGuardandoSolicitudAlmacen] = useState(false);
+  const [guardandoSolicitudAlmacen, setGuardandoSolicitudAlmacen] = useState(false);
 
-const [showSolicitudCompraModal, setShowSolicitudCompraModal] = useState(false);
-const [guardandoSolicitudCompra, setGuardandoSolicitudCompra] = useState(false);
+  const [showSolicitudCompraModal, setShowSolicitudCompraModal] = useState(false);
+  const [guardandoSolicitudCompra, setGuardandoSolicitudCompra] = useState(false);
 
-
-
-
-
-const getTargetMeta = (targetId) => {
-  const target = equiposInfo.find((t) => String(t.id) === String(targetId));
-
-  if (!target) {
-    return {
-      equipo_id: null,
-      ubicacion_tecnica_id: null,
-    };
-  }
-
-  return {
-    equipo_id: target.tipo === "EQUIPO" ? target.id : null,
-    ubicacion_tecnica_id:
-      target.tipo === "UBICACION_TECNICA" ? target.id : null,
-  };
-};
-
-const buildSolicitudCompraCreatePayload = (form, extra = {}) => ({
-  tratamiento_id: tratamiento?.id || tratamientoData?.id || null,
-  equipo_id: extra.equipo_id ?? null,
-  ubicacion_tecnica_id: extra.ubicacion_tecnica_id ?? null,
-  esGeneral: !!extra.esGeneral,
-  department: form.department || "",
-  requester: form.email?.trim() || "",
-  requiredDate: form.requiredDate || "",
-  comments: form.comments || "",
-  lineas: Array.isArray(form.lineas)
-    ? form.lineas.map((l) => ({
-        itemId: l.itemId || null,
-        itemCode: l.itemCode || "",
-        description: l.description || "",
-        quantity: Number(l.quantity) || 1,
-        warehouseCode: l.warehouseCode || "",
-        costingCode: l.costCenter || "",
-        projectCode: l.projectCode || "",
-        rubro: l.rubro || "",
-        rubroSapCode: l.rubroSapCode || "",
-        paqueteTrabajo: l.paqueteTrabajo || "",
-      }))
-    : [],
-});
-
-
-  const equiposInfo = useMemo(() => {
-    return (equipos || []).map((e) => ({
-      id: getRegistroId(e),
-      nombre: e.equipoNombre || e.ubicacionTecnicaNombre,
-      codigo: e.equipoNombre || e.ubicacionTecnicaNombre,
-      tag: e.equipoTipo || e.ubicacionTecnicaCodigo,
-      tipo: e.equipoId ? "EQUIPO" : "UBICACION_TECNICA",
-    }));
-  }, [equipos]);
-
-    const solicitudesCompraArr = useMemo(() => {
-    const arr =
-      tratamientoData?.solicitudesCompra ||
-      tratamiento?.solicitudesCompra ||
-      tratamientoData?.tratamiento?.solicitudesCompra ||
-      [];
-    return Array.isArray(arr) ? arr : [];
-  }, [tratamientoData, tratamiento]);
-
-
-  const initialSolicitudesCompra = useMemo(() => {
-  const general = solicitudesCompraArr.find((s) => s?.esGeneral === true) || null;
-  const individuales = solicitudesCompraArr.filter((s) => !s?.esGeneral);
-
-  const solicitudesPorEquipo = {};
-
-  for (const sol of individuales) {
-    const key = String(sol.equipo_id || sol.ubicacion_tecnica_id || "");
-    if (!key) continue;
-
-    solicitudesPorEquipo[key] = {
-      department: sol.department || "",
-      email: sol.requester || sol.email || "",
-      requiredDate: sol.requiredDate ? String(sol.requiredDate).slice(0, 10) : "",
-      comments: sol.comments || "",
-      lineas: Array.isArray(sol.lineas)
-        ? sol.lineas.map((l) => ({
-            id: l.id,
-            itemId: l.itemId || "",
-            itemCode: l.itemCode || "",
-            description: l.description || "",
-            quantity: Number(l.quantity) || 1,
-            warehouseCode: l.warehouseCode || "",
-            costCenter: l.costingCode || "",
-            projectCode: l.projectCode || "",
-            rubro: l.rubro || "",
-            rubroSapCode: l.rubroSapCode || "",
-            paqueteTrabajo: l.paqueteTrabajo || "",
-          }))
-        : [],
-    };
-  }
-
-  return {
-    solicitudGeneral: general
-      ? {
-          department: general.department || "",
-          email: general.requester || general.email || "",
-          requiredDate: general.requiredDate
-            ? String(general.requiredDate).slice(0, 10)
-            : "",
-          comments: general.comments || "",
-          lineas: Array.isArray(general.lineas)
-            ? general.lineas.map((l) => ({
-                id: l.id,
-                itemId: l.itemId || "",
-                itemCode: l.itemCode || "",
-                description: l.description || "",
-                quantity: Number(l.quantity) || 1,
-                warehouseCode: l.warehouseCode || "",
-                costCenter: l.costingCode || "",
-                projectCode: l.projectCode || "",
-                rubro: l.rubro || "",
-                rubroSapCode: l.rubroSapCode || "",
-                paqueteTrabajo: l.paqueteTrabajo || "",
-              }))
-            : [],
-        }
-      : null,
-    solicitudesPorEquipo,
-  };
-}, [solicitudesCompraArr]);
-
-
-const buildSolicitudCompraUpdatePayload = (form) => ({
-  department: form.department || "",
-  requester: form.email?.trim() || "",
-  requiredDate: form.requiredDate || "",
-  comments: form.comments || "",
-  lineas: Array.isArray(form.lineas)
-    ? form.lineas.map((l) => ({
-        itemId: l.itemId || null,
-        itemCode: l.itemCode || "",
-        description: l.description || "",
-        quantity: Number(l.quantity) || 1,
-        warehouseCode: l.warehouseCode || "",
-        costingCode: l.costCenter || "",
-        projectCode: l.projectCode || "",
-        rubro: l.rubro || "",
-        rubroSapCode: l.rubroSapCode || "",
-        paqueteTrabajo: l.paqueteTrabajo || "",
-      }))
-    : [],
-});
-
-  const solicitudesAlmacenArr = useMemo(() => {
-  const arr =
-    tratamientoData?.solicitudesAlmacen ||
-    tratamiento?.solicitudesAlmacen ||
-    tratamientoData?.tratamiento?.solicitudesAlmacen ||
-    [];
-  return Array.isArray(arr) ? arr : [];
-}, [tratamientoData, tratamiento]);
-
-
-const validarSolicitudCompraForm = (form, label = "solicitud de compra") => {
-  if (!form?.email?.trim()) {
-    throw new Error(`El correo del solicitante es obligatorio en ${label}`);
-  }
-
-  if (!form?.requiredDate) {
-    throw new Error(`La fecha requerida es obligatoria en ${label}`);
-  }
-
-  if (!Array.isArray(form.lineas) || form.lineas.length === 0) {
-    throw new Error(`Debe existir al menos una línea en ${label}`);
-  }
-};
-
-const handleGuardarSolicitudesCompraDesdeOT = async (result) => {
-  try {
-    setGuardandoSolicitudCompra(true);
-
-    const tratamientoId = tratamiento?.id || tratamientoData?.id;
-    if (!tratamientoId) {
-      throw new Error("No se encontró el tratamiento para guardar la solicitud");
-    }
-
-    const generalExistente =
-      solicitudesCompraArr.find((s) => s?.esGeneral === true) || null;
-
-    const individualesExistentes = solicitudesCompraArr.filter(
-      (s) => !s?.esGeneral
-    );
-
-    // GENERAL
-    if (result?.solicitudGeneral && !isSolicitudVacia(result.solicitudGeneral)) {
-      if (generalExistente) {
-        await updateSolicitudCompra(
-          generalExistente.id,
-          buildSolicitudCompraUpdatePayload(result.solicitudGeneral)
-        );
-      } else {
-        await createSolicitudCompra(
-          buildSolicitudCompraCreatePayload(result.solicitudGeneral, {
-            esGeneral: true,
-            equipo_id: null,
-            ubicacion_tecnica_id: null,
-          })
-        );
-      }
-    }
-
-    // INDIVIDUALES
-    const formsPorEquipo = result?.solicitudesPorEquipo || {};
-
-    for (const [key, form] of Object.entries(formsPorEquipo)) {
-      if (!form || isSolicitudVacia(form)) continue;
-
-      const existente = individualesExistentes.find(
-        (s) =>
-          String(s.equipo_id || s.ubicacion_tecnica_id || "") === String(key)
-      );
-
-      if (existente) {
-        await updateSolicitudCompra(
-          existente.id,
-          buildSolicitudCompraUpdatePayload(form)
-        );
-      } else {
-        const meta = getTargetMeta(key);
-
-        await createSolicitudCompra(
-          buildSolicitudCompraCreatePayload(form, {
-            esGeneral: false,
-            equipo_id: meta.equipo_id,
-            ubicacion_tecnica_id: meta.ubicacion_tecnica_id,
-          })
-        );
-      }
-    }
-
-    const updated = await getTratamientoByAviso(aviso.id);
-    setTratamientoData(updated);
-    setShowSolicitudCompraModal(false);
-  } catch (error) {
-    console.error("Error guardando solicitudes de compra desde OT:", error);
-    alert(
-      error?.response?.data?.message ||
-        error?.response?.data?.errors?.[0] ||
-        error?.message ||
-        "Error al guardar solicitudes de compra"
-    );
-  } finally {
-    setGuardandoSolicitudCompra(false);
-  }
-};
-
-const initialSolicitudesAlmacen = useMemo(() => {
-  return mapSolicitudesAlmacenToModalValue(solicitudesAlmacenArr);
-}, [solicitudesAlmacenArr]);
-
-  const solicitudGeneral = useMemo(() => {
-    return solicitudesCompraArr.find((s) => s?.esGeneral === true) || null;
-  }, [solicitudesCompraArr]);
-
-  const handleGuardarSolicitudesAlmacenDesdeOT = async (result) => {
-  try {
-    setGuardandoSolicitudAlmacen(true);
-
-    const tratamientoId = tratamiento?.id || tratamientoData?.id;
-    if (!tratamientoId) {
-      throw new Error("No se encontró el tratamiento para guardar la solicitud");
-    }
-
-    const generalExistente =
-      solicitudesAlmacenArr.find((s) => s?.esGeneral === true) || null;
-
-    const individualesExistentes = solicitudesAlmacenArr.filter(
-      (s) => !s?.esGeneral
-    );
-
-    // GENERAL
-    if (result?.solicitudGeneral && !isSolicitudVacia(result.solicitudGeneral)) {
-      if (generalExistente) {
-        await updateSolicitudAlmacen(
-          generalExistente.id,
-          buildSolicitudAlmacenUpdatePayload(result.solicitudGeneral)
-        );
-      } else {
-        await createSolicitudAlmacen(
-          buildSolicitudAlmacenCreatePayload(result.solicitudGeneral, {
-            tratamiento_id: tratamientoId,
-            esGeneral: true,
-            equipo_id: null,
-            ubicacion_tecnica_id: null,
-          })
-        );
-      }
-    }
-
-    // INDIVIDUALES
-    const formsPorEquipo = result?.solicitudesPorEquipo || {};
-
-    for (const [key, form] of Object.entries(formsPorEquipo)) {
-      if (!form || isSolicitudVacia(form)) continue;
-
-      const existente = individualesExistentes.find(
-        (s) =>
-          String(s.equipo_id || s.ubicacion_tecnica_id || "") === String(key)
-      );
-
-      if (existente) {
-        await updateSolicitudAlmacen(
-          existente.id,
-          buildSolicitudAlmacenUpdatePayload(form)
-        );
-      } else {
-        const meta = getTargetMeta(key);
-
-        await createSolicitudAlmacen(
-          buildSolicitudAlmacenCreatePayload(form, {
-            tratamiento_id: tratamientoId,
-            esGeneral: false,
-            equipo_id: meta.equipo_id,
-            ubicacion_tecnica_id: meta.ubicacion_tecnica_id,
-          })
-        );
-      }
-    }
-
-    const updated = await getTratamientoByAviso(aviso.id);
-    setTratamientoData(updated);
-    setShowSolicitudAlmacenModal(false);
-  } catch (error) {
-    console.error("Error guardando solicitudes de almacén desde OT:", error);
-    alert(
-      error?.response?.data?.message ||
-        error?.response?.data?.errors?.[0] ||
-        error?.message ||
-        "Error al guardar solicitudes de almacén"
-    );
-  } finally {
-    setGuardandoSolicitudAlmacen(false);
-  }
-};
   const [formData, setFormData] = useState({
     descripcionGeneral: "",
     descripcionDetallada: "",
@@ -429,6 +332,174 @@ const initialSolicitudesAlmacen = useMemo(() => {
     observaciones: "",
   });
 
+  const equiposInfo = useMemo(() => {
+    return (equipos || []).map((e) => ({
+      id: String(getRegistroId(e)),
+      nombre:
+        e.equipoNombre ||
+        e.ubicacionTecnicaNombre ||
+        e.equipo?.nombre ||
+        e.ubicacionTecnica?.nombre,
+      codigo:
+        e.equipoNombre ||
+        e.ubicacionTecnicaNombre ||
+        e.equipo?.codigo ||
+        e.ubicacionTecnica?.codigo,
+      tag: e.equipoTipo || e.ubicacionTecnicaCodigo,
+      tipo: e.equipoId ? "EQUIPO" : "UBICACION_TECNICA",
+    }));
+  }, [equipos]);
+
+  const getTargetMeta = (targetId) => {
+    const target = equiposInfo.find((t) => String(t.id) === String(targetId));
+
+    if (!target) {
+      return {
+        equipo_id: null,
+        ubicacion_tecnica_id: null,
+      };
+    }
+
+    return {
+      equipo_id: target.tipo === "EQUIPO" ? target.id : null,
+      ubicacion_tecnica_id: target.tipo === "UBICACION_TECNICA" ? target.id : null,
+    };
+  };
+
+  const buildSolicitudCompraCreatePayload = (form, extra = {}) => ({
+    tratamiento_id: tratamiento?.id || tratamientoData?.id || null,
+    equipo_id: extra.equipo_id ?? null,
+    ubicacion_tecnica_id: extra.ubicacion_tecnica_id ?? null,
+    esGeneral: !!extra.esGeneral,
+    department: form.department || "",
+    requester: form.email?.trim() || "",
+    requiredDate: form.requiredDate || "",
+    comments: form.comments || "",
+    lineas: Array.isArray(form.lineas)
+      ? form.lineas.map((l) => ({
+          itemId: l.itemId || null,
+          itemCode: l.itemCode || "",
+          description: l.description || "",
+          quantity: Number(l.quantity) || 1,
+          warehouseCode: l.warehouseCode || "",
+          costingCode: l.costCenter || "",
+          projectCode: l.projectCode || "",
+          rubro: l.rubro || "",
+          rubroSapCode: l.rubroSapCode || "",
+          paqueteTrabajo: l.paqueteTrabajo || "",
+        }))
+      : [],
+  });
+
+  const solicitudesCompraArr = useMemo(() => {
+    const arr =
+      tratamientoData?.solicitudesCompra ||
+      tratamiento?.solicitudesCompra ||
+      tratamientoData?.tratamiento?.solicitudesCompra ||
+      [];
+    return Array.isArray(arr) ? arr : [];
+  }, [tratamientoData, tratamiento]);
+
+  const initialSolicitudesCompra = useMemo(() => {
+    const general =
+      solicitudesCompraArr.find((s) => s?.esGeneral === true) || null;
+    const individuales = solicitudesCompraArr.filter((s) => !s?.esGeneral);
+
+    const solicitudesPorEquipo = {};
+
+    for (const sol of individuales) {
+      const key = String(sol.equipo_id || sol.ubicacion_tecnica_id || "");
+      if (!key) continue;
+
+      solicitudesPorEquipo[key] = {
+        department: sol.department || "",
+        email: sol.requester || sol.email || "",
+        requiredDate: sol.requiredDate
+          ? String(sol.requiredDate).slice(0, 10)
+          : "",
+        comments: sol.comments || "",
+        lineas: Array.isArray(sol.lineas)
+          ? sol.lineas.map((l) => ({
+              id: l.id,
+              itemId: l.itemId || "",
+              itemCode: l.itemCode || "",
+              description: l.description || "",
+              quantity: Number(l.quantity) || 1,
+              warehouseCode: l.warehouseCode || "",
+              costCenter: l.costingCode || "",
+              projectCode: l.projectCode || "",
+              rubro: l.rubro || "",
+              rubroSapCode: l.rubroSapCode || "",
+              paqueteTrabajo: l.paqueteTrabajo || "",
+            }))
+          : [],
+      };
+    }
+
+    return {
+      solicitudGeneral: general
+        ? {
+            department: general.department || "",
+            email: general.requester || general.email || "",
+            requiredDate: general.requiredDate
+              ? String(general.requiredDate).slice(0, 10)
+              : "",
+            comments: general.comments || "",
+            lineas: Array.isArray(general.lineas)
+              ? general.lineas.map((l) => ({
+                  id: l.id,
+                  itemId: l.itemId || "",
+                  itemCode: l.itemCode || "",
+                  description: l.description || "",
+                  quantity: Number(l.quantity) || 1,
+                  warehouseCode: l.warehouseCode || "",
+                  costCenter: l.costingCode || "",
+                  projectCode: l.projectCode || "",
+                  rubro: l.rubro || "",
+                  rubroSapCode: l.rubroSapCode || "",
+                  paqueteTrabajo: l.paqueteTrabajo || "",
+                }))
+              : [],
+          }
+        : null,
+      solicitudesPorEquipo,
+    };
+  }, [solicitudesCompraArr]);
+
+  const buildSolicitudCompraUpdatePayload = (form) => ({
+    department: form.department || "",
+    requester: form.email?.trim() || "",
+    requiredDate: form.requiredDate || "",
+    comments: form.comments || "",
+    lineas: Array.isArray(form.lineas)
+      ? form.lineas.map((l) => ({
+          itemId: l.itemId || null,
+          itemCode: l.itemCode || "",
+          description: l.description || "",
+          quantity: Number(l.quantity) || 1,
+          warehouseCode: l.warehouseCode || "",
+          costingCode: l.costCenter || "",
+          projectCode: l.projectCode || "",
+          rubro: l.rubro || "",
+          rubroSapCode: l.rubroSapCode || "",
+          paqueteTrabajo: l.paqueteTrabajo || "",
+        }))
+      : [],
+  });
+
+  const solicitudesAlmacenArr = useMemo(() => {
+    const arr =
+      tratamientoData?.solicitudesAlmacen ||
+      tratamiento?.solicitudesAlmacen ||
+      tratamientoData?.tratamiento?.solicitudesAlmacen ||
+      [];
+    return Array.isArray(arr) ? arr : [];
+  }, [tratamientoData, tratamiento]);
+
+  const initialSolicitudesAlmacen = useMemo(() => {
+    return mapSolicitudesAlmacenToModalValue(solicitudesAlmacenArr);
+  }, [solicitudesAlmacenArr]);
+
   useEffect(() => {
     if (!isOpen) {
       tratamientoAplicadoRef.current = false;
@@ -437,11 +508,21 @@ const initialSolicitudesAlmacen = useMemo(() => {
       setTratamientoData(null);
       setArchivosAdjuntos([]);
       setErrors({});
+      setFormData({
+        descripcionGeneral: "",
+        descripcionDetallada: "",
+        supervisorId: "",
+        fechaProgramadaInicio: "",
+        fechaProgramadaFin: "",
+        observaciones: "",
+      });
+      setNumeroOTGenerado("");
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
+
     setCargandoTrabajadores(true);
 
     Promise.all([
@@ -455,21 +536,41 @@ const initialSolicitudesAlmacen = useMemo(() => {
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !aviso) return;
+    if (!isOpen) return;
 
-    const numero = onGenerarNumeroOT
-      ? onGenerarNumeroOT()
-      : `OT-${Date.now().toString().slice(-6)}`;
+    if (mode === "edit" && initialData) {
+      const mapped = mapOrdenTrabajoToModalData(initialData);
 
-    setNumeroOTGenerado(numero);
+      setNumeroOTGenerado(mapped.numeroOT || "");
+      setArchivosAdjuntos(mapped.archivosAdjuntos || []);
+      setEquipos(mapped.equipos || []);
+      setFormData({
+        descripcionGeneral: mapped.descripcionGeneral || "",
+        descripcionDetallada: mapped.descripcionDetallada || "",
+        supervisorId: mapped.supervisorId || "",
+        fechaProgramadaInicio: mapped.fechaProgramadaInicio || "",
+        fechaProgramadaFin: mapped.fechaProgramadaFin || "",
+        observaciones: mapped.observaciones || "",
+      });
+      return;
+    }
 
-    setFormData((prev) => ({
-      ...prev,
-      descripcionGeneral: aviso.descripcion || "",
-      fechaProgramadaInicio: aviso.fechaSugerida || "",
-      fechaProgramadaFin: aviso.fechaSugeridaFin || "",
-    }));
-  }, [isOpen, aviso, onGenerarNumeroOT]);
+    if (mode === "create" && aviso) {
+      const numero = onGenerarNumeroOT
+        ? onGenerarNumeroOT()
+        : `OT-${Date.now().toString().slice(-6)}`;
+
+      setNumeroOTGenerado(numero);
+      setFormData({
+        descripcionGeneral: aviso.descripcion || "",
+        descripcionDetallada: "",
+        supervisorId: "",
+        fechaProgramadaInicio: aviso.fechaSugerida || "",
+        fechaProgramadaFin: aviso.fechaSugeridaFin || "",
+        observaciones: "",
+      });
+    }
+  }, [isOpen, aviso, onGenerarNumeroOT, mode, initialData]);
 
   useEffect(() => {
     if (!isOpen || !aviso?.id) return;
@@ -483,13 +584,16 @@ const initialSolicitudesAlmacen = useMemo(() => {
   }, [isOpen, aviso?.id]);
 
   useEffect(() => {
-    if (!isOpen || !aviso?.id) return;
+    if (!isOpen || !aviso?.id || mode !== "create") return;
 
     const cargarRegistros = async () => {
       try {
-        const equiposResp = await getEquiposDisponiblesPorAviso(aviso.id).catch(() => []);
+        const equiposResp = await getEquiposDisponiblesPorAviso(aviso.id).catch(
+          () => []
+        );
 
         const equiposIniciales = (equiposResp || []).map((rel) => ({
+          id: null,
           equipoId: rel.equipo.id,
           ubicacionTecnicaId: null,
           equipoNombre: rel.equipo.nombre || rel.equipo.codigo,
@@ -506,7 +610,12 @@ const initialSolicitudesAlmacen = useMemo(() => {
           estado: "PENDIENTE",
           fechaInicioProgramada: "",
           fechaFinProgramada: "",
+          fechaInicioReal: "",
+          fechaFinReal: "",
+          observacionesEquipo: "",
+          observaciones: "",
           trabajadoresAsignados: [],
+          trabajadoresData: [],
           encargadoId: null,
           planMantenimientoId: null,
           planMantenimiento: null,
@@ -520,6 +629,7 @@ const initialSolicitudesAlmacen = useMemo(() => {
           const ubicacionId = rel.ubicacionTecnicaId || rel.ubicacionId || ut.id;
 
           return {
+            id: null,
             equipoId: null,
             ubicacionTecnicaId: ubicacionId,
             equipoNombre: "",
@@ -533,7 +643,12 @@ const initialSolicitudesAlmacen = useMemo(() => {
             estado: "PENDIENTE",
             fechaInicioProgramada: "",
             fechaFinProgramada: "",
+            fechaInicioReal: "",
+            fechaFinReal: "",
+            observacionesEquipo: "",
+            observaciones: "",
             trabajadoresAsignados: [],
+            trabajadoresData: [],
             encargadoId: null,
             planMantenimientoId: null,
             planMantenimiento: null,
@@ -551,10 +666,16 @@ const initialSolicitudesAlmacen = useMemo(() => {
     };
 
     cargarRegistros();
-  }, [isOpen, aviso?.id, aviso?.ubicacionesRelacion]);
+  }, [isOpen, aviso?.id, aviso?.ubicacionesRelacion, mode]);
 
   useEffect(() => {
-    if (!isOpen || !tratamientoData || !equipos.length || tratamientoAplicadoRef.current) {
+    if (
+      !isOpen ||
+      mode !== "create" ||
+      !tratamientoData ||
+      !equipos.length ||
+      tratamientoAplicadoRef.current
+    ) {
       return;
     }
 
@@ -569,11 +690,12 @@ const initialSolicitudesAlmacen = useMemo(() => {
       prev.map((eq) => {
         const te = tratEquipos.find((t) => {
           if (eq.equipoId) return t.equipoId === eq.equipoId || t.equipo?.id === eq.equipoId;
-          if (eq.ubicacionTecnicaId)
+          if (eq.ubicacionTecnicaId) {
             return (
               t.ubicacionTecnicaId === eq.ubicacionTecnicaId ||
               t.ubicacionTecnica?.id === eq.ubicacionTecnicaId
             );
+          }
           return false;
         });
 
@@ -623,7 +745,7 @@ const initialSolicitudesAlmacen = useMemo(() => {
         };
       })
     );
-  }, [isOpen, tratamientoData, equipos.length, esCorrectivo]);
+  }, [isOpen, mode, tratamientoData, equipos.length, esCorrectivo]);
 
   useEffect(() => {
     if (!isOpen || !esPreventivo || !equipos.length) return;
@@ -671,7 +793,7 @@ const initialSolicitudesAlmacen = useMemo(() => {
     return () => {
       cancelled = true;
     };
-  }, [isOpen, esPreventivo, equipos.length]);
+  }, [isOpen, esPreventivo, equipos]);
 
   const seleccionarPlan = async (equipoIndex, planId) => {
     if (!planId) {
@@ -687,6 +809,7 @@ const initialSolicitudesAlmacen = useMemo(() => {
       const acts = (planSel?.actividades || []).map((a) =>
         mkActOT(
           {
+            id: a.id,
             planMantenimientoActividadId: a.id,
             codigoActividad: a.codigoActividad,
             sistema: a.sistema,
@@ -780,7 +903,7 @@ const initialSolicitudesAlmacen = useMemo(() => {
               duracionEstimadaValor: 0,
               rolTecnico: "tecnico_mecanico",
               cantidadTecnicos: 1,
-              origen: "OT",
+              origen: "MANUAL",
             },
             { forceSelected: true, esCorrectivo: true }
           ),
@@ -792,6 +915,7 @@ const initialSolicitudesAlmacen = useMemo(() => {
 
   const removeActividadOT = (eqIndex, actIndex) => {
     if (!esCorrectivo) return;
+
     setEquipos((prev) => {
       const updated = [...prev];
       updated[eqIndex] = {
@@ -846,6 +970,161 @@ const initialSolicitudesAlmacen = useMemo(() => {
     }
   };
 
+  const handleGuardarSolicitudesCompraDesdeOT = async (result) => {
+    try {
+      setGuardandoSolicitudCompra(true);
+
+      const tratamientoId = tratamiento?.id || tratamientoData?.id;
+      if (!tratamientoId) {
+        throw new Error("No se encontró el tratamiento para guardar la solicitud");
+      }
+
+      const generalExistente =
+        solicitudesCompraArr.find((s) => s?.esGeneral === true) || null;
+
+      const individualesExistentes = solicitudesCompraArr.filter(
+        (s) => !s?.esGeneral
+      );
+
+      if (result?.solicitudGeneral && !isSolicitudVacia(result.solicitudGeneral)) {
+        if (generalExistente) {
+          await updateSolicitudCompra(
+            generalExistente.id,
+            buildSolicitudCompraUpdatePayload(result.solicitudGeneral)
+          );
+        } else {
+          await createSolicitudCompra(
+            buildSolicitudCompraCreatePayload(result.solicitudGeneral, {
+              esGeneral: true,
+              equipo_id: null,
+              ubicacion_tecnica_id: null,
+            })
+          );
+        }
+      }
+
+      const formsPorEquipo = result?.solicitudesPorEquipo || {};
+
+      for (const [key, form] of Object.entries(formsPorEquipo)) {
+        if (!form || isSolicitudVacia(form)) continue;
+
+        const existente = individualesExistentes.find(
+          (s) =>
+            String(s.equipo_id || s.ubicacion_tecnica_id || "") === String(key)
+        );
+
+        if (existente) {
+          await updateSolicitudCompra(
+            existente.id,
+            buildSolicitudCompraUpdatePayload(form)
+          );
+        } else {
+          const meta = getTargetMeta(key);
+
+          await createSolicitudCompra(
+            buildSolicitudCompraCreatePayload(form, {
+              esGeneral: false,
+              equipo_id: meta.equipo_id,
+              ubicacion_tecnica_id: meta.ubicacion_tecnica_id,
+            })
+          );
+        }
+      }
+
+      const updated = await getTratamientoByAviso(aviso.id);
+      setTratamientoData(updated);
+      setShowSolicitudCompraModal(false);
+    } catch (error) {
+      console.error("Error guardando solicitudes de compra desde OT:", error);
+      alert(
+        error?.response?.data?.message ||
+          error?.response?.data?.errors?.[0] ||
+          error?.message ||
+          "Error al guardar solicitudes de compra"
+      );
+    } finally {
+      setGuardandoSolicitudCompra(false);
+    }
+  };
+
+  const handleGuardarSolicitudesAlmacenDesdeOT = async (result) => {
+    try {
+      setGuardandoSolicitudAlmacen(true);
+
+      const tratamientoId = tratamiento?.id || tratamientoData?.id;
+      if (!tratamientoId) {
+        throw new Error("No se encontró el tratamiento para guardar la solicitud");
+      }
+
+      const generalExistente =
+        solicitudesAlmacenArr.find((s) => s?.esGeneral === true) || null;
+
+      const individualesExistentes = solicitudesAlmacenArr.filter(
+        (s) => !s?.esGeneral
+      );
+
+      if (result?.solicitudGeneral && !isSolicitudVacia(result.solicitudGeneral)) {
+        if (generalExistente) {
+          await updateSolicitudAlmacen(
+            generalExistente.id,
+            buildSolicitudAlmacenUpdatePayload(result.solicitudGeneral)
+          );
+        } else {
+          await createSolicitudAlmacen(
+            buildSolicitudAlmacenCreatePayload(result.solicitudGeneral, {
+              tratamiento_id: tratamientoId,
+              esGeneral: true,
+              equipo_id: null,
+              ubicacion_tecnica_id: null,
+            })
+          );
+        }
+      }
+
+      const formsPorEquipo = result?.solicitudesPorEquipo || {};
+
+      for (const [key, form] of Object.entries(formsPorEquipo)) {
+        if (!form || isSolicitudVacia(form)) continue;
+
+        const existente = individualesExistentes.find(
+          (s) =>
+            String(s.equipo_id || s.ubicacion_tecnica_id || "") === String(key)
+        );
+
+        if (existente) {
+          await updateSolicitudAlmacen(
+            existente.id,
+            buildSolicitudAlmacenUpdatePayload(form)
+          );
+        } else {
+          const meta = getTargetMeta(key);
+
+          await createSolicitudAlmacen(
+            buildSolicitudAlmacenCreatePayload(form, {
+              tratamiento_id: tratamientoId,
+              esGeneral: false,
+              equipo_id: meta.equipo_id,
+              ubicacion_tecnica_id: meta.ubicacion_tecnica_id,
+            })
+          );
+        }
+      }
+
+      const updated = await getTratamientoByAviso(aviso.id);
+      setTratamientoData(updated);
+      setShowSolicitudAlmacenModal(false);
+    } catch (error) {
+      console.error("Error guardando solicitudes de almacén desde OT:", error);
+      alert(
+        error?.response?.data?.message ||
+          error?.response?.data?.errors?.[0] ||
+          error?.message ||
+          "Error al guardar solicitudes de almacén"
+      );
+    } finally {
+      setGuardandoSolicitudAlmacen(false);
+    }
+  };
 
   const handleSubmitInternal = () => {
     const newErrors = validateOTForm({
@@ -861,10 +1140,14 @@ const initialSolicitudesAlmacen = useMemo(() => {
     setMostrarConfirmacion(true);
   };
 
-  const confirmarCreacion = () => {
-    const tratamientoId = tratamientoData?.id || tratamientoData?.tratamiento?.id;
+  const confirmarGuardado = () => {
+    const tratamientoId =
+      initialData?.tratamientoId ||
+      tratamientoData?.id ||
+      tratamientoData?.tratamiento?.id ||
+      null;
 
-    if (!tratamientoId) {
+    if (!tratamientoId && mode === "create") {
       alert("Este aviso no tiene tratamiento cargado.");
       return;
     }
@@ -877,6 +1160,8 @@ const initialSolicitudesAlmacen = useMemo(() => {
       equipos,
       archivosAdjuntos,
       esPreventivo,
+      mode,
+      initialData,
     });
 
     onGuardar(payload);
@@ -891,13 +1176,16 @@ const initialSolicitudesAlmacen = useMemo(() => {
           <div className="px-8 py-6 border-b bg-slate-900 shrink-0 flex items-center justify-between">
             <div>
               <h3 className="text-2xl font-bold text-white">
-                Crear Orden de Trabajo Grupal
+                {mode === "edit"
+                  ? "Editar Orden de Trabajo Grupal"
+                  : "Crear Orden de Trabajo Grupal"}
               </h3>
+
               <div className="flex items-center gap-2 mt-1 flex-wrap text-sm text-slate-300">
                 <span className="font-semibold text-white">{numeroOTGenerado}</span>
                 <span>•</span>
                 <span>
-                  Aviso <b className="text-white">{aviso?.numeroAviso}</b>
+                  Aviso <b className="text-white">{aviso?.numeroAviso || aviso?.id}</b>
                 </span>
                 {tipoMantenimiento && (
                   <>
@@ -939,7 +1227,9 @@ const initialSolicitudesAlmacen = useMemo(() => {
                   <div className="p-2.5 rounded-xl bg-slate-900">
                     <ClipboardCheck className="w-5 h-5 text-white" />
                   </div>
-                  <h4 className="text-xl font-semibold text-slate-900">Información General</h4>
+                  <h4 className="text-xl font-semibold text-slate-900">
+                    Información General
+                  </h4>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1052,7 +1342,9 @@ const initialSolicitudesAlmacen = useMemo(() => {
                   <div className="p-2.5 rounded-xl bg-slate-700">
                     <Upload className="w-5 h-5 text-white" />
                   </div>
-                  <h4 className="text-xl font-semibold text-slate-900">Archivos Adjuntos Generales</h4>
+                  <h4 className="text-xl font-semibold text-slate-900">
+                    Archivos Adjuntos Generales
+                  </h4>
                 </div>
 
                 <input
@@ -1071,19 +1363,23 @@ const initialSolicitudesAlmacen = useMemo(() => {
               </div>
 
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-  <div className="flex items-center justify-between mb-4">
-    <h4 className="text-xl font-semibold text-slate-900">Solicitud de Compra</h4>
-    <button
-      onClick={() => setShowSolicitudCompraModal(true)}
-      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-medium flex items-center gap-2"
-      type="button"
-      disabled={guardandoSolicitudCompra}
-    >
-      <Edit className="w-4 h-4" />
-      {guardandoSolicitudCompra ? "Guardando..." : "Editar solicitud de compra"}
-    </button>
-  </div>
-</div>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-xl font-semibold text-slate-900">
+                    Solicitud de Compra
+                  </h4>
+                  <button
+                    onClick={() => setShowSolicitudCompraModal(true)}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-medium flex items-center gap-2"
+                    type="button"
+                    disabled={guardandoSolicitudCompra}
+                  >
+                    <Edit className="w-4 h-4" />
+                    {guardandoSolicitudCompra
+                      ? "Guardando..."
+                      : "Editar solicitud de compra"}
+                  </button>
+                </div>
+              </div>
 
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <Label>Observaciones Generales</Label>
@@ -1097,14 +1393,16 @@ const initialSolicitudesAlmacen = useMemo(() => {
               </div>
 
               <button
-  type="button"
-  onClick={() => setShowSolicitudAlmacenModal(true)}
-  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium flex items-center gap-2"
-  disabled={guardandoSolicitudAlmacen}
->
-  <Edit className="w-4 h-4" />
-  {guardandoSolicitudAlmacen ? "Guardando..." : "Editar solicitud de almacén"}
-</button>
+                type="button"
+                onClick={() => setShowSolicitudAlmacenModal(true)}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium flex items-center gap-2"
+                disabled={guardandoSolicitudAlmacen}
+              >
+                <Edit className="w-4 h-4" />
+                {guardandoSolicitudAlmacen
+                  ? "Guardando..."
+                  : "Editar solicitud de almacén"}
+              </button>
             </div>
           </div>
 
@@ -1124,7 +1422,7 @@ const initialSolicitudesAlmacen = useMemo(() => {
               type="button"
             >
               <CheckCircle2 className="w-5 h-5" />
-              Crear Orden de Trabajo
+              {mode === "edit" ? "Guardar cambios" : "Crear Orden de Trabajo"}
             </button>
           </div>
         </div>
@@ -1143,37 +1441,62 @@ const initialSolicitudesAlmacen = useMemo(() => {
       />
 
       <ModalSolicitudCompra
-  isOpen={showSolicitudCompraModal}
-  onClose={() => setShowSolicitudCompraModal(false)}
-  onConfirm={handleGuardarSolicitudesCompraDesdeOT}
-  targets={equiposInfo}
-  equiposRelacion={aviso?.equiposRelacion || []}
-  ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
-  equiposInfo={equiposInfo}
-  initialValue={initialSolicitudesCompra}
-/>
+        isOpen={showSolicitudCompraModal}
+        onClose={() => setShowSolicitudCompraModal(false)}
+        onConfirm={handleGuardarSolicitudesCompraDesdeOT}
+        targets={equiposInfo}
+        equiposRelacion={aviso?.equiposRelacion || []}
+        ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
+        equiposInfo={equiposInfo}
+        initialValue={initialSolicitudesCompra}
+      />
 
       <ModalSolicitudAlmacen
-  isOpen={showSolicitudAlmacenModal}
-  onClose={() => setShowSolicitudAlmacenModal(false)}
-  onConfirm={handleGuardarSolicitudesAlmacenDesdeOT}
-  targets={equiposInfo}
-  equiposRelacion={aviso?.equiposRelacion || []}
-  ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
-  equiposInfo={equiposInfo}
-  initialValue={initialSolicitudesAlmacen}
-/>
+        isOpen={showSolicitudAlmacenModal}
+        onClose={() => setShowSolicitudAlmacenModal(false)}
+        onConfirm={handleGuardarSolicitudesAlmacenDesdeOT}
+        targets={equiposInfo}
+        equiposRelacion={aviso?.equiposRelacion || []}
+        ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
+        equiposInfo={equiposInfo}
+        initialValue={initialSolicitudesAlmacen}
+      />
 
       {mostrarConfirmacion && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200">
             <h3 className="text-xl font-semibold text-slate-900 mb-2">
-              ¿Confirmar creación?
+              {mode === "edit" ? "¿Confirmar cambios?" : "¿Confirmar creación?"}
             </h3>
+
             <p className="text-sm text-slate-600 mb-6">
-              Se creará la OT <span className="font-semibold text-slate-900">{numeroOTGenerado}</span>{" "}
-              para <span className="font-semibold text-slate-900">{equipos.length}</span> registros.
+              {mode === "edit" ? (
+                <>
+                  Se actualizará la OT{" "}
+                  <span className="font-semibold text-slate-900">
+                    {numeroOTGenerado}
+                  </span>{" "}
+                  para{" "}
+                  <span className="font-semibold text-slate-900">
+                    {equipos.length}
+                  </span>{" "}
+                  registros.
+                </>
+              ) : (
+                <>
+                  Se creará la OT{" "}
+                  <span className="font-semibold text-slate-900">
+                    {numeroOTGenerado}
+                  </span>{" "}
+                  para{" "}
+                  <span className="font-semibold text-slate-900">
+                    {equipos.length}
+                  </span>{" "}
+                  registros.
+                </>
+              )}
             </p>
+
             <div className="flex gap-3">
               <button
                 onClick={() => setMostrarConfirmacion(false)}
@@ -1184,7 +1507,7 @@ const initialSolicitudesAlmacen = useMemo(() => {
               </button>
               <button
                 onClick={() => {
-                  confirmarCreacion();
+                  confirmarGuardado();
                   setMostrarConfirmacion(false);
                 }}
                 className="flex-1 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium transition"
@@ -1201,7 +1524,11 @@ const initialSolicitudesAlmacen = useMemo(() => {
 }
 
 function Label({ children }) {
-  return <label className="block text-sm font-medium text-slate-700 mb-2">{children}</label>;
+  return (
+    <label className="block text-sm font-medium text-slate-700 mb-2">
+      {children}
+    </label>
+  );
 }
 
 function FieldError({ message }) {
