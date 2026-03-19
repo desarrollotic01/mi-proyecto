@@ -1,11 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  X, Plus, Trash2, Save, Wrench, Clock, Users,
-  ChevronDown, ChevronUp, Upload, FileText, Sparkles,
-  Package, CalendarDays, Hash,
+  X,
+  Plus,
+  Trash2,
+  Save,
+  Wrench,
+  Clock,
+  Users,
+  ChevronDown,
+  ChevronUp,
+  Upload,
+  FileText,
+  Package,
+  CalendarDays,
+  Hash,
 } from "lucide-react";
 import { planMantenimientoService } from "../services/planMantenimientoService";
 import { equipoService } from "../../mantenimiento/services/equipoService";
+import { itemService } from "../services/itemService";
+import {rubroService } from "../services/rubroService";
 
 /** UID simple para el front */
 const uid = () =>
@@ -58,47 +71,117 @@ const DEFAULT_ACTIVIDAD = () => ({
 
 const DEFAULT_ITEM_ACTIVIDAD = () => ({
   uid: uid(),
-  recurso: "MATERIAL",
-  itemCode: "",
-  item: "",
-  unidad: "",
-  cantidad: 1,
-  observacion: "",
-});
-
-const DEFAULT_ITEM_PLAN = () => ({
-  uid: uid(),
+  itemId: "",
   itemCode: "",
   description: "",
   quantity: 1,
   warehouseCode: "01",
   costCenter: "",
   projectCode: "",
-  rubro: "",
+  rubroSapCode: "",
   paqueteTrabajo: "",
   observacion: "",
 });
 
-export default function ModalCrearPlan({ onClose, onCreated, equipoPreseleccionado }) {
+const DEFAULT_ITEM_PLAN = () => ({
+  uid: uid(),
+  itemId: "",
+  itemCode: "",
+  description: "",
+  quantity: 1,
+  warehouseCode: "01",
+  costCenter: "",
+  projectCode: "",
+  rubroSapCode: "",
+  paqueteTrabajo: "",
+  observacion: "",
+});
+
+function Field({ label, required = false, children }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+        {label} {required && <span className="text-rose-500">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function Input(props) {
+  return (
+    <input
+      {...props}
+      className={`w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 bg-white ${
+        props.className || ""
+      }`}
+    />
+  );
+}
+
+function Select(props) {
+  const { children, className = "", ...rest } = props;
+  return (
+    <select
+      {...rest}
+      className={`w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-400 bg-white ${className}`}
+    >
+      {children}
+    </select>
+  );
+}
+
+function Section({ title, action, children }) {
+  return (
+    <section className="bg-white border border-slate-200 rounded-xl">
+      <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-4">
+        <h3 className="text-base font-semibold text-slate-800">{title}</h3>
+        {action}
+      </div>
+      <div className="p-5">{children}</div>
+    </section>
+  );
+}
+
+function EmptyState({ text }) {
+  return (
+    <div className="border border-dashed border-slate-300 rounded-lg px-4 py-8 text-center text-sm text-slate-500">
+      {text}
+    </div>
+  );
+}
+
+export default function ModalCrearPlan({
+  onClose,
+  onCreated,
+  equipoPreseleccionado,
+}) {
   const [equipos, setEquipos] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [expandedByUid, setExpandedByUid] = useState({});
 
-  // items/adjuntos generales del plan
   const [itemsPlan, setItemsPlan] = useState([DEFAULT_ITEM_PLAN()]);
   const [adjuntosPlan, setAdjuntosPlan] = useState([]);
 
-  // ESTADO DEL FORMULARIO
+  const [itemsCatalogo, setItemsCatalogo] = useState([]);
+const [loadingItems, setLoadingItems] = useState(false);
+
+
+const [rubros, setRubros] = useState([]);
+const [loadingRubros, setLoadingRubros] = useState(false);
+
   const [form, setForm] = useState({
     codigoPlan: "",
-    contextoObjetivo: "EQUIPO", // "EQUIPO" o "UBICACION_TECNICA"
+    contextoObjetivo: "EQUIPO",
     ubicacionId: "",
     familiaId: equipoPreseleccionado?.familia?.id || "",
     tipoEquipo: equipoPreseleccionado?.tipoEquipo || "",
     modeloEquipo: equipoPreseleccionado?.modelo || "",
     equipoId: equipoPreseleccionado?.id || "",
     nombre: equipoPreseleccionado
-      ? `Plan de Mantenimiento - ${equipoPreseleccionado.nombre || equipoPreseleccionado.codigo}`
+      ? `Plan de Mantenimiento - ${
+          equipoPreseleccionado.nombre || equipoPreseleccionado.codigo
+        }`
       : "",
     tipo: "PREVENTIVO",
     frecuencia: "MENSUAL",
@@ -107,24 +190,26 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
 
   const [actividades, setActividades] = useState([]);
 
-  // =========================
-  // FUNCIÓN CLAVE: handleEquipoChange
-  // =========================
   const handleEquipoChange = (e) => {
     const selectedId = e.target.value;
-    
+
     if (!selectedId) {
-      setForm(prev => ({ 
-        ...prev, equipoId: "", familiaId: "", tipoEquipo: "", modeloEquipo: "", nombre: "" 
+      setForm((prev) => ({
+        ...prev,
+        equipoId: "",
+        familiaId: "",
+        tipoEquipo: "",
+        modeloEquipo: "",
+        nombre: "",
       }));
       setActividades([]);
       return;
     }
 
-    const equipo = equipos.find(eq => String(eq.id) === String(selectedId));
-    
+    const equipo = equipos.find((eq) => String(eq.id) === String(selectedId));
+
     if (equipo) {
-      setForm(prev => ({
+      setForm((prev) => ({
         ...prev,
         equipoId: equipo.id,
         familiaId: equipo.familiaId || "",
@@ -133,11 +218,10 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
         nombre: `Plan de Mantenimiento - ${equipo.nombre || equipo.codigo}`,
       }));
 
-      // Auto-poblar actividades
       if (equipo.actividades?.length > 0) {
-        const actividadesAuto = equipo.actividades.map(a => ({
+        const actividadesAuto = equipo.actividades.map((a) => ({
           ...DEFAULT_ACTIVIDAD(),
-          uid: uid(), 
+          uid: uid(),
           sistema: a.sistema || "",
           subsistema: a.subsistema || "",
           componente: a.componente || "",
@@ -147,15 +231,20 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
           duracionValor: a.duracionValor || 30,
           unidadDuracion: a.unidadDuracion || "min",
           cantidadTecnicos: a.cantidadTecnicos || 1,
-          items: (a.items || []).map(it => ({
+          items: (a.items || []).map((it) => ({
             ...DEFAULT_ITEM_ACTIVIDAD(),
             uid: uid(),
-            recurso: it.recurso,
-            item: it.item,
-            itemCode: it.itemCode,
-            unidad: it.unidad,
-            cantidad: it.cantidad
-          }))
+            itemId: it.itemId || "",
+            itemCode: it.itemCode || "",
+            description: it.description || "",
+            quantity: it.quantity || 1,
+            warehouseCode: it.warehouseCode || "01",
+            costCenter: it.costingCode || "",
+            projectCode: it.projectCode || "",
+            rubroSapCode: it.rubroSapCode || "",
+            paqueteTrabajo: it.paqueteTrabajo || "",
+            observacion: it.observacion || "",
+          })),
         }));
         setActividades(actividadesAuto);
       } else {
@@ -164,9 +253,52 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
     }
   };
 
-  // =========================
-  // CARGA EQUIPOS
-  // =========================
+  const handleSelectItemPlan = (uidItem, selectedItemId) => {
+  const itemSeleccionado = itemsCatalogo.find(
+    (it) => String(it.id) === String(selectedItemId)
+  );
+
+  if (!itemSeleccionado) {
+    updateItemPlan(uidItem, {
+      itemId: "",
+      itemCode: "",
+      description: "",
+      rubroSapCode: "",
+    });
+    return;
+  }
+
+  updateItemPlan(uidItem, {
+    itemId: itemSeleccionado.id || "",
+    itemCode: itemSeleccionado.sapCode || "",
+    description: itemSeleccionado.nombre || "",
+    rubroSapCode: itemSeleccionado.rubroSapCode || "",
+  });
+};
+
+const handleSelectItemActividad = (uidActividad, uidItem, selectedItemId) => {
+  const itemSeleccionado = itemsCatalogo.find(
+    (it) => String(it.id) === String(selectedItemId)
+  );
+
+  if (!itemSeleccionado) {
+    updateItemActividad(uidActividad, uidItem, {
+      itemId: "",
+      itemCode: "",
+      description: "",
+      rubroSapCode: "",
+    });
+    return;
+  }
+
+  updateItemActividad(uidActividad, uidItem, {
+    itemId: itemSeleccionado.id || "",
+    itemCode: itemSeleccionado.sapCode || "",
+    description: itemSeleccionado.nombre || "",
+    rubroSapCode: itemSeleccionado.rubroSapCode || "",
+  });
+};
+
   useEffect(() => {
     const loadEquipos = async () => {
       try {
@@ -188,6 +320,41 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
   }, []);
 
   useEffect(() => {
+  const loadRubros = async () => {
+    try {
+      setLoadingRubros(true);
+      const data = await rubroService.getAll();
+      setRubros(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error cargando rubros:", error);
+      setRubros([]);
+    } finally {
+      setLoadingRubros(false);
+    }
+  };
+
+  loadRubros();
+}, []);
+
+
+  useEffect(() => {
+  const loadItems = async () => {
+    try {
+      setLoadingItems(true);
+      const data = await itemService.getAll();
+      setItemsCatalogo(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error cargando items:", error);
+      setItemsCatalogo([]);
+    } finally {
+      setLoadingItems(false);
+    }
+  };
+
+  loadItems();
+}, []);
+
+  useEffect(() => {
     if (!equipoPreseleccionado) return;
     setForm((prev) => ({
       ...prev,
@@ -195,7 +362,9 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
       tipoEquipo: equipoPreseleccionado?.tipoEquipo || "",
       modeloEquipo: equipoPreseleccionado?.modelo || "",
       equipoId: equipoPreseleccionado?.id || "",
-      nombre: `Plan de Mantenimiento - ${equipoPreseleccionado.nombre || equipoPreseleccionado.codigo}`,
+      nombre: `Plan de Mantenimiento - ${
+        equipoPreseleccionado.nombre || equipoPreseleccionado.codigo
+      }`,
     }));
   }, [equipoPreseleccionado]);
 
@@ -205,39 +374,58 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
     }
   }, [form.frecuencia]);
 
-  // =========================
-  // MEMO FILTROS
-  // =========================
   const familias = useMemo(() => {
-    return [...new Map(equipos.filter((e) => e.familiaId).map((e) => [e.familiaId, { id: e.familiaId, nombre: e.familiaNombre }])).values()];
+    return [
+      ...new Map(
+        equipos
+          .filter((e) => e.familiaId)
+          .map((e) => [e.familiaId, { id: e.familiaId, nombre: e.familiaNombre }])
+      ).values(),
+    ];
   }, [equipos]);
 
   const tipos = useMemo(() => {
-    return [...new Set(equipos.filter((e) => !form.familiaId || e.familiaId === form.familiaId).map((e) => e.tipoEquipo).filter(Boolean))];
+    return [
+      ...new Set(
+        equipos
+          .filter((e) => !form.familiaId || e.familiaId === form.familiaId)
+          .map((e) => e.tipoEquipo)
+          .filter(Boolean)
+      ),
+    ];
   }, [equipos, form.familiaId]);
 
   const modelos = useMemo(() => {
-    return [...new Set(equipos.filter((e) => {
-      if (form.familiaId && e.familiaId !== form.familiaId) return false;
-      if (form.tipoEquipo && e.tipoEquipo !== form.tipoEquipo) return false;
-      return true;
-    }).map((e) => e.modelo).filter(Boolean))];
+    return [
+      ...new Set(
+        equipos
+          .filter((e) => {
+            if (form.familiaId && e.familiaId !== form.familiaId) return false;
+            if (form.tipoEquipo && e.tipoEquipo !== form.tipoEquipo) return false;
+            return true;
+          })
+          .map((e) => e.modelo)
+          .filter(Boolean)
+      ),
+    ];
   }, [equipos, form.familiaId, form.tipoEquipo]);
 
   const equiposFiltrados = useMemo(() => equipos, [equipos]);
 
-  // =========================
-  // CRUD ITEMS Y ACTIVIDADES
-  // =========================
   const addItemPlan = () => setItemsPlan((p) => [...p, DEFAULT_ITEM_PLAN()]);
-  const updateItemPlan = (uidItem, patch) => setItemsPlan((prev) => prev.map((it) => (it.uid === uidItem ? { ...it, ...patch } : it)));
-  const removeItemPlan = (uidItem) => setItemsPlan((prev) => prev.filter((it) => it.uid !== uidItem));
+  const updateItemPlan = (uidItem, patch) =>
+    setItemsPlan((prev) =>
+      prev.map((it) => (it.uid === uidItem ? { ...it, ...patch } : it))
+    );
+  const removeItemPlan = (uidItem) =>
+    setItemsPlan((prev) => prev.filter((it) => it.uid !== uidItem));
 
   const agregarActividad = () => {
     const act = DEFAULT_ACTIVIDAD();
     setActividades((prev) => [...prev, act]);
     setExpandedByUid((prev) => ({ ...prev, [act.uid]: true }));
   };
+
   const eliminarActividad = (uidActividad) => {
     setActividades((prev) => prev.filter((a) => a.uid !== uidActividad));
     setExpandedByUid((prev) => {
@@ -246,29 +434,68 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
       return copy;
     });
   };
-  const toggleActividad = (uidActividad) => setExpandedByUid((prev) => ({ ...prev, [uidActividad]: !prev[uidActividad] }));
-  const updateActividad = (uidActividad, patch) => setActividades((prev) => prev.map((a) => (a.uid === uidActividad ? { ...a, ...patch } : a)));
+
+  const toggleActividad = (uidActividad) =>
+    setExpandedByUid((prev) => ({
+      ...prev,
+      [uidActividad]: !prev[uidActividad],
+    }));
+
+  const updateActividad = (uidActividad, patch) =>
+    setActividades((prev) =>
+      prev.map((a) => (a.uid === uidActividad ? { ...a, ...patch } : a))
+    );
+
   const addItemToActividad = (uidActividad) => {
-    setActividades((prev) => prev.map((a) => a.uid !== uidActividad ? a : { ...a, items: [...a.items, DEFAULT_ITEM_ACTIVIDAD()] }));
-  };
-  const updateItemActividad = (uidActividad, uidItem, patch) => {
-    setActividades((prev) => prev.map((a) => a.uid !== uidActividad ? a : { ...a, items: a.items.map((it) => it.uid === uidItem ? { ...it, ...patch } : it) }));
-  };
-  const removeItemActividad = (uidActividad, uidItem) => {
-    setActividades((prev) => prev.map((a) => a.uid !== uidActividad ? a : { ...a, items: a.items.filter((it) => it.uid !== uidItem) }));
+    setActividades((prev) =>
+      prev.map((a) =>
+        a.uid !== uidActividad
+          ? a
+          : { ...a, items: [...a.items, DEFAULT_ITEM_ACTIVIDAD()] }
+      )
+    );
   };
 
-  // UPLOAD ADJUNTOS
+  const updateItemActividad = (uidActividad, uidItem, patch) => {
+    setActividades((prev) =>
+      prev.map((a) =>
+        a.uid !== uidActividad
+          ? a
+          : {
+              ...a,
+              items: a.items.map((it) =>
+                it.uid === uidItem ? { ...it, ...patch } : it
+              ),
+            }
+      )
+    );
+  };
+
+  const removeItemActividad = (uidActividad, uidItem) => {
+    setActividades((prev) =>
+      prev.map((a) =>
+        a.uid !== uidActividad
+          ? a
+          : { ...a, items: a.items.filter((it) => it.uid !== uidItem) }
+      )
+    );
+  };
+
   const subirAdjuntosPlan = async (files) => {
     if (!files?.length) return;
     const formData = new FormData();
     Array.from(files).forEach((f) => formData.append("files", f));
     try {
-      const res = await fetch("/api/adjuntos/upload", { method: "POST", body: formData });
+      const res = await fetch("/api/adjuntos/upload", {
+        method: "POST",
+        body: formData,
+      });
       if (!res.ok) throw new Error("Error al subir adjuntos del plan");
       const archivos = await res.json();
       setAdjuntosPlan((prev) => [...prev, ...(archivos || [])]);
-    } catch (err) { alert(err.message); }
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const subirAdjuntosActividad = async (uidActividad, files) => {
@@ -276,65 +503,101 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
     const formData = new FormData();
     Array.from(files).forEach((f) => formData.append("files", f));
     try {
-      const res = await fetch("/api/adjuntos/upload", { method: "POST", body: formData });
+      const res = await fetch("/api/adjuntos/upload", {
+        method: "POST",
+        body: formData,
+      });
       if (!res.ok) throw new Error("Error al subir adjuntos");
       const archivos = await res.json();
-      setActividades((prev) => prev.map((a) => a.uid !== uidActividad ? a : { ...a, adjuntos: [...(a.adjuntos || []), ...(archivos || [])] }));
-    } catch (err) { alert(err.message); }
+      setActividades((prev) =>
+        prev.map((a) =>
+          a.uid !== uidActividad
+            ? a
+            : { ...a, adjuntos: [...(a.adjuntos || []), ...(archivos || [])] }
+        )
+      );
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const validarAntesDeGuardar = () => {
-    if (!form.codigoPlan?.trim()) return "El código del plan (codigoPlan) es obligatorio";
+    if (!form.codigoPlan?.trim())
+      return "El código del plan (codigoPlan) es obligatorio";
     if (!form.nombre?.trim()) return "El nombre del plan es obligatorio";
     if (!form.tipo) return "El tipo de plan es obligatorio";
     if (!form.frecuencia) return "La frecuencia del plan es obligatoria";
+
     if (form.frecuencia === "POR_HORA") {
       const fh = Number(form.frecuenciaHoras);
-      if (!Number.isFinite(fh) || fh <= 0) return "Si la frecuencia es POR_HORA, frecuenciaHoras debe ser > 0";
-      if (!Number.isInteger(fh)) return "frecuenciaHoras debe ser un número entero";
+      if (!Number.isFinite(fh) || fh <= 0)
+        return "Si la frecuencia es POR_HORA, frecuenciaHoras debe ser > 0";
+      if (!Number.isInteger(fh))
+        return "frecuenciaHoras debe ser un número entero";
     }
-    if (form.contextoObjetivo === "EQUIPO" && !form.familiaId && !form.tipoEquipo && !form.modeloEquipo) {
+
+    if (
+      form.contextoObjetivo === "EQUIPO" &&
+      !form.familiaId &&
+      !form.tipoEquipo &&
+      !form.modeloEquipo
+    ) {
       return "Debe especificar al menos Familia, Tipo o Modelo para el plan de equipo";
     }
-    if (!Array.isArray(actividades) || actividades.length === 0) return "El plan de mantenimiento debe tener al menos una actividad";
+
+    if (!Array.isArray(actividades) || actividades.length === 0) {
+      return "El plan de mantenimiento debe tener al menos una actividad";
+    }
+
     return null;
   };
 
   const guardarPlan = async () => {
     const err = validarAntesDeGuardar();
-    if (err) { alert(err); return; }
+    if (err) {
+      alert(err);
+      return;
+    }
 
     setGuardando(true);
 
     try {
       const itemsPlanClean = (itemsPlan || [])
-        .filter((x) => (x.itemCode || "").trim() || (x.description || "").trim())
-        .map((it) => ({
-          itemCode: it.itemCode?.trim(),
-          description: it.description?.trim() || null,
-          quantity: Number(it.quantity),
-          warehouseCode: String(it.warehouseCode || "01").trim(),
-          costCenter: it.costCenter?.trim() || null,
-          projectCode: it.projectCode?.trim() || null,
-          rubro: it.rubro?.trim() || null,
-          paqueteTrabajo: it.paqueteTrabajo?.trim() || null,
-          observacion: it.observacion?.trim() || null,
-        }));
-
+  .filter((x) => (x.itemCode || "").trim() || (x.description || "").trim())
+  .map((it) => ({
+    itemId: it.itemId || null,
+    itemCode: it.itemCode?.trim(),
+    description: it.description?.trim() || null,
+    quantity: Number(it.quantity),
+    warehouseCode: String(it.warehouseCode || "01").trim(),
+    costCenter: it.costCenter?.trim() || null,
+    projectCode: it.projectCode?.trim() || null,
+    rubroSapCode: it.rubroSapCode ? Number(it.rubroSapCode) : null,
+    paqueteTrabajo: it.paqueteTrabajo?.trim() || null,
+    observacion: it.observacion?.trim() || null,
+  }));
       const payload = {
         codigoPlan: form.codigoPlan?.trim(),
         nombre: form.nombre?.trim(),
         tipo: form.tipo,
         frecuencia: form.frecuencia,
-        frecuenciaHoras: form.frecuencia === "POR_HORA" ? Number(form.frecuenciaHoras) : null,
-        
-        contextoObjetivo: form.contextoObjetivo,
-        equipoObjetivoId: form.contextoObjetivo === "EQUIPO" ? form.equipoId : null,
-        ubicacionTecnicaObjetivoId: form.contextoObjetivo === "UBICACION_TECNICA" ? form.ubicacionId : null,
+        frecuenciaHoras:
+          form.frecuencia === "POR_HORA"
+            ? Number(form.frecuenciaHoras)
+            : null,
 
-        familiaId: form.contextoObjetivo === "EQUIPO" ? normalize(form.familiaId) : null,
-        tipoEquipo: form.contextoObjetivo === "EQUIPO" ? normalize(form.tipoEquipo) : null,
-        modeloEquipo: form.contextoObjetivo === "EQUIPO" ? normalize(form.modeloEquipo) : null,
+        contextoObjetivo: form.contextoObjetivo,
+        equipoObjetivoId:
+          form.contextoObjetivo === "EQUIPO" ? form.equipoId : null,
+        ubicacionTecnicaObjetivoId:
+          form.contextoObjetivo === "UBICACION_TECNICA" ? form.ubicacionId : null,
+
+        familiaId:
+          form.contextoObjetivo === "EQUIPO" ? normalize(form.familiaId) : null,
+        tipoEquipo:
+          form.contextoObjetivo === "EQUIPO" ? normalize(form.tipoEquipo) : null,
+        modeloEquipo:
+          form.contextoObjetivo === "EQUIPO" ? normalize(form.modeloEquipo) : null,
         esEspecifico: form.contextoObjetivo === "EQUIPO" && !!form.equipoId,
 
         itemsPlan: itemsPlanClean,
@@ -350,11 +613,15 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
           unidadDuracion: a.unidadDuracion,
           cantidadTecnicos: Number(a.cantidadTecnicos),
           items: (a.items || []).map((it) => ({
-            recurso: it.recurso,
-            item: it.item?.trim(),
+            itemId: it.itemId || null,
             itemCode: it.itemCode?.trim(),
-            unidad: it.unidad?.trim(),
-            cantidad: Number(it.cantidad),
+            description: it.description?.trim() || null,
+            quantity: Number(it.quantity),
+            warehouseCode: String(it.warehouseCode || "01").trim(),
+            costCenter: it.costCenter?.trim() || null,
+            projectCode: it.projectCode?.trim() || null,
+            rubroSapCode: it.rubroSapCode ? Number(it.rubroSapCode) : null,
+            paqueteTrabajo: it.paqueteTrabajo?.trim() || null,
             observacion: normalize(it.observacion),
           })),
           adjuntos: a.adjuntos || [],
@@ -362,7 +629,6 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
       };
 
       await planMantenimientoService.createPlan(payload);
-
       onCreated?.();
       onClose?.();
     } catch (error) {
@@ -376,269 +642,542 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
   const disabledPorEquipo = !!equipoPreseleccionado;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-50 p-4">
-      <div className="bg-white w-full max-w-7xl max-h-[96vh] overflow-hidden rounded-3xl shadow-2xl flex flex-col">
-        
+    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
+      <div className="bg-slate-50 w-full max-w-6xl max-h-[94vh] overflow-hidden rounded-2xl shadow-xl flex flex-col border border-slate-200">
         {/* HEADER */}
-        <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-8 text-white relative overflow-hidden">
-          <div className="flex justify-between items-start relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="bg-white/20 backdrop-blur-xl p-3 rounded-2xl shadow-lg">
-                <Wrench size={32} strokeWidth={2.5} />
-              </div>
-              <div>
-                <h2 className="text-3xl font-bold mb-1 flex items-center gap-2">
-                  Crear Plan de Mantenimiento
-                  <Sparkles size={24} className="text-yellow-300" />
-                </h2>
-                <p className="text-blue-100 text-sm">
-                  {equipoPreseleccionado
-                    ? `📌 Plan específico para: ${equipoPreseleccionado.codigo} - ${equipoPreseleccionado.nombre || "Sin nombre"}`
-                    : "Define actividades, recursos y adjuntos del plan para un equipo o ubicación"}
-                </p>
-              </div>
+        <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center shrink-0">
+              <Wrench size={20} className="text-white" />
             </div>
-            <button onClick={onClose} className="bg-white/10 hover:bg-white/20 p-2.5 rounded-xl transition-all duration-200 hover:scale-110">
-              <X size={24} strokeWidth={2.5} />
-            </button>
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold text-slate-900">
+                Crear Plan de Mantenimiento
+              </h2>
+              <p className="text-sm text-slate-500 truncate">
+                {equipoPreseleccionado
+                  ? `Equipo seleccionado: ${
+                      equipoPreseleccionado.codigo
+                    } - ${equipoPreseleccionado.nombre || "Sin nombre"}`
+                  : "Configure la información general, recursos y actividades del plan"}
+              </p>
+            </div>
           </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        {/* CONTENIDO */}
-        <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-slate-50 via-white to-blue-50">
-          
-          {/* INFO PLAN */}
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 mb-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-1.5 h-8 bg-gradient-to-b from-blue-600 to-blue-400 rounded-full"></div>
-              <h3 className="text-xl font-bold text-slate-800">Información del Plan</h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              
-              {/* SELECTOR DE CONTEXTO */}
-              <div className="md:col-span-3 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex gap-8 mb-2">
-                <label className="flex items-center gap-3 cursor-pointer font-bold text-slate-700">
-                  <input type="radio" name="ctx" checked={form.contextoObjetivo === "EQUIPO"} 
-                    onChange={() => setForm(p => ({ ...p, contextoObjetivo: "EQUIPO", ubicacionId: "" }))} 
-                    className="w-5 h-5 text-blue-600" /> Plan para Equipo
+        {/* BODY */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* INFORMACIÓN GENERAL */}
+          <Section title="Información general">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="md:col-span-2 xl:col-span-3 flex flex-wrap gap-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <input
+                    type="radio"
+                    name="ctx"
+                    checked={form.contextoObjetivo === "EQUIPO"}
+                    onChange={() =>
+                      setForm((p) => ({
+                        ...p,
+                        contextoObjetivo: "EQUIPO",
+                        ubicacionId: "",
+                      }))
+                    }
+                  />
+                  Plan para equipo
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer font-bold text-slate-700">
-                  <input type="radio" name="ctx" checked={form.contextoObjetivo === "UBICACION_TECNICA"} 
-                    onChange={() => setForm(p => ({ ...p, contextoObjetivo: "UBICACION_TECNICA", equipoId: "", familiaId: "", tipoEquipo: "", modeloEquipo: "" }))} 
-                    className="w-5 h-5 text-blue-600" /> Plan para Ubicación Técnica
+
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <input
+                    type="radio"
+                    name="ctx"
+                    checked={form.contextoObjetivo === "UBICACION_TECNICA"}
+                    onChange={() =>
+                      setForm((p) => ({
+                        ...p,
+                        contextoObjetivo: "UBICACION_TECNICA",
+                        equipoId: "",
+                        familiaId: "",
+                        tipoEquipo: "",
+                        modeloEquipo: "",
+                      }))
+                    }
+                  />
+                  Plan para ubicación técnica
                 </label>
               </div>
 
-              {/* SELECTOR DINÁMICO (CAMPO ELIMINADO AQUÍ) */}
               {form.contextoObjetivo === "EQUIPO" && (
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">
-                    Equipo <span className="text-blue-600">(Equipo de referencia)</span>
-                  </label>
-                  <select value={form.equipoId} onChange={handleEquipoChange} disabled={disabledPorEquipo} className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}>
+                <Field label="Equipo">
+                  <Select
+                    value={form.equipoId}
+                    onChange={handleEquipoChange}
+                    disabled={disabledPorEquipo}
+                    className={disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : ""}
+                  >
                     <option value="">Seleccione un equipo...</option>
-                    {equiposFiltrados.map((eq) => (<option key={eq.id} value={eq.id}>{eq.codigo} - {eq.nombre}</option>))}
-                  </select>
-                </div>
+                    {equiposFiltrados.map((eq) => (
+                      <option key={eq.id} value={eq.id}>
+                        {eq.codigo} - {eq.nombre}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
               )}
 
-              {/* CODIGO PLAN */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                  <Hash size={16} /> Código del Plan <span className="text-red-500">*</span>
-                </label>
-                <input className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none" value={form.codigoPlan} onChange={(e) => setForm((p) => ({ ...p, codigoPlan: e.target.value }))} placeholder="PM-0001" />
-              </div>
+              <Field label="Código del plan" required>
+                <Input
+                  value={form.codigoPlan}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, codigoPlan: e.target.value }))
+                  }
+                  placeholder="PM-0001"
+                />
+              </Field>
 
-              {/* FRECUENCIA */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                  <CalendarDays size={16} /> Frecuencia <span className="text-red-500">*</span>
-                </label>
-                <select value={form.frecuencia} onChange={(e) => setForm((p) => ({ ...p, frecuencia: e.target.value }))} className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none bg-white">
-                  {FRECUENCIAS.map((f) => (<option key={f.value} value={f.value}>{f.label}</option>))}
-                </select>
-              </div>
+              <Field label="Frecuencia" required>
+                <Select
+                  value={form.frecuencia}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, frecuencia: e.target.value }))
+                  }
+                >
+                  {FRECUENCIAS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
 
-              {/* FRECUENCIA HORAS */}
-              <div className="relative">
-                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                  <Clock size={16} /> Frecuencia (horas) {form.frecuencia === "POR_HORA" && <span className="text-red-500">*</span>}
-                </label>
+              <Field
+                label="Frecuencia (horas)"
+                required={form.frecuencia === "POR_HORA"}
+              >
                 {form.frecuencia === "POR_HORA" ? (
-                  <input type="number" min="1" step="1" value={form.frecuenciaHoras} onChange={(e) => setForm((p) => ({ ...p, frecuenciaHoras: e.target.value }))} className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none" placeholder="Ej: 8" />
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.frecuenciaHoras}
+                    onChange={(e) =>
+                      setForm((p) => ({
+                        ...p,
+                        frecuenciaHoras: e.target.value,
+                      }))
+                    }
+                    placeholder="Ej: 8"
+                  />
                 ) : (
-                  <div className="w-full border-2 border-slate-200 p-3.5 rounded-xl bg-slate-50 text-slate-500 text-sm">Solo aplica si es <b>POR_HORA</b></div>
+                  <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-100 text-sm text-slate-500">
+                    Solo aplica para frecuencia POR_HORA
+                  </div>
                 )}
-              </div>
+              </Field>
 
-              {/* FAMILIA, TIPO, MODELO */}
               {form.contextoObjetivo === "EQUIPO" && (
                 <>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Familia</label>
-                    <select value={form.familiaId} onChange={(e) => setForm((p) => ({ ...p, familiaId: e.target.value }))} disabled={disabledPorEquipo} className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}>
+                  <Field label="Familia">
+                    <Select
+                      value={form.familiaId}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, familiaId: e.target.value }))
+                      }
+                      disabled={disabledPorEquipo}
+                      className={disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : ""}
+                    >
                       <option value="">Todas las familias</option>
-                      {familias.map((f) => (<option key={f.id} value={f.id}>{f.nombre}</option>))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Equipo</label>
-                    <select value={form.tipoEquipo} onChange={(e) => setForm((p) => ({ ...p, tipoEquipo: e.target.value, modeloEquipo: "", equipoId: "" }))} disabled={disabledPorEquipo} className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}>
+                      {familias.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.nombre}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <Field label="Tipo de equipo">
+                    <Select
+                      value={form.tipoEquipo}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          tipoEquipo: e.target.value,
+                          modeloEquipo: "",
+                          equipoId: "",
+                        }))
+                      }
+                      disabled={disabledPorEquipo}
+                      className={disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : ""}
+                    >
                       <option value="">Todos los tipos</option>
-                      {tipos.map((t) => (<option key={t} value={t}>{t}</option>))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Modelo</label>
-                    <select value={form.modeloEquipo} onChange={(e) => setForm((p) => ({ ...p, modeloEquipo: e.target.value, equipoId: "" }))} disabled={disabledPorEquipo} className={`w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none ${disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : "bg-white"}`}>
+                      {tipos.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <Field label="Modelo">
+                    <Select
+                      value={form.modeloEquipo}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          modeloEquipo: e.target.value,
+                          equipoId: "",
+                        }))
+                      }
+                      disabled={disabledPorEquipo}
+                      className={disabledPorEquipo ? "bg-slate-100 cursor-not-allowed" : ""}
+                    >
                       <option value="">Todos los modelos</option>
-                      {modelos.map((m) => (<option key={m} value={m}>{m}</option>))}
-                    </select>
-                  </div>
+                      {modelos.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
                 </>
               )}
 
-              {/* NOMBRE Y TIPO PLAN */}
-              <div className={form.contextoObjetivo === "EQUIPO" ? "lg:col-span-2" : "lg:col-span-1"}>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Plan <span className="text-red-500">*</span></label>
-                <input className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none" value={form.nombre} onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))} />
+              <div className={form.contextoObjetivo === "EQUIPO" ? "xl:col-span-2" : ""}>
+                <Field label="Nombre del plan" required>
+                  <Input
+                    value={form.nombre}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, nombre: e.target.value }))
+                    }
+                  />
+                </Field>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Tipo de Plan</label>
-                <select value={form.tipo} onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))} className="w-full border-2 border-slate-300 p-3.5 rounded-xl outline-none bg-white">
+
+              <Field label="Tipo de plan">
+                <Select
+                  value={form.tipo}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, tipo: e.target.value }))
+                  }
+                >
                   <option>PREVENTIVO</option>
-                </select>
-              </div>
+                </Select>
+              </Field>
             </div>
-          </div>
+          </Section>
 
-          {/* =========================
-              ITEMS GENERALES DEL PLAN
-          ========================= */}
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden mb-6">
-            <div className="flex justify-between items-center p-6 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-slate-200">
-              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-8 bg-gradient-to-b from-indigo-600 to-purple-500 rounded-full"></div>
-                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  Recursos del Plan (General) <Package className="w-5 h-5 text-indigo-600" />
-                </h3>
-              </div>
-              <button type="button" onClick={addItemPlan} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3 rounded-xl flex items-center gap-2 font-bold">
-                <Plus size={18} /> Agregar Item Plan
+          {/* ITEMS GENERALES */}
+          <Section
+            title="Recursos generales del plan"
+            action={
+              <button
+                type="button"
+                onClick={addItemPlan}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm hover:bg-slate-800"
+              >
+                <Plus size={16} />
+                Agregar
               </button>
-            </div>
-
-            <div className="p-6 space-y-3 bg-gradient-to-br from-slate-50 to-white">
+            }
+          >
+            <div className="space-y-3">
               {itemsPlan.map((it) => (
-                <div key={it.uid} className="bg-white border-2 border-slate-200 rounded-xl p-4 relative">
-                  <button type="button" onClick={() => removeItemPlan(it.uid)} className="absolute top-3 right-3 text-red-600 hover:text-red-800 bg-white rounded-lg p-1.5 hover:bg-red-50">
-                    <Trash2 size={16} />
-                  </button>
+                <div
+                  key={it.uid}
+                  className="border border-slate-200 rounded-lg p-4 bg-white"
+                >
+                  <div className="flex justify-end mb-3">
+                    <button
+                      type="button"
+                      onClick={() => removeItemPlan(it.uid)}
+                      className="inline-flex items-center gap-1 text-sm text-rose-600 hover:text-rose-700"
+                    >
+                      <Trash2 size={15} />
+                      Eliminar
+                    </button>
+                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-6 gap-3 pr-10">
-                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">ItemCode <span className="text-red-500">*</span></label><input value={it.itemCode} onChange={(e) => updateItemPlan(it.uid, { itemCode: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                    <div className="md:col-span-2"><label className="text-xs font-bold text-slate-600 mb-1 block">Descripción</label><input value={it.description} onChange={(e) => updateItemPlan(it.uid, { description: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Cantidad <span className="text-red-500">*</span></label><input type="number" min="1" value={it.quantity} onChange={(e) => updateItemPlan(it.uid, { quantity: Number(e.target.value) }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Almacén</label><input value={it.warehouseCode} onChange={(e) => updateItemPlan(it.uid, { warehouseCode: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Centro costo</label><input value={it.costCenter} onChange={(e) => updateItemPlan(it.uid, { costCenter: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Proyecto</label><input value={it.projectCode} onChange={(e) => updateItemPlan(it.uid, { projectCode: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Rubro</label><input value={it.rubro} onChange={(e) => updateItemPlan(it.uid, { rubro: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                    <div className="md:col-span-2"><label className="text-xs font-bold text-slate-600 mb-1 block">Paquete trabajo</label><input value={it.paqueteTrabajo} onChange={(e) => updateItemPlan(it.uid, { paqueteTrabajo: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                    <div className="md:col-span-6"><label className="text-xs font-bold text-slate-600 mb-1 block">Observación</label><input value={it.observacion} onChange={(e) => updateItemPlan(it.uid, { observacion: e.target.value }) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                    <Field label="Ítem" required>
+  <Select
+    value={it.itemId || ""}
+    onChange={(e) => handleSelectItemPlan(it.uid, e.target.value)}
+  >
+    <option value="">
+      {loadingItems ? "Cargando items..." : "Seleccione un ítem"}
+    </option>
+    {itemsCatalogo.map((item) => (
+      <option key={item.id} value={item.id}>
+        {item.sapCode} - {item.nombre}
+      </option>
+    ))}
+  </Select>
+</Field>
+
+<Field label="ItemCode" required>
+  <Input value={it.itemCode} readOnly className="bg-slate-100" />
+</Field>
+
+<Field label="Descripción">
+  <Input
+    value={it.description}
+    onChange={(e) =>
+      updateItemPlan(it.uid, { description: e.target.value })
+    }
+  />
+</Field>
+
+                    <Field label="Cantidad" required>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={it.quantity}
+                        onChange={(e) =>
+                          updateItemPlan(it.uid, {
+                            quantity: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Almacén">
+                      <Input
+                        value={it.warehouseCode}
+                        onChange={(e) =>
+                          updateItemPlan(it.uid, {
+                            warehouseCode: e.target.value,
+                          })
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Centro de costo">
+                      <Input
+                        value={it.costCenter}
+                        onChange={(e) =>
+                          updateItemPlan(it.uid, { costCenter: e.target.value })
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Proyecto">
+                      <Input
+                        value={it.projectCode}
+                        onChange={(e) =>
+                          updateItemPlan(it.uid, { projectCode: e.target.value })
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Rubro">
+  <Select
+    value={it.rubroSapCode || ""}
+    onChange={(e) =>
+      updateItemPlan(it.uid, {
+        rubroSapCode: e.target.value,
+      })
+    }
+  >
+    <option value="">
+      {loadingRubros ? "Cargando..." : "Seleccione rubro"}
+    </option>
+
+    {rubros.map((r) => (
+      <option key={r.codigo} value={r.codigo}>
+        {r.codigo} - {r.nombre}
+      </option>
+    ))}
+  </Select>
+</Field>
+
+                    <Field label="Paquete de trabajo">
+                      <Input
+                        value={it.paqueteTrabajo}
+                        onChange={(e) =>
+                          updateItemPlan(it.uid, {
+                            paqueteTrabajo: e.target.value,
+                          })
+                        }
+                      />
+                    </Field>
+
+                    <div className="md:col-span-2 xl:col-span-4">
+                      <Field label="Observación">
+                        <Input
+                          value={it.observacion}
+                          onChange={(e) =>
+                            updateItemPlan(it.uid, {
+                              observacion: e.target.value,
+                            })
+                          }
+                        />
+                      </Field>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </Section>
 
-          {/* =========================
-              ADJUNTOS GENERALES DEL PLAN
-          ========================= */}
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden mb-6">
-            <div className="flex justify-between items-center p-6 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-slate-200">
-              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-8 bg-gradient-to-b from-amber-600 to-orange-500 rounded-full"></div>
-                <h3 className="text-xl font-bold text-slate-800">Adjuntos del Plan (General)</h3>
-              </div>
-              <label className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-3 rounded-xl font-bold cursor-pointer">
-                <Upload size={18} /> Subir
-                <input type="file" multiple className="hidden" onChange={(e) => subirAdjuntosPlan(e.target.files)} />
+          {/* ADJUNTOS PLAN */}
+          <Section
+            title="Adjuntos del plan"
+            action={
+              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
+                <Upload size={16} />
+                Subir
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => subirAdjuntosPlan(e.target.files)}
+                />
               </label>
-            </div>
-
-            <div className="p-6 bg-gradient-to-br from-slate-50 to-white">
-              {adjuntosPlan.length === 0 ? (
-                <div className="text-sm text-slate-500">Sin adjuntos generales.</div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {adjuntosPlan.map((a, i) => (
-                    <div key={`${a?.id || a?.nombre || "adj"}_${i}`} className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm">
-                      <FileText size={16} className="text-amber-600" />
-                      <span className="text-amber-800 font-medium flex-1 truncate">{a?.nombre || "archivo"}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* =========================
-              ACTIVIDADES 
-          ========================= */}
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-            <div className="flex justify-between items-center p-6 bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50 border-b border-slate-200">
-              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-8 bg-gradient-to-b from-green-600 to-emerald-500 rounded-full"></div>
-                <h3 className="text-xl font-bold text-slate-800">
-                  Actividades del Plan <span className="ml-2 bg-green-600 text-white px-3 py-1 rounded-full text-sm">{actividades.length}</span>
-                </h3>
-              </div>
-              <button onClick={agregarActividad} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-5 py-3 rounded-xl flex items-center gap-2 font-bold">
-                <Plus size={20} /> Agregar Actividad
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto bg-gradient-to-br from-slate-50 to-white">
-              {actividades.length === 0 ? (
-                <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl border-2 border-dashed border-slate-300">
-                  <div className="bg-slate-200 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Plus className="text-slate-500" size={36} />
+            }
+          >
+            {adjuntosPlan.length === 0 ? (
+              <EmptyState text="No hay adjuntos cargados." />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {adjuntosPlan.map((a, i) => (
+                  <div
+                    key={`${a?.id || a?.nombre || "adj"}_${i}`}
+                    className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50"
+                  >
+                    <FileText size={16} className="text-slate-500" />
+                    <span className="text-slate-700 truncate">
+                      {a?.nombre || "archivo"}
+                    </span>
                   </div>
-                  <p className="text-slate-700 font-bold text-lg">Sin actividades</p>
-                </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          {/* ACTIVIDADES */}
+          <Section
+            title={`Actividades del plan (${actividades.length})`}
+            action={
+              <button
+                onClick={agregarActividad}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm hover:bg-slate-800"
+              >
+                <Plus size={16} />
+                Agregar actividad
+              </button>
+            }
+          >
+            <div className="space-y-4">
+              {actividades.length === 0 ? (
+                <EmptyState text="No hay actividades registradas." />
               ) : (
                 actividades.map((act, index) => {
                   const abierto = !!expandedByUid[act.uid];
 
                   return (
-                    <div key={act.uid} className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden">
-                      <div className="flex items-center gap-3 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 cursor-pointer" onClick={() => toggleActividad(act.uid)}>
-                        <div className="bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm">{index + 1}</div>
-                        <div className="flex-1">
-                          <span className="text-xs font-semibold text-blue-600 uppercase">Actividad {index + 1}</span>
-                          <h4 className="font-bold text-slate-800 text-lg">{act.tarea || "Nueva actividad"}</h4>
+                    <div
+                      key={act.uid}
+                      className="border border-slate-200 rounded-xl bg-white overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleActividad(act.uid)}
+                        className="w-full px-4 py-4 flex items-center justify-between gap-4 bg-slate-50 hover:bg-slate-100 border-b border-slate-200"
+                      >
+                        <div className="text-left min-w-0">
+                          <p className="text-xs font-semibold text-slate-500 uppercase">
+                            Actividad {index + 1}
+                          </p>
+                          <p className="text-sm font-semibold text-slate-800 truncate">
+                            {act.tarea || "Nueva actividad"}
+                          </p>
                         </div>
+
                         <div className="flex items-center gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); eliminarActividad(act.uid); }} className="bg-red-100 hover:bg-red-200 text-red-600 p-2.5 rounded-xl">
-                            <Trash2 size={18} />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              eliminarActividad(act.uid);
+                            }}
+                            className="p-2 rounded-lg text-rose-600 hover:bg-rose-50"
+                          >
+                            <Trash2 size={16} />
                           </button>
-                          {abierto ? <ChevronUp className="text-slate-400" size={24} /> : <ChevronDown className="text-slate-400" size={24} />}
+                          {abierto ? (
+                            <ChevronUp size={18} className="text-slate-500" />
+                          ) : (
+                            <ChevronDown size={18} className="text-slate-500" />
+                          )}
                         </div>
-                      </div>
+                      </button>
 
                       {abierto && (
-                        <div className="p-6 space-y-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div><label className="block text-xs font-bold text-slate-600 mb-2">Sistema</label><input value={act.sistema} onChange={(e) => updateActividad(act.uid, { sistema: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" /></div>
-                            <div><label className="block text-xs font-bold text-slate-600 mb-2">Subsistema</label><input value={act.subsistema} onChange={(e) => updateActividad(act.uid, { subsistema: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" /></div>
-                            <div><label className="block text-xs font-bold text-slate-600 mb-2">Componente</label><input value={act.componente} onChange={(e) => updateActividad(act.uid, { componente: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" /></div>
-                            <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-600 mb-2">Tarea <span className="text-red-500">*</span></label><input value={act.tarea} onChange={(e) => updateActividad(act.uid, { tarea: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" /></div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-2">Tipo de Trabajo</label>
-                              <select value={act.tipoTrabajo} onChange={(e) => updateActividad(act.uid, { tipoTrabajo: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none bg-white">
-                                <option value="TORQUEO_REGULACION">Torqueo/Regulación</option>
+                        <div className="p-4 space-y-5">
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            <Field label="Sistema">
+                              <Input
+                                value={act.sistema}
+                                onChange={(e) =>
+                                  updateActividad(act.uid, { sistema: e.target.value })
+                                }
+                              />
+                            </Field>
+
+                            <Field label="Subsistema">
+                              <Input
+                                value={act.subsistema}
+                                onChange={(e) =>
+                                  updateActividad(act.uid, {
+                                    subsistema: e.target.value,
+                                  })
+                                }
+                              />
+                            </Field>
+
+                            <Field label="Componente">
+                              <Input
+                                value={act.componente}
+                                onChange={(e) =>
+                                  updateActividad(act.uid, {
+                                    componente: e.target.value,
+                                  })
+                                }
+                              />
+                            </Field>
+
+                            <div className="md:col-span-2">
+                              <Field label="Tarea" required>
+                                <Input
+                                  value={act.tarea}
+                                  onChange={(e) =>
+                                    updateActividad(act.uid, {
+                                      tarea: e.target.value,
+                                    })
+                                  }
+                                />
+                              </Field>
+                            </div>
+
+                            <Field label="Tipo de trabajo">
+                              <Select
+                                value={act.tipoTrabajo}
+                                onChange={(e) =>
+                                  updateActividad(act.uid, {
+                                    tipoTrabajo: e.target.value,
+                                  })
+                                }
+                              >
+                                <option value="TORQUEO_REGULACION">
+                                  Torqueo / Regulación
+                                </option>
                                 <option value="APLICACION">Aplicación</option>
                                 <option value="REVISION">Revisión</option>
                                 <option value="INSPECCION">Inspección</option>
@@ -647,76 +1186,296 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
                                 <option value="AJUSTE">Ajuste</option>
                                 <option value="LUBRICACION">Lubricación</option>
                                 <option value="REPARACION">Reparación</option>
-                              </select>
-                            </div>
-                          </div>
+                              </Select>
+                            </Field>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-2 flex items-center gap-1"><Clock size={14} /> Duración</label>
+                            <Field label="Duración">
                               <div className="flex gap-2">
-                                <input type="number" min="0.1" step="0.1" value={act.duracionValor} onChange={(e) => updateActividad(act.uid, { duracionValor: e.target.value === "" ? 0 : Number(e.target.value) }) } className="flex-1 border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" />
-                                <select value={act.unidadDuracion} onChange={(e) => { const nuevaUnidad = e.target.value; const minutosActuales = toMinutes( act.duracionValor, act.unidadDuracion ); const nuevoValor = fromMinutes( minutosActuales, nuevaUnidad ); updateActividad(act.uid, { unidadDuracion: nuevaUnidad, duracionValor: Number( (nuevoValor || 0).toFixed(2) ), }); }} className="border-2 border-slate-300 p-3 rounded-xl text-sm outline-none bg-white">
+                                <Input
+                                  type="number"
+                                  min="0.1"
+                                  step="0.1"
+                                  value={act.duracionValor}
+                                  onChange={(e) =>
+                                    updateActividad(act.uid, {
+                                      duracionValor:
+                                        e.target.value === ""
+                                          ? 0
+                                          : Number(e.target.value),
+                                    })
+                                  }
+                                />
+                                <Select
+                                  value={act.unidadDuracion}
+                                  onChange={(e) => {
+                                    const nuevaUnidad = e.target.value;
+                                    const minutosActuales = toMinutes(
+                                      act.duracionValor,
+                                      act.unidadDuracion
+                                    );
+                                    const nuevoValor = fromMinutes(
+                                      minutosActuales,
+                                      nuevaUnidad
+                                    );
+                                    updateActividad(act.uid, {
+                                      unidadDuracion: nuevaUnidad,
+                                      duracionValor: Number(
+                                        (nuevoValor || 0).toFixed(2)
+                                      ),
+                                    });
+                                  }}
+                                  className="w-28"
+                                >
                                   <option value="min">min</option>
                                   <option value="h">h</option>
-                                </select>
+                                </Select>
                               </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-2">Rol requerido <span className="text-red-500">*</span></label>
-                              <select value={act.rolTecnico} onChange={(e) => updateActividad(act.uid, { rolTecnico: e.target.value }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none bg-white">
-                                <option value="tecnico_mecanico">Técnico Mecánico</option>
-                                <option value="tecnico_electrico">Técnico Eléctrico</option>
+                            </Field>
+
+                            <Field label="Rol técnico" required>
+                              <Select
+                                value={act.rolTecnico}
+                                onChange={(e) =>
+                                  updateActividad(act.uid, {
+                                    rolTecnico: e.target.value,
+                                  })
+                                }
+                              >
+                                <option value="tecnico_mecanico">
+                                  Técnico Mecánico
+                                </option>
+                                <option value="tecnico_electrico">
+                                  Técnico Eléctrico
+                                </option>
                                 <option value="supervisor">Supervisor</option>
-                                <option value="operario_de_mantenimiento">Operario de Mantenimiento</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 mb-2 flex items-center gap-1"><Users size={14} /> Cant. Técnicos</label>
-                              <input type="number" min="1" value={act.cantidadTecnicos} onChange={(e) => updateActividad(act.uid, { cantidadTecnicos: Number(e.target.value) }) } className="w-full border-2 border-slate-300 p-3 rounded-xl text-sm outline-none" />
-                            </div>
+                                <option value="operario_de_mantenimiento">
+                                  Operario de Mantenimiento
+                                </option>
+                              </Select>
+                            </Field>
+
+                            <Field label="Cantidad de técnicos">
+                              <Input
+                                type="number"
+                                min="1"
+                                value={act.cantidadTecnicos}
+                                onChange={(e) =>
+                                  updateActividad(act.uid, {
+                                    cantidadTecnicos: Number(e.target.value),
+                                  })
+                                }
+                              />
+                            </Field>
                           </div>
 
                           {/* ITEMS ACTIVIDAD */}
-                          <div>
-                            <div className="flex items-center justify-between mb-4">
-                              <h5 className="text-sm font-bold text-slate-700">Recursos por Actividad {act.items.length > 0 && <span className="ml-2 bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-xs font-bold">{act.items.length}</span>}</h5>
-                              <button type="button" onClick={() => addItemToActividad(act.uid)} className="flex items-center gap-2 text-sm bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold"><Plus size={16} /> Agregar Item</button>
+                          <div className="border border-slate-200 rounded-lg">
+                            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                              <h5 className="text-sm font-semibold text-slate-700">
+                                Recursos de la actividad
+                              </h5>
+                              <button
+                                type="button"
+                                onClick={() => addItemToActividad(act.uid)}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm hover:bg-slate-50"
+                              >
+                                <Plus size={15} />
+                                Agregar
+                              </button>
                             </div>
 
-                            {act.items.length > 0 && (
-                              <div className="space-y-3">
-                                {act.items.map((item) => (
-                                  <div key={item.uid} className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4 relative">
-                                    <button type="button" onClick={() => removeItemActividad(act.uid, item.uid) } className="absolute top-3 right-3 text-red-600 bg-white rounded-lg p-1.5"><Trash2 size={16} /></button>
-                                    <div className="grid grid-cols-1 md:grid-cols-6 gap-3 pr-10">
-                                      <div><label className="text-xs font-bold text-slate-600 mb-1 block">Código *</label><input value={item.itemCode} onChange={(e) => updateItemActividad( act.uid, item.uid, { itemCode: e.target.value } ) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                                      <div className="md:col-span-2"><label className="text-xs font-bold text-slate-600 mb-1 block">Item *</label><input value={item.item} onChange={(e) => updateItemActividad( act.uid, item.uid, { item: e.target.value } ) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                                      <div><label className="text-xs font-bold text-slate-600 mb-1 block">Tipo</label><select value={item.recurso} onChange={(e) => updateItemActividad( act.uid, item.uid, { recurso: e.target.value } ) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none bg-white"><option value="MATERIAL">📦 Material</option><option value="MANO_OBRA">👷 Mano de Obra</option><option value="SERVICIO">🧾 Servicio</option></select></div>
-                                      <div><label className="text-xs font-bold text-slate-600 mb-1 block">Unidad *</label><input value={item.unidad} onChange={(e) => updateItemActividad( act.uid, item.uid, { unidad: e.target.value } ) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                                      <div><label className="text-xs font-bold text-slate-600 mb-1 block">Cantidad *</label><input type="number" min="0" step="0.1" value={item.cantidad} onChange={(e) => updateItemActividad( act.uid, item.uid, { cantidad: Number(e.target.value), } ) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
-                                      <div className="md:col-span-6"><label className="text-xs font-bold text-slate-600 mb-1 block">Observación</label><input value={item.observacion || ""} onChange={(e) => updateItemActividad( act.uid, item.uid, { observacion: e.target.value } ) } className="w-full border-2 border-slate-300 rounded-xl p-2 text-sm outline-none" /></div>
+                            <div className="p-4 space-y-3">
+                              {act.items.length === 0 ? (
+                                <EmptyState text="No hay recursos agregados en esta actividad." />
+                              ) : (
+                                act.items.map((item) => (
+                                  <div
+                                    key={item.uid}
+                                    className="border border-slate-200 rounded-lg p-4 bg-slate-50"
+                                  >
+                                    <div className="flex justify-end mb-3">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removeItemActividad(act.uid, item.uid)
+                                        }
+                                        className="inline-flex items-center gap-1 text-sm text-rose-600 hover:text-rose-700"
+                                      >
+                                        <Trash2 size={15} />
+                                        Eliminar
+                                      </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                                     <Field label="Ítem" required>
+  <Select
+    value={item.itemId || ""}
+    onChange={(e) =>
+      handleSelectItemActividad(act.uid, item.uid, e.target.value)
+    }
+  >
+    <option value="">
+      {loadingItems ? "Cargando items..." : "Seleccione un ítem"}
+    </option>
+    {itemsCatalogo.map((itSel) => (
+      <option key={itSel.id} value={itSel.id}>
+        {itSel.sapCode} - {itSel.nombre}
+      </option>
+    ))}
+  </Select>
+</Field>
+
+<Field label="ItemCode" required>
+  <Input value={item.itemCode} readOnly className="bg-slate-100" />
+</Field>
+
+<Field label="Descripción">
+  <Input
+    value={item.description}
+    onChange={(e) =>
+      updateItemActividad(act.uid, item.uid, {
+        description: e.target.value,
+      })
+    }
+  />
+</Field>
+                                      <Field label="Cantidad" required>
+                                        <Input
+                                          type="number"
+                                          min="1"
+                                          value={item.quantity}
+                                          onChange={(e) =>
+                                            updateItemActividad(act.uid, item.uid, {
+                                              quantity: Number(e.target.value),
+                                            })
+                                          }
+                                        />
+                                      </Field>
+
+                                      <Field label="Almacén">
+                                        <Input
+                                          value={item.warehouseCode}
+                                          onChange={(e) =>
+                                            updateItemActividad(act.uid, item.uid, {
+                                              warehouseCode: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </Field>
+
+                                      <Field label="Centro de costo">
+                                        <Input
+                                          value={item.costCenter}
+                                          onChange={(e) =>
+                                            updateItemActividad(act.uid, item.uid, {
+                                              costCenter: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </Field>
+
+                                      <Field label="Proyecto">
+                                        <Input
+                                          value={item.projectCode}
+                                          onChange={(e) =>
+                                            updateItemActividad(act.uid, item.uid, {
+                                              projectCode: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </Field>
+<Field label="Rubro">
+  <Select
+    value={item.rubroSapCode || ""}
+    onChange={(e) =>
+      updateItemActividad(act.uid, item.uid, {
+        rubroSapCode: e.target.value,
+      })
+    }
+  >
+    <option value="">
+      {loadingRubros ? "Cargando..." : "Seleccione rubro"}
+    </option>
+
+    {rubros.map((r) => (
+      <option key={r.codigo} value={r.codigo}>
+        {r.codigo} - {r.nombre}
+      </option>
+    ))}
+  </Select>
+</Field>
+                                      <Field label="Paquete de trabajo">
+                                        <Input
+                                          value={item.paqueteTrabajo}
+                                          onChange={(e) =>
+                                            updateItemActividad(act.uid, item.uid, {
+                                              paqueteTrabajo: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </Field>
+
+                                      <div className="md:col-span-2 xl:col-span-4">
+                                        <Field label="Observación">
+                                          <Input
+                                            value={item.observacion || ""}
+                                            onChange={(e) =>
+                                              updateItemActividad(act.uid, item.uid, {
+                                                observacion: e.target.value,
+                                              })
+                                            }
+                                          />
+                                        </Field>
+                                      </div>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
-                            )}
+                                ))
+                              )}
+                            </div>
                           </div>
 
                           {/* ADJUNTOS ACTIVIDAD */}
-                          <div>
-                            <h5 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">Adjuntos de Actividad {act.adjuntos.length > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-xs font-bold">{act.adjuntos.length}</span>}</h5>
-                            <label className="inline-flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-xl font-bold cursor-pointer"><Upload size={16} /> Subir <input type="file" multiple className="hidden" onChange={(e) => subirAdjuntosActividad( act.uid, e.target.files ) } /></label>
-                            {act.adjuntos.length > 0 && (
-                              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {act.adjuntos.map((a, i) => (
-                                  <div key={`${a?.id || a?.nombre || "adj"}_${i}`} className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm">
-                                    <FileText size={16} className="text-amber-600" />
-                                    <span className="text-amber-800 font-medium flex-1 truncate">{a?.nombre || "archivo"}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                          <div className="border border-slate-200 rounded-lg">
+                            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                              <h5 className="text-sm font-semibold text-slate-700">
+                                Adjuntos de la actividad
+                              </h5>
+                              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
+                                <Upload size={15} />
+                                Subir
+                                <input
+                                  type="file"
+                                  multiple
+                                  className="hidden"
+                                  onChange={(e) =>
+                                    subirAdjuntosActividad(act.uid, e.target.files)
+                                  }
+                                />
+                              </label>
+                            </div>
+
+                            <div className="p-4">
+                              {act.adjuntos.length === 0 ? (
+                                <EmptyState text="No hay adjuntos en esta actividad." />
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  {act.adjuntos.map((a, i) => (
+                                    <div
+                                      key={`${a?.id || a?.nombre || "adj"}_${i}`}
+                                      className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50"
+                                    >
+                                      <FileText
+                                        size={16}
+                                        className="text-slate-500"
+                                      />
+                                      <span className="text-slate-700 truncate">
+                                        {a?.nombre || "archivo"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -725,19 +1484,35 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
                 })
               )}
             </div>
-          </div>
+          </Section>
         </div>
 
         {/* FOOTER */}
-        <div className="bg-slate-50 p-6 border-t-2 border-slate-200">
-          <div className="flex gap-4 justify-end">
-            <button onClick={onClose} className="px-8 py-3.5 rounded-xl font-bold text-slate-700 bg-white border-2 border-slate-300">
-              Cancelar
-            </button>
-            <button onClick={guardarPlan} disabled={guardando} className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 disabled:from-slate-400 disabled:to-slate-500 text-white px-10 py-3.5 rounded-xl font-bold flex items-center gap-3">
-              {guardando ? <><div className="w-5 h-5 border-[3px] border-white border-t-transparent rounded-full animate-spin"></div>Guardando...</> : <><Save size={22} />Guardar Plan</>}
-            </button>
-          </div>
+        <div className="bg-white border-t border-slate-200 px-6 py-4 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+
+          <button
+            onClick={guardarPlan}
+            disabled={guardando}
+            className="px-5 py-2.5 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-60 inline-flex items-center gap-2"
+          >
+            {guardando ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save size={16} />
+                Guardar plan
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

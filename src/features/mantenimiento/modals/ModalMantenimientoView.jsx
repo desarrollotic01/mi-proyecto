@@ -1,36 +1,72 @@
+import { useEffect, useState } from "react";
+import { getTratamientoByAviso } from "../services/tratamientoService";
+
 export default function ModalMantenimientoView({
   isOpen,
   onClose,
   wizardStep,
   setWizardStep,
   data,
+  cambiarEstado,
+  abrirTratamiento,
 }) {
+  const [tratamiento, setTratamiento] = useState(null);
+  const [loadingTratamiento, setLoadingTratamiento] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !data?.id) return;
+
+    let active = true;
+
+    const cargarTratamiento = async () => {
+      try {
+        setLoadingTratamiento(true);
+        const resp = await getTratamientoByAviso(data.id);
+        if (!active) return;
+        setTratamiento(resp || null);
+      } catch (error) {
+        if (!active) return;
+        setTratamiento(null);
+      } finally {
+        if (active) setLoadingTratamiento(false);
+      }
+    };
+
+    cargarTratamiento();
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, data?.id]);
+
   if (!isOpen || !data) return null;
 
   const ViewField = ({ label, value, fullWidth = false }) => (
-    <div className={`flex flex-col gap-1 ${fullWidth ? 'col-span-full' : ''}`}>
-      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+    <div className={`flex flex-col gap-1 ${fullWidth ? "col-span-full" : ""}`}>
+      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
         {label}
       </label>
-      <div className="p-3 border border-gray-200 rounded-lg bg-gradient-to-br from-gray-50 to-white text-sm text-gray-800 min-h-[42px] flex items-center">
-        {value || <span className="text-gray-400">Sin información</span>}
+      <div className="p-3 border border-slate-200 rounded-lg bg-white text-sm text-slate-800 min-h-[42px] flex items-center">
+        {value || <span className="text-slate-400">Sin información</span>}
       </div>
     </div>
   );
 
-  const Badge = ({ children, variant = 'default' }) => {
+  const Badge = ({ children, variant = "default" }) => {
     const variants = {
-      default: 'bg-gray-100 text-gray-700',
-      success: 'bg-green-100 text-green-700',
-      warning: 'bg-yellow-100 text-yellow-700',
-      info: 'bg-blue-100 text-blue-700',
-      danger: 'bg-red-100 text-red-700',
-      purple: 'bg-purple-100 text-purple-700',
-      indigo: 'bg-indigo-100 text-indigo-700',
+      default: "bg-slate-100 text-slate-700 border border-slate-200",
+      success: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+      warning: "bg-amber-50 text-amber-700 border border-amber-200",
+      info: "bg-blue-50 text-blue-700 border border-blue-200",
+      danger: "bg-rose-50 text-rose-700 border border-rose-200",
+      purple: "bg-violet-50 text-violet-700 border border-violet-200",
+      indigo: "bg-indigo-50 text-indigo-700 border border-indigo-200",
     };
 
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${variants[variant]}`}>
+      <span
+        className={`px-3 py-1 rounded-full text-xs font-semibold ${variants[variant]}`}
+      >
         {children}
       </span>
     );
@@ -38,81 +74,108 @@ export default function ModalMantenimientoView({
 
   const getPrioridadVariant = (prioridad) => {
     switch (prioridad?.toLowerCase()) {
-      case 'alta': return 'danger';
-      case 'media': return 'warning';
-      case 'baja': return 'info';
-      default: return 'default';
+      case "alta":
+        return "danger";
+      case "media":
+        return "warning";
+      case "baja":
+        return "info";
+      default:
+        return "default";
     }
   };
 
   const getEstadoVariant = (estado) => {
     switch (estado?.toLowerCase()) {
-      case 'tratado': return 'success';
-      case 'con ot': return 'info';
-      case 'pendiente': return 'warning';
-      default: return 'default';
+      case "tratado":
+        return "success";
+      case "con ot":
+        return "info";
+      case "pendiente":
+        return "warning";
+      default:
+        return "default";
     }
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return '—';
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    if (!dateString) return "—";
+    return new Date(dateString).toLocaleDateString("es-PE", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
   const formatDateTime = (dateString) => {
-    if (!dateString) return '—';
-    return new Date(dateString).toLocaleString('es-PE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    if (!dateString) return "—";
+    return new Date(dateString).toLocaleString("es-PE", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-      {/* MODAL RESPONSIVO */}
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+  const getTargetNombre = (te) => {
+    return (
+      te?.equipo?.nombre ||
+      te?.equipo?.descripcion ||
+      te?.ubicacionTecnica?.nombre ||
+      te?.ubicacionTecnica?.descripcion ||
+      "Sin objetivo"
+    );
+  };
 
-        {/* ---------------- HEADER ---------------- */}
-        <div className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700">
-          <div className="flex justify-between items-start">
+  const getTargetCodigo = (te) => {
+    return (
+      te?.equipo?.codigo ||
+      te?.equipo?.tag ||
+      te?.ubicacionTecnica?.codigo ||
+      "—"
+    );
+  };
+
+  const solicitudesCompra = tratamiento?.solicitudesCompra || [];
+  const solicitudesAlmacen = tratamiento?.solicitudesAlmacen || [];
+  const equiposTratamiento = tratamiento?.equipos || [];
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4">
+<div className="bg-white rounded-2xl shadow-2xl w-[98vw] max-w-[120rem] h-[96vh] flex flex-col overflow-hidden border border-slate-200">        {/* HEADER */}
+        <div className="px-5 py-3 border-b bg-slate-900">
+          <div className="flex justify-between items-start gap-4">
             <div>
               <h2 className="text-2xl font-bold text-white mb-1">
                 Aviso de Mantenimiento
               </h2>
-              <p className="text-blue-100 text-sm">
-                {data.numeroAviso || 'Sin número de aviso'}
+              <p className="text-slate-300 text-sm">
+                {data.numeroAviso || "Sin número de aviso"}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
               <Badge variant={getPrioridadVariant(data.prioridad)}>
-                {data.prioridad || 'Sin prioridad'}
+                {data.prioridad || "Sin prioridad"}
               </Badge>
               <Badge variant={getEstadoVariant(data.estadoAviso)}>
-                {data.estadoAviso || 'Sin estado'}
+                {data.estadoAviso || "Sin estado"}
               </Badge>
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-6 mt-6 border-b border-blue-500 pb-2">
+          <div className="flex gap-6 mt-6 border-b border-slate-700 pb-2">
             {[
-              { num: 1, label: 'Información General' },
-              { num: 2, label: 'Cliente y Contacto' },
-              { num: 3, label: 'Equipos y Seguimiento' }
+              { num: 1, label: "Información General" },
+              { num: 2, label: "Cliente y Contacto" },
+              { num: 3, label: "Equipos y Tratamiento" },
             ].map((step) => (
               <button
                 key={step.num}
-                className={`pb-2 font-semibold transition-all ${
+                className={`pb-2 font-semibold text-sm transition-all ${
                   wizardStep === step.num
                     ? "text-white border-b-2 border-white"
-                    : "text-blue-200 hover:text-white"
+                    : "text-slate-400 hover:text-white"
                 }`}
                 onClick={() => setWizardStep(step.num)}
               >
@@ -121,23 +184,16 @@ export default function ModalMantenimientoView({
             ))}
           </div>
 
-          <p className="text-blue-100 font-medium mt-3 text-sm">
+          <p className="text-slate-300 font-medium mt-3 text-sm">
             Paso {wizardStep} de 3
           </p>
         </div>
 
-        {/* ---------------- CONTENIDO ---------------- */}
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-
-          {/* === PASO 1: INFORMACIÓN GENERAL === */}
+        {/* CONTENIDO */}
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
           {wizardStep === 1 && (
             <div className="space-y-6">
-              {/* Sección: Datos del Aviso */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-blue-600 rounded"></span>
-                  Datos del Aviso
-                </h3>
+              <Section title="Datos del Aviso">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <ViewField label="N° Orden de Venta" value={data.ordenVenta} />
                   <ViewField label="Centro de Costo" value={data.centroCosto} />
@@ -147,444 +203,396 @@ export default function ModalMantenimientoView({
                   <ViewField label="Producto" value={data.producto} />
                   <ViewField label="Prioridad" value={data.prioridad} />
                   <ViewField label="Estado del Aviso" value={data.estadoAviso} />
-                  <ViewField 
-                    label="Fecha de Atención" 
-                    value={formatDate(data.fechaAtencion)} 
-                  />
+                  <ViewField label="Fecha de Atención" value={formatDate(data.fechaAtencion)} />
                 </div>
-              </div>
+              </Section>
 
-              {/* Sección: Descripción */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-blue-600 rounded"></span>
-                  Descripción
-                </h3>
+              <Section title="Descripción">
                 <div className="grid grid-cols-1 gap-4">
-                  <ViewField 
-                    label="Descripción Resumida" 
-                    value={data.descripcionResumida} 
-                    fullWidth 
+                  <ViewField
+                    label="Descripción Resumida"
+                    value={data.descripcionResumida}
+                    fullWidth
                   />
-                  <ViewField 
-                    label="Descripción Detallada" 
-                    value={data.descripcion} 
-                    fullWidth 
+                  <ViewField
+                    label="Descripción Detallada"
+                    value={data.descripcion}
+                    fullWidth
                   />
                 </div>
-              </div>
+              </Section>
 
-              {/* Sección: Ubicación */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-blue-600 rounded"></span>
-                  Ubicación
-                </h3>
+              <Section title="Ubicación">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <ViewField label="Ubicación Técnica" value={data.ubicacionTecnica} />
                   <ViewField label="Dirección de Atención" value={data.direccionAtencion} />
                 </div>
-              </div>
+              </Section>
             </div>
           )}
 
-          {/* === PASO 2: CLIENTE Y CONTACTO === */}
           {wizardStep === 2 && (
             <div className="space-y-6">
-              {/* Sección: Datos del Cliente */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-blue-600 rounded"></span>
-                  Datos del Cliente
-                </h3>
+              <Section title="Datos del Cliente">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <ViewField label="ID Cliente" value={data.cliente} />
                   <ViewField label="N° Orden Cliente" value={data.ordenCliente} />
                   <ViewField label="Sede" value={data.sede} />
                   <ViewField label="Almacén" value={data.almacen} />
                 </div>
-              </div>
+              </Section>
 
-              {/* Sección: Contacto */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-blue-600 rounded"></span>
-                  Información de Contacto
-                </h3>
+              <Section title="Información de Contacto">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <ViewField label="Nombre del Contacto" value={data.nombreContacto} />
                   <ViewField label="Correo Electrónico" value={data.correoContacto} />
                   <ViewField label="Número de Teléfono" value={data.numeroContacto} />
                 </div>
-              </div>
+              </Section>
 
-              {/* Sección: Solicitante */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-blue-600 rounded"></span>
-                  Información del Solicitante
-                </h3>
+              <Section title="Información del Solicitante">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField 
-                    label="Solicitante" 
-                    value={data.solicitante?.nombreApellido} 
-                  />
-                  <ViewField 
-                    label="Usuario" 
-                    value={data.solicitante?.alias} 
-                  />
+                  <ViewField label="Solicitante" value={data.solicitante?.nombreApellido} />
+                  <ViewField label="Usuario" value={data.solicitante?.alias} />
                 </div>
-              </div>
+              </Section>
             </div>
           )}
 
-          {/* === PASO 3: EQUIPOS Y SEGUIMIENTO === */}
           {wizardStep === 3 && (
             <div className="space-y-6">
-              {/* Sección: Supervisor */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-blue-600 rounded"></span>
-                  Asignación
-                </h3>
+              <Section title="Asignación">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField 
-                    label="Supervisor Asignado" 
-                    value={data.supervisorAsignado} 
-                  />
-                  <ViewField 
-                    label="Creado Por" 
-                    value={data.creador?.nombreApellido} 
-                  />
+                  <ViewField label="Supervisor Asignado" value={data.supervisorAsignado} />
+                  <ViewField label="Creado Por" value={data.creador?.nombreApellido} />
                 </div>
-              </div>
+              </Section>
 
-              {/* Sección: Ubicaciones Técnicas */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <span className="w-1 h-6 bg-purple-600 rounded"></span>
-                    Ubicaciones Técnicas
-                  </h3>
-                  <Badge variant="purple">
-                    {data.ubicacionesTecnicas?.length || 0} ubicaciones
-                  </Badge>
-                </div>
-                
-                {data.ubicacionesTecnicas && data.ubicacionesTecnicas.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {data.ubicacionesTecnicas.map((ubicacion) => (
-                      <div 
-                        key={ubicacion.codigo || Math.random()} 
-                        className="group relative p-5 border-2 border-purple-100 rounded-xl bg-gradient-to-br from-purple-50 via-white to-purple-50 hover:border-purple-300 hover:shadow-lg transition-all duration-300"
-                      >
-                        {/* Indicador visual */}
-                        <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-purple-500 to-purple-600 rounded-l-xl"></div>
-                        
-                        <div className="ml-3">
-                          {/* Header con nombre */}
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                <h4 className="font-bold text-gray-900 text-base">
-                                  {ubicacion.nombre || 'Sin nombre'}
-                                </h4>
-                              </div>
-                            </div>
-                          </div>
+              <Section
+                title="Detalle del Tratamiento"
+                right={
+                  loadingTratamiento ? (
+                    <Badge variant="default">Cargando...</Badge>
+                  ) : tratamiento ? (
+                    <Badge variant="success">{tratamiento.estado || "Registrado"}</Badge>
+                  ) : (
+                    <Badge variant="warning">Sin tratamiento</Badge>
+                  )
+                }
+              >
+                {tratamiento ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <ViewField label="Estado" value={tratamiento.estado} />
+                    <ViewField label="Fecha creación" value={formatDateTime(tratamiento.createdAt)} />
+                    <ViewField label="Última actualización" value={formatDateTime(tratamiento.updatedAt)} />
+                  </div>
+                ) : (
+                  <EmptyState text="No hay tratamiento registrado para este aviso." />
+                )}
+              </Section>
 
-                          {/* Información detallada */}
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-gray-500 uppercase w-20">Código:</span>
-                              <span className="text-sm font-mono font-semibold text-purple-700 bg-purple-100 px-2 py-1 rounded">
-                                {ubicacion.codigo || '—'}
-                              </span>
-                            </div>
-                            
-                            {ubicacion.descripcion && (
-                              <div className="flex gap-2 pt-2 border-t border-purple-100">
-                                <span className="text-xs font-semibold text-gray-500 uppercase">Descripción:</span>
-                                <p className="text-sm text-gray-700 flex-1">
-                                  {ubicacion.descripcion}
-                                </p>
-                              </div>
-                            )}
-
-                            {ubicacion.direccion && (
-                              <div className="flex gap-2">
-                                <span className="text-xs font-semibold text-gray-500 uppercase">Dirección:</span>
-                                <p className="text-sm text-gray-700 flex-1">
-                                  {ubicacion.direccion}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+              <Section
+                title="Solicitudes de Compra"
+                right={<Badge variant="info">{solicitudesCompra.length} registros</Badge>}
+              >
+                {solicitudesCompra.length > 0 ? (
+                  <div className="space-y-4">
+                    {solicitudesCompra.map((sol, index) => (
+                      <SolicitudCard
+                        key={sol.id || index}
+                        titulo={`Solicitud de Compra #${index + 1}`}
+                        subtitulo={sol.esGeneral ? "General" : "Individual"}
+                        estado={sol.estado}
+                        fields={[
+                          ["Required Date", formatDate(sol.requiredDate)],
+                          ["Department", sol.department],
+                          ["Requester", sol.requester],
+                          ["Comentarios", sol.comments],
+                          [
+                            "Objetivo",
+                            sol.esGeneral
+                              ? "General"
+                              : sol.equipo_id || sol.ubicacion_tecnica_id || "—",
+                          ],
+                        ]}
+                        lineas={sol.lineas || []}
+                      />
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-white rounded-lg border-2 border-dashed border-gray-200">
-                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <p className="text-gray-500 text-sm font-medium">No hay ubicaciones técnicas asignadas</p>
-                    <p className="text-gray-400 text-xs mt-1">Las ubicaciones aparecerán aquí cuando sean asignadas</p>
-                  </div>
+                  <EmptyState text="No hay solicitudes de compra registradas." />
                 )}
-              </div>
+              </Section>
 
-              {/* Sección: Equipos Relacionados */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <span className="w-1 h-6 bg-indigo-600 rounded"></span>
-                    Equipos Relacionados
-                  </h3>
-                  <Badge variant="indigo">
-                    {data.equiposRelacion?.length || 0} equipos
-                  </Badge>
-                </div>
-                
-                {data.equiposRelacion && data.equiposRelacion.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {data.equiposRelacion.map((rel) => (
-                      <div 
-                        key={rel.equipo?.codigo || Math.random()} 
-                        className="group relative p-5 border-2 border-indigo-100 rounded-xl bg-gradient-to-br from-indigo-50 via-white to-indigo-50 hover:border-indigo-300 hover:shadow-lg transition-all duration-300"
+              <Section
+                title="Solicitudes de Almacén"
+                right={<Badge variant="purple">{solicitudesAlmacen.length} registros</Badge>}
+              >
+                {solicitudesAlmacen.length > 0 ? (
+                  <div className="space-y-4">
+                    {solicitudesAlmacen.map((sol, index) => (
+                      <SolicitudCard
+                        key={sol.id || index}
+                        titulo={`Solicitud de Almacén #${index + 1}`}
+                        subtitulo={sol.esGeneral ? "General" : "Individual"}
+                        estado={sol.estado}
+                        fields={[
+                          ["Required Date", formatDate(sol.requiredDate)],
+                          ["Department", sol.department],
+                          ["Requester", sol.requester],
+                          ["Comentarios", sol.comments],
+                          [
+                            "Objetivo",
+                            sol.esGeneral
+                              ? "General"
+                              : sol.equipo_id || sol.ubicacion_tecnica_id || "—",
+                          ],
+                        ]}
+                        lineas={sol.lineas || []}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState text="No hay solicitudes de almacén registradas." />
+                )}
+              </Section>
+
+              <Section
+                title="Objetivos y Actividades del Tratamiento"
+                right={<Badge variant="indigo">{equiposTratamiento.length} objetivos</Badge>}
+              >
+                {equiposTratamiento.length > 0 ? (
+                  <div className="space-y-5">
+                    {equiposTratamiento.map((te, index) => (
+                      <div
+                        key={te.id || index}
+                        className="border border-slate-200 rounded-xl bg-white"
                       >
-                        {/* Indicador visual */}
-                        <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-indigo-500 to-indigo-600 rounded-l-xl"></div>
-                        
-                        <div className="ml-3">
-                          {/* Header con nombre y badge */}
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                                </svg>
-                                <h4 className="font-bold text-gray-900 text-base">
-                                  {rel.equipo?.nombre || 'Sin nombre'}
-                                </h4>
-                              </div>
-                            </div>
-                            {rel.equipo?.tipo && (
-                              <Badge variant="indigo">
-                                {rel.equipo.tipo}
+                        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3 flex-wrap">
+                          <div>
+                            <p className="font-semibold text-slate-900">
+                              {getTargetNombre(te)}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Código: {getTargetCodigo(te)}
+                            </p>
+                          </div>
+
+                          <div className="flex gap-2 flex-wrap">
+                            {te.planMantenimiento ? (
+                              <Badge variant="success">
+                                Plan: {te.planMantenimiento.codigoPlan || te.planMantenimiento.nombre}
                               </Badge>
+                            ) : (
+                              <Badge variant="default">Sin plan</Badge>
                             )}
-                          </div>
-
-                          {/* Información detallada */}
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-gray-500 uppercase w-20">Código:</span>
-                              <span className="text-sm font-mono font-semibold text-indigo-700 bg-indigo-100 px-2 py-1 rounded">
-                                {rel.equipo?.codigo || '—'}
-                              </span>
-                            </div>
-                            
-                            {rel.equipo?.descripcion && (
-                              <div className="flex gap-2 pt-2 border-t border-indigo-100">
-                                <span className="text-xs font-semibold text-gray-500 uppercase">Descripción:</span>
-                                <p className="text-sm text-gray-700 flex-1">
-                                  {rel.equipo.descripcion}
-                                </p>
-                              </div>
-                            )}
-
-                            {rel.equipo?.modelo && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-gray-500 uppercase w-20">Modelo:</span>
-                                <span className="text-sm text-gray-700">
-                                  {rel.equipo.modelo}
-                                </span>
-                              </div>
-                            )}
-
-                            {rel.equipo?.marca && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-gray-500 uppercase w-20">Marca:</span>
-                                <span className="text-sm text-gray-700">
-                                  {rel.equipo.marca}
-                                </span>
-                              </div>
-                            )}
+                            <Badge variant="default">
+                              {(te.actividades || []).length} actividades
+                            </Badge>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-white rounded-lg border-2 border-dashed border-gray-200">
-                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                    </svg>
-                    <p className="text-gray-500 text-sm font-medium">No hay equipos relacionados</p>
-                    <p className="text-gray-400 text-xs mt-1">Los equipos aparecerán aquí cuando sean asignados</p>
-                  </div>
-                )}
-              </div>
 
-              {/* Sección: Tratamientos */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <span className="w-1 h-6 bg-green-600 rounded"></span>
-                    Historial de Tratamientos
-                  </h3>
-                  <Badge variant="success">
-                    {data.tratamientos?.length || 0} registros
-                  </Badge>
-                </div>
-                
-                {data.tratamientos && data.tratamientos.length > 0 ? (
-                  <div className="space-y-3">
-                    {data.tratamientos.map((trat, index) => (
-                      <div 
-                        key={index}
-                        className="group relative p-4 border-l-4 border-green-500 bg-gradient-to-r from-green-50 to-white rounded-lg hover:shadow-md transition-all duration-200"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="flex items-center justify-center w-8 h-8 bg-green-100 rounded-full">
-                                <span className="text-green-700 font-bold text-sm">
-                                  {index + 1}
-                                </span>
-                              </div>
-                              <div>
-                                <p className="text-sm font-semibold text-gray-800">
-                                  Tratamiento #{index + 1}
-                                </p>
-                                {trat.fechaTratamiento && (
-                                  <p className="text-xs text-gray-500">
-                                    {formatDateTime(trat.fechaTratamiento)}
-                                  </p>
+                        <div className="p-4 space-y-4">
+                          {(te.actividades || []).length > 0 ? (
+                            te.actividades.map((act, i) => (
+                              <div
+                                key={act.id || i}
+                                className="border border-slate-200 rounded-lg p-4 bg-slate-50"
+                              >
+                                <div className="flex items-start justify-between gap-3 flex-wrap">
+                                  <div>
+                                    <p className="font-semibold text-slate-800">
+                                      {act.tarea || "Sin tarea"}
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                      {[
+                                        act.sistema,
+                                        act.subsistema,
+                                        act.componente,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" / ") || "Sin clasificación"}
+                                    </p>
+                                  </div>
+
+                                  <div className="flex gap-2 flex-wrap">
+                                    <Badge variant="default">{act.origen || "—"}</Badge>
+                                    <Badge variant="info">{act.estado || "—"}</Badge>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+                                  <MiniField label="Tipo trabajo" value={act.tipoTrabajo} />
+                                  <MiniField label="Rol técnico" value={act.rolTecnico} />
+                                  <MiniField label="Cantidad técnicos" value={act.cantidadTecnicos} />
+                                  <MiniField label="Duración" value={`${act.duracionEstimadaValor || 0} ${act.unidadDuracion || "min"}`} />
+                                </div>
+
+                                {act.descripcion && (
+                                  <div className="mt-3">
+                                    <p className="text-xs font-semibold text-slate-500 uppercase mb-1">
+                                      Descripción
+                                    </p>
+                                    <p className="text-sm text-slate-700">{act.descripcion}</p>
+                                  </div>
+                                )}
+
+                                {act.observaciones && (
+                                  <div className="mt-3">
+                                    <p className="text-xs font-semibold text-slate-500 uppercase mb-1">
+                                      Observaciones
+                                    </p>
+                                    <p className="text-sm text-slate-700">{act.observaciones}</p>
+                                  </div>
                                 )}
                               </div>
-                            </div>
-                            
-                            {trat.descripcion && (
-                              <div className="ml-11 mt-2">
-                                <p className="text-sm text-gray-700 leading-relaxed">
-                                  {trat.descripcion}
-                                </p>
-                              </div>
-                            )}
-                            
-                            {trat.observaciones && (
-                              <div className="ml-11 mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                                <p className="text-xs text-yellow-800">
-                                  <span className="font-semibold">Observaciones:</span> {trat.observaciones}
-                                </p>
-                              </div>
-                            )}
-
-                            {trat.realizadoPor && (
-                              <div className="ml-11 mt-2 flex items-center gap-2 text-xs text-gray-600">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                </svg>
-                                <span>Realizado por: <span className="font-medium">{trat.realizadoPor}</span></span>
-                              </div>
-                            )}
-                          </div>
-
-                          {trat.estado && (
-                            <Badge variant={trat.estado === 'completado' ? 'success' : 'warning'}>
-                              {trat.estado}
-                            </Badge>
+                            ))
+                          ) : (
+                            <EmptyState text="No hay actividades registradas para este objetivo." small />
                           )}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-white rounded-lg border-2 border-dashed border-gray-200">
-                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                    </svg>
-                    <p className="text-gray-500 text-sm font-medium">No hay tratamientos registrados</p>
-                    <p className="text-gray-400 text-xs mt-1">El historial de tratamientos aparecerá aquí</p>
-                  </div>
+                  <EmptyState text="No hay objetivos ni actividades en el tratamiento." />
                 )}
-              </div>
+              </Section>
 
-              {/* Sección: Auditoría */}
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-gray-600 rounded"></span>
-                  Información de Auditoría
-                </h3>
+              <Section title="Información de Auditoría">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField 
-                    label="Fecha de Creación" 
-                    value={formatDateTime(data.createdAt)} 
-                  />
-                  <ViewField 
-                    label="Última Actualización" 
-                    value={formatDateTime(data.updatedAt)} 
-                  />
+                  <ViewField label="Fecha de Creación" value={formatDateTime(data.createdAt)} />
+                  <ViewField label="Última Actualización" value={formatDateTime(data.updatedAt)} />
                 </div>
-              </div>
+              </Section>
             </div>
           )}
         </div>
 
-        {/* ---------------- FOOTER ---------------- */}
+        {/* FOOTER */}
         <div className="p-4 border-t bg-white flex justify-between items-center">
           <button
-            className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors flex items-center gap-2"
+            className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-semibold transition-colors"
             onClick={() => {
               if (wizardStep === 1) onClose();
               else setWizardStep((prev) => prev - 1);
             }}
           >
-            {wizardStep === 1 ? (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Cerrar
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Anterior
-              </>
-            )}
+            {wizardStep === 1 ? "Cerrar" : "Anterior"}
           </button>
 
           {wizardStep < 3 ? (
             <button
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+              className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold transition-colors"
               onClick={() => setWizardStep((prev) => prev + 1)}
             >
               Siguiente
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
             </button>
           ) : (
             <button
-              className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+              className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold transition-colors"
               onClick={onClose}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
               Finalizar
             </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, right, children }) {
+  return (
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+        {right}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function EmptyState({ text, small = false }) {
+  return (
+    <div
+      className={`text-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 ${
+        small ? "py-6 px-4" : "py-10 px-6"
+      }`}
+    >
+      <p className="text-sm">{text}</p>
+    </div>
+  );
+}
+
+function MiniField({ label, value }) {
+  return (
+    <div className="border border-slate-200 rounded-lg bg-white p-3">
+      <p className="text-[11px] font-semibold text-slate-500 uppercase mb-1">{label}</p>
+      <p className="text-sm text-slate-800">{value || "—"}</p>
+    </div>
+  );
+}
+
+function SolicitudCard({ titulo, subtitulo, estado, fields = [], lineas = [] }) {
+  return (
+    <div className="border border-slate-200 rounded-xl bg-white">
+      <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="font-semibold text-slate-900">{titulo}</p>
+          <p className="text-xs text-slate-500">{subtitulo}</p>
+        </div>
+        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+          {estado || "Sin estado"}
+        </span>
+      </div>
+
+      <div className="p-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {fields.map(([label, value], idx) => (
+            <MiniField key={idx} label={label} value={value} />
+          ))}
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
+            Líneas
+          </p>
+
+          {lineas.length > 0 ? (
+            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-100">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">ItemCode</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Descripción</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Cantidad</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Warehouse</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Costing</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Project</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Rubro SAP</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Paquete</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineas.map((linea, idx) => (
+                    <tr key={linea.id || idx} className="border-t border-slate-200">
+                      <td className="px-3 py-2 text-slate-800">{linea.itemCode || "—"}</td>
+                      <td className="px-3 py-2 text-slate-800">{linea.description || "—"}</td>
+                      <td className="px-3 py-2 text-slate-800">{linea.quantity || "—"}</td>
+                      <td className="px-3 py-2 text-slate-800">{linea.warehouseCode || "—"}</td>
+                      <td className="px-3 py-2 text-slate-800">{linea.costingCode || "—"}</td>
+                      <td className="px-3 py-2 text-slate-800">{linea.projectCode || "—"}</td>
+                      <td className="px-3 py-2 text-slate-800">{linea.rubroSapCode || "—"}</td>
+                      <td className="px-3 py-2 text-slate-800">{linea.paqueteTrabajo || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState text="No hay líneas registradas." small />
           )}
         </div>
       </div>

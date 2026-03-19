@@ -3,13 +3,13 @@ import {
   X,
   Plus,
   Trash2,
-  ShoppingCart,
   Package,
   Calendar,
   Mail,
   CheckCircle,
   MapPinned,
   ClipboardList,
+  Warehouse,
 } from "lucide-react";
 
 import { itemService } from "../../features/PlanMantenimiento/services/itemService";
@@ -47,9 +47,6 @@ const emptyForm = () => ({
   lineas: [emptyLinea()],
 });
 
-/**
- * Normaliza una línea que viene del backend o del frontend
- */
 const normalizeLinea = (l = {}) => ({
   ...emptyLinea(),
   ...l,
@@ -69,10 +66,6 @@ const normalizeLinea = (l = {}) => ({
   paqueteTrabajo: l.paqueteTrabajo || "",
 });
 
-/**
- * Normaliza un formulario completo para el modal
- * Convierte requester -> email
- */
 const normalizeForm = (form) => {
   const f = form || emptyForm();
   const lineas = Array.isArray(f.lineas) ? f.lineas : [];
@@ -116,35 +109,11 @@ const isSolicitudVacia = (s) => {
 const getTargetTypeLabel = (type) =>
   type === "UBICACION_TECNICA" ? "Ubicación técnica" : "Equipo";
 
-/**
- * Convierte el form del frontend al payload del backend
- * email -> requester
- * costCenter -> costingCode
- */
-const buildPayloadSolicitud = (form) => ({
-  department: form.department || "",
-  requester: form.email || "",
-  requiredDate: form.requiredDate || "",
-  comments: form.comments || "",
-  lineas: (form.lineas || []).map((linea) => ({
-    itemId: linea.itemId || null,
-    itemCode: linea.itemCode || "",
-    description: linea.description || "",
-    quantity: Number(linea.quantity) || 1,
-    warehouseCode: linea.warehouseCode || "",
-    costingCode: linea.costCenter || "",
-    projectCode: linea.projectCode || "",
-    rubro: linea.rubro || "",
-    rubroSapCode: linea.rubroSapCode || "",
-    paqueteTrabajo: linea.paqueteTrabajo || "",
-  })),
-});
-
 /* ══════════════════════════════════════════
-   SUB-COMPONENTE: FORMULARIO DE SOLICITUD
+   SUB-COMPONENTE: FORMULARIO
 ══════════════════════════════════════════ */
 
-function FormSolicitud({
+function FormSolicitudAlmacen({
   data,
   onChange,
   items = [],
@@ -239,9 +208,9 @@ function FormSolicitud({
           </label>
           <input
             type="text"
-            placeholder="Ej: Mantenimiento"
-            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-            value={data.department}
+            placeholder="Ej: Almacén"
+            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            value={data.department ?? ""}
             onChange={(e) => set("department", e.target.value)}
           />
         </div>
@@ -254,8 +223,8 @@ function FormSolicitud({
           <input
             type="email"
             placeholder="correo@empresa.com"
-            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-            value={data.email}
+            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            value={data.email ?? ""}
             onChange={(e) => set("email", e.target.value)}
           />
         </div>
@@ -267,8 +236,8 @@ function FormSolicitud({
           </label>
           <input
             type="date"
-            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-            value={data.requiredDate}
+            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            value={data.requiredDate ?? ""}
             onChange={(e) => set("requiredDate", e.target.value)}
           />
         </div>
@@ -280,8 +249,8 @@ function FormSolicitud({
           <input
             type="text"
             placeholder="Notas adicionales..."
-            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-            value={data.comments}
+            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            value={data.comments ?? ""}
             onChange={(e) => set("comments", e.target.value)}
           />
         </div>
@@ -291,7 +260,7 @@ function FormSolicitud({
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
             <Package className="w-4 h-4 text-gray-500" />
-            Artículos
+            Artículos de almacén
           </p>
           <span className="text-xs text-gray-400">
             {data.lineas.length} ítem{data.lineas.length !== 1 ? "s" : ""}
@@ -302,18 +271,20 @@ function FormSolicitud({
           {data.lineas.map((l, idx) => (
             <div
               key={l.id}
-              className="grid grid-cols-12 gap-2 items-end bg-gray-50 border rounded-xl p-3"
+              className="grid grid-cols-12 gap-2 items-end bg-red-50/40 border border-red-100 rounded-xl p-3"
             >
               <div className="col-span-3">
                 <p className="text-xs text-gray-500 mb-1">Ítem *</p>
                 <select
-                  className="w-full px-2 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400 bg-white"
-                  value={l.itemId || ""}
+                  className="w-full px-2 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300 bg-white"
+                  value={l.itemId ?? ""}
                   onChange={(e) => handleSelectItem(l.id, e.target.value)}
                   disabled={loadingCatalogos}
                 >
                   <option value="">
-                    {loadingCatalogos ? "Cargando items..." : "Seleccione un ítem"}
+                    {loadingCatalogos
+                      ? "Cargando items..."
+                      : "Seleccione un ítem"}
                   </option>
                   {items.map((item) => (
                     <option key={item.id} value={item.id}>
@@ -328,7 +299,7 @@ function FormSolicitud({
                 <input
                   type="text"
                   className="w-full px-2 py-1.5 border rounded-lg text-sm bg-gray-100 focus:outline-none"
-                  value={l.itemCode}
+                  value={l.itemCode ?? ""}
                   readOnly
                 />
               </div>
@@ -338,9 +309,11 @@ function FormSolicitud({
                 <input
                   type="text"
                   placeholder="Descripción"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
-                  value={l.description}
-                  onChange={(e) => updateLinea(l.id, "description", e.target.value)}
+                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
+                  value={l.description ?? ""}
+                  onChange={(e) =>
+                    updateLinea(l.id, "description", e.target.value)
+                  }
                 />
               </div>
 
@@ -349,8 +322,8 @@ function FormSolicitud({
                 <input
                   type="number"
                   min="1"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm text-center font-semibold focus:outline-none focus:ring-1 focus:ring-green-400"
-                  value={l.quantity}
+                  className="w-full px-2 py-1.5 border rounded-lg text-sm text-center font-semibold focus:outline-none focus:ring-1 focus:ring-red-300"
+                  value={l.quantity ?? 1}
                   onChange={(e) =>
                     updateLinea(l.id, "quantity", Number(e.target.value))
                   }
@@ -362,8 +335,8 @@ function FormSolicitud({
                 <input
                   type="text"
                   placeholder="01"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
-                  value={l.warehouseCode}
+                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
+                  value={l.warehouseCode ?? ""}
                   onChange={(e) =>
                     updateLinea(l.id, "warehouseCode", e.target.value)
                   }
@@ -375,9 +348,11 @@ function FormSolicitud({
                 <input
                   type="text"
                   placeholder="CC-001"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
-                  value={l.costCenter}
-                  onChange={(e) => updateLinea(l.id, "costCenter", e.target.value)}
+                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
+                  value={l.costCenter ?? ""}
+                  onChange={(e) =>
+                    updateLinea(l.id, "costCenter", e.target.value)
+                  }
                 />
               </div>
 
@@ -386,8 +361,8 @@ function FormSolicitud({
                 <input
                   type="text"
                   placeholder="Opcional"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
-                  value={l.projectCode}
+                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
+                  value={l.projectCode ?? ""}
                   onChange={(e) =>
                     updateLinea(l.id, "projectCode", e.target.value)
                   }
@@ -397,13 +372,15 @@ function FormSolicitud({
               <div className="col-span-2">
                 <p className="text-xs text-gray-500 mb-1">Rubro</p>
                 <select
-                  className="w-full px-2 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400 bg-white"
-                  value={l.rubroSapCode || ""}
+                  className="w-full px-2 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300 bg-white"
+                  value={l.rubroSapCode ?? ""}
                   onChange={(e) => handleSelectRubro(l.id, e.target.value)}
                   disabled={loadingCatalogos}
                 >
                   <option value="">
-                    {loadingCatalogos ? "Cargando rubros..." : "Seleccione rubro"}
+                    {loadingCatalogos
+                      ? "Cargando rubros..."
+                      : "Seleccione rubro"}
                   </option>
                   {rubros.map((rubro) => (
                     <option key={rubro.id} value={rubro.sapCode}>
@@ -418,8 +395,8 @@ function FormSolicitud({
                 <input
                   type="text"
                   placeholder="PT-001"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
-                  value={l.paqueteTrabajo || ""}
+                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
+                  value={l.paqueteTrabajo ?? ""}
                   onChange={(e) =>
                     updateLinea(l.id, "paqueteTrabajo", e.target.value)
                   }
@@ -431,7 +408,7 @@ function FormSolicitud({
                   <button
                     type="button"
                     onClick={() => removeLinea(l.id)}
-                    className="px-3 py-2 bg-red-50 border border-red-200 text-red-500 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-1"
+                    className="px-3 py-2 bg-red-50 border border-red-200 text-red-600 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Eliminar
@@ -442,7 +419,7 @@ function FormSolicitud({
                   <button
                     type="button"
                     onClick={addLinea}
-                    className="px-3 py-2 bg-green-50 border border-green-200 text-green-600 rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-1"
+                    className="px-3 py-2 bg-red-100 border border-red-200 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center justify-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Agregar línea
@@ -461,7 +438,7 @@ function FormSolicitud({
    COMPONENTE PRINCIPAL
 ══════════════════════════════════════════ */
 
-export default function ModalSolicitudCompra({
+export default function ModalSolicitudAlmacen({
   isOpen,
   onClose,
   onConfirm,
@@ -480,76 +457,69 @@ export default function ModalSolicitudCompra({
   const [rubros, setRubros] = useState([]);
   const [loadingCatalogos, setLoadingCatalogos] = useState(false);
 
-
-
   const normalizedTargets = useMemo(() => {
-  const sourceTargets =
-    Array.isArray(contextoOt?.targets) && contextoOt.targets.length > 0
-      ? contextoOt.targets
-      : targets;
+    const sourceTargets =
+      Array.isArray(contextoOt?.targets) && contextoOt.targets.length > 0
+        ? contextoOt.targets
+        : targets;
 
-  if (Array.isArray(sourceTargets) && sourceTargets.length > 0) {
-    return sourceTargets.map((t) => ({
-      id: String(t.id),
-      type: t.type || "EQUIPO",
-      nombre: t.nombre || t.tag || t.id,
-      tag: t.tag || t.id,
-      equipoId: t.equipoId || null,
-      ubicacionTecnicaId: t.ubicacionTecnicaId || null,
-    }));
-  }
+    if (Array.isArray(sourceTargets) && sourceTargets.length > 0) {
+      return sourceTargets.map((t) => ({
+        id: String(t.id),
+        type: t.type || "EQUIPO",
+        nombre: t.nombre || t.tag || t.id,
+        tag: t.tag || t.id,
+        equipoId: t.equipoId || null,
+        ubicacionTecnicaId: t.ubicacionTecnicaId || null,
+      }));
+    }
 
-  const fallbackEquipos = (equiposRelacion || []).map((rel) => {
-    const equipoId = String(rel.equipoId);
-    const eq = (equiposInfo || []).find((e) => String(e.id) === equipoId);
+    const fallbackEquipos = (equiposRelacion || []).map((rel) => {
+      const equipoId = String(rel.equipoId);
+      const eq = (equiposInfo || []).find((e) => String(e.id) === equipoId);
 
-    return {
-      id: equipoId,
-      type: "EQUIPO",
-      nombre: eq?.nombre || eq?.tag || equipoId,
-      tag: eq?.tag || equipoId,
-      equipoId,
-      ubicacionTecnicaId: null,
-    };
-  });
+      return {
+        id: equipoId,
+        type: "EQUIPO",
+        nombre: eq?.nombre || eq?.tag || equipoId,
+        tag: eq?.tag || equipoId,
+        equipoId,
+        ubicacionTecnicaId: null,
+      };
+    });
 
-  const fallbackUbicaciones = (ubicacionesRelacion || []).map((rel) => {
-    const id = String(
-      rel.ubicacionId ||
-        rel.ubicacionTecnicaId ||
-        rel?.ubicacion?.id ||
-        rel?.ubicacionTecnica?.id
-    );
+    const fallbackUbicaciones = (ubicacionesRelacion || []).map((rel) => {
+      const id = String(
+        rel.ubicacionId ||
+          rel.ubicacionTecnicaId ||
+          rel?.ubicacion?.id ||
+          rel?.ubicacionTecnica?.id
+      );
 
-    return {
-      id,
-      type: "UBICACION_TECNICA",
-      nombre:
-        rel?.ubicacionTecnica?.nombre ||
-        rel?.ubicacion?.nombre ||
-        rel?.ubicacionTecnica?.codigo ||
-        rel?.ubicacion?.codigo ||
-        `Ubicación técnica ${id}`,
-      tag:
-        rel?.ubicacionTecnica?.codigo ||
-        rel?.ubicacion?.codigo ||
+      return {
         id,
-      equipoId: null,
-      ubicacionTecnicaId: id,
-    };
-  });
+        type: "UBICACION_TECNICA",
+        nombre:
+          rel?.ubicacionTecnica?.nombre ||
+          rel?.ubicacion?.nombre ||
+          rel?.ubicacionTecnica?.codigo ||
+          rel?.ubicacion?.codigo ||
+          `Ubicación técnica ${id}`,
+        tag:
+          rel?.ubicacionTecnica?.codigo ||
+          rel?.ubicacion?.codigo ||
+          id,
+        equipoId: null,
+        ubicacionTecnicaId: id,
+      };
+    });
 
-  return [...fallbackEquipos, ...fallbackUbicaciones];
-}, [contextoOt, targets, equiposRelacion, ubicacionesRelacion, equiposInfo]);
-
-
-
-
+    return [...fallbackEquipos, ...fallbackUbicaciones];
+  }, [contextoOt, targets, equiposRelacion, ubicacionesRelacion, equiposInfo]);
 
   const targetsKey = useMemo(() => {
-  return normalizedTargets.map((t) => `${t.type}-${t.id}`).join("|");
-}, [normalizedTargets]);
-
+    return normalizedTargets.map((t) => `${t.type}-${t.id}`).join("|");
+  }, [normalizedTargets]);
 
   useEffect(() => {
     const cargarCatalogos = async () => {
@@ -564,7 +534,7 @@ export default function ModalSolicitudCompra({
         setItems(Array.isArray(itemsData) ? itemsData : []);
         setRubros(Array.isArray(rubrosData) ? rubrosData : []);
       } catch (error) {
-        console.error("Error cargando catálogos de solicitud de compra:", error);
+        console.error("Error cargando catálogos de solicitud de almacén:", error);
         setItems([]);
         setRubros([]);
       } finally {
@@ -578,23 +548,23 @@ export default function ModalSolicitudCompra({
   }, [isOpen]);
 
   useEffect(() => {
-  if (!isOpen) return;
+    if (!isOpen) return;
 
-  const generalInicial = initialValue?.solicitudGeneral
-    ? normalizeForm(initialValue.solicitudGeneral)
-    : normalizeForm(emptyForm());
+    const generalInicial = initialValue?.solicitudGeneral
+      ? normalizeForm(initialValue.solicitudGeneral)
+      : normalizeForm(emptyForm());
 
-  const nextPorTarget = {};
-  for (const target of normalizedTargets) {
-    const key = String(target.id);
-    const fromInitial = initialValue?.solicitudesPorEquipo?.[key];
-    nextPorTarget[key] = normalizeForm(fromInitial || emptyForm());
-  }
+    const nextPorTarget = {};
+    for (const target of normalizedTargets) {
+      const key = String(target.id);
+      const fromInitial = initialValue?.solicitudesPorEquipo?.[key];
+      nextPorTarget[key] = normalizeForm(fromInitial || emptyForm());
+    }
 
-  setGeneral(generalInicial);
-  setPorTarget(nextPorTarget);
-  setTab("general");
-}, [isOpen, initialValue, targetsKey]);
+    setGeneral(generalInicial);
+    setPorTarget(nextPorTarget);
+    setTab("general");
+  }, [isOpen, initialValue, targetsKey]);
 
   const updateTargetForm = (targetId, form) => {
     setPorTarget((prev) => ({ ...prev, [targetId]: form }));
@@ -608,36 +578,44 @@ export default function ModalSolicitudCompra({
   }, [normalizedTargets, porTarget]);
 
   const handleConfirm = () => {
-  const solicitudesPorEquipo = {};
+    const solicitudesPorEquipo = {};
 
-  normalizedTargets.forEach((target) => {
-    const key = String(target.id);
-    const f = porTarget[key];
+    normalizedTargets.forEach((target) => {
+      const key = String(target.id);
+      const f = porTarget[key];
 
-    if (!isSolicitudVacia(f)) {
-      solicitudesPorEquipo[key] = {
-        ...buildPayloadSolicitud(f),
-        targetMeta: {
-          id: target.id,
-          type: target.type,
-          nombre: target.nombre,
-          tag: target.tag,
-          equipo_id: target.equipoId || null,
-          ubicacion_tecnica_id: target.ubicacionTecnicaId || null,
-        },
-      };
-    }
-  });
+      if (!isSolicitudVacia(f)) {
+        solicitudesPorEquipo[key] = {
+          ...f,
+          lineas: (f.lineas || []).map((linea) => ({
+            ...linea,
+            costingCode: linea.costCenter || "",
+          })),
+          targetMeta: {
+            id: target.id,
+            type: target.type,
+            nombre: target.nombre,
+            tag: target.tag,
+            equipo_id: target.equipoId || null,
+            ubicacion_tecnica_id: target.ubicacionTecnicaId || null,
+          },
+        };
+      }
+    });
 
-  onConfirm({
-    contextoOt,
-    solicitudGeneral: {
-      ...buildPayloadSolicitud(general),
-      esGeneral: true,
-    },
-    solicitudesPorEquipo,
-  });
-};
+    onConfirm({
+      contextoOt,
+      solicitudGeneral: {
+        ...general,
+        esGeneral: true,
+        lineas: (general.lineas || []).map((linea) => ({
+          ...linea,
+          costingCode: linea.costCenter || "",
+        })),
+      },
+      solicitudesPorEquipo,
+    });
+  };
 
   const currentData =
     tab === "general"
@@ -656,18 +634,21 @@ export default function ModalSolicitudCompra({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white w-full max-w-6xl rounded-2xl flex flex-col max-h-[92vh] shadow-2xl">
-        <div className="p-6 border-b bg-gradient-to-r from-green-50 to-emerald-50 flex items-center justify-between shrink-0">
+        <div className="p-6 border-b bg-gradient-to-r from-red-50 to-rose-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-600 rounded-xl">
-              <ShoppingCart className="w-6 h-6 text-white" />
+            <div className="p-3 bg-red-600 rounded-xl">
+              <Warehouse className="w-6 h-6 text-white" />
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                Solicitudes de Compra
+                Solicitudes de Almacén
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                General obligatoria · {solicitudesNoVaciasCount} objetivo
-                {solicitudesNoVaciasCount !== 1 ? "s" : ""} con solicitud individual
+                {soloContextoOt
+                  ? "General + objetivos de esta orden de trabajo"
+                  : `General opcional · ${solicitudesNoVaciasCount} objetivo${
+                      solicitudesNoVaciasCount !== 1 ? "s" : ""
+                    } con solicitud individual`}
               </p>
             </div>
           </div>
@@ -675,32 +656,36 @@ export default function ModalSolicitudCompra({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-white/70 rounded-full transition-colors"
           >
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-          <div className="w-64 border-r bg-gray-50 flex flex-col shrink-0">
+          <div className="w-64 border-r bg-red-50/40 flex flex-col shrink-0">
             <div className="p-3 space-y-1 flex-1 overflow-y-auto">
               <button
                 type="button"
                 onClick={() => setTab("general")}
                 className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-colors ${
                   tab === "general"
-                    ? "bg-green-600 text-white shadow-sm"
-                    : "hover:bg-gray-100 text-gray-700"
+                    ? "bg-red-600 text-white shadow-sm"
+                    : "hover:bg-red-100 text-gray-700"
                 }`}
               >
-                <ShoppingCart className="w-4 h-4 shrink-0" />
+                <Warehouse className="w-4 h-4 shrink-0" />
                 <span className="flex-1 truncate">General</span>
-                <CheckCircle className="w-4 h-4 shrink-0 opacity-60" />
+                {!isSolicitudVacia(general) ? (
+                  <CheckCircle className="w-4 h-4 shrink-0 opacity-80" />
+                ) : (
+                  <Plus className="w-4 h-4 shrink-0 opacity-50" />
+                )}
               </button>
 
               {normalizedTargets.length > 0 && (
                 <div className="pt-2 pb-1">
-                  <p className="text-xs text-gray-400 uppercase font-semibold px-3">
+                  <p className="text-xs text-red-400 uppercase font-semibold px-3">
                     Por objetivo
                   </p>
                 </div>
@@ -718,10 +703,10 @@ export default function ModalSolicitudCompra({
                     onClick={() => setTab(String(target.id))}
                     className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-left transition-colors ${
                       isActive
-                        ? "bg-indigo-600 text-white shadow-sm"
+                        ? "bg-rose-600 text-white shadow-sm"
                         : filled
-                        ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                        : "hover:bg-gray-100 text-gray-500"
+                        ? "bg-rose-50 text-rose-700 border border-rose-200"
+                        : "hover:bg-red-100 text-gray-500"
                     }`}
                   >
                     {target.type === "UBICACION_TECNICA" ? (
@@ -734,7 +719,7 @@ export default function ModalSolicitudCompra({
                       <p className="truncate font-medium text-xs">{target.nombre}</p>
                       <p
                         className={`text-xs truncate ${
-                          isActive ? "text-indigo-200" : "text-gray-400"
+                          isActive ? "text-rose-200" : "text-gray-400"
                         }`}
                       >
                         {getTargetTypeLabel(target.type)} · {target.tag}
@@ -755,15 +740,19 @@ export default function ModalSolicitudCompra({
               <div className="text-xs text-gray-500 space-y-1">
                 <div className="flex justify-between">
                   <span>General</span>
-                  <span className="text-green-600 font-semibold">✓ siempre</span>
+                  <span
+                    className={`font-semibold ${
+                      !isSolicitudVacia(general) ? "text-red-600" : "text-gray-400"
+                    }`}
+                  >
+                    {!isSolicitudVacia(general) ? "Con datos" : "Vacía"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Individuales</span>
                   <span
                     className={`font-semibold ${
-                      solicitudesNoVaciasCount > 0
-                        ? "text-indigo-600"
-                        : "text-gray-400"
+                      solicitudesNoVaciasCount > 0 ? "text-rose-600" : "text-gray-400"
                     }`}
                   >
                     {solicitudesNoVaciasCount}
@@ -776,16 +765,16 @@ export default function ModalSolicitudCompra({
           <div className="flex-1 overflow-y-auto">
             <div
               className={`px-6 py-4 border-b flex items-center justify-between shrink-0 ${
-                tab === "general" ? "bg-green-50" : "bg-indigo-50"
+                tab === "general" ? "bg-red-50" : "bg-rose-50"
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 {tab === "general" ? (
                   <>
-                    <ShoppingCart className="w-5 h-5 text-green-600" />
+                    <Warehouse className="w-5 h-5 text-red-600" />
                     <div>
                       <p className="font-semibold text-gray-800">
-                        Solicitud General
+                        Solicitud General de Almacén
                       </p>
                       <p className="text-xs text-gray-500">
                         Aplicada a todo el tratamiento
@@ -795,22 +784,22 @@ export default function ModalSolicitudCompra({
                 ) : (
                   <>
                     {currentTarget?.type === "UBICACION_TECNICA" ? (
-                      <MapPinned className="w-5 h-5 text-indigo-600" />
+                      <MapPinned className="w-5 h-5 text-rose-600" />
                     ) : (
-                      <Package className="w-5 h-5 text-indigo-600" />
+                      <Package className="w-5 h-5 text-rose-600" />
                     )}
 
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-800 truncate">
                         {currentTarget?.nombre || tab}
                       </p>
-                      <p className="text-xs text-indigo-500 truncate">
+                      <p className="text-xs text-rose-500 truncate">
                         {getTargetTypeLabel(currentTarget?.type)} · {currentTarget?.tag}
                       </p>
                     </div>
 
                     {currentTargetHasData && (
-                      <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-semibold border bg-green-100 border-green-300 text-green-700">
+                      <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-semibold border bg-red-100 border-red-300 text-red-700">
                         Con datos
                       </span>
                     )}
@@ -821,9 +810,7 @@ export default function ModalSolicitudCompra({
               {tab !== "general" && (
                 <button
                   type="button"
-                  onClick={() =>
-                    updateTargetForm(String(tab), normalizeForm(emptyForm()))
-                  }
+                  onClick={() => updateTargetForm(String(tab), normalizeForm(emptyForm()))}
                   className="text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-lg hover:bg-white/60 transition"
                 >
                   Limpiar este objetivo
@@ -832,7 +819,7 @@ export default function ModalSolicitudCompra({
             </div>
 
             <div className="p-6">
-              <FormSolicitud
+              <FormSolicitudAlmacen
                 data={currentData}
                 onChange={currentSetFn}
                 items={items}
@@ -850,7 +837,7 @@ export default function ModalSolicitudCompra({
             </span>
 
             {solicitudesNoVaciasCount > 0 && (
-              <span className="flex items-center gap-1 text-indigo-600 font-medium">
+              <span className="flex items-center gap-1 text-rose-600 font-medium">
                 <ClipboardList className="w-4 h-4" />
                 {solicitudesNoVaciasCount} solicitud
                 {solicitudesNoVaciasCount !== 1 ? "es" : ""} individual
@@ -870,9 +857,9 @@ export default function ModalSolicitudCompra({
             <button
               type="button"
               onClick={handleConfirm}
-              className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 font-medium text-sm shadow-lg shadow-green-500/20 flex items-center gap-2"
+              className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl hover:from-red-700 hover:to-rose-700 font-medium text-sm shadow-lg shadow-red-500/20 flex items-center gap-2"
             >
-              <ShoppingCart className="w-4 h-4" />
+              <Warehouse className="w-4 h-4" />
               Guardar solicitudes
             </button>
           </div>

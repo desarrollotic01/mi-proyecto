@@ -7,12 +7,17 @@ export const equipoService = {
   deleteEquipo,
   getEquiposByClienteId,
   actualizarAdjuntosPortal,
+  getEquipoById,
 };
 
 function getEquipos() {
   return api.get("/equipo").then(res => {
     return Array.isArray(res.data) ? res.data : [];
   });
+}
+
+function getEquipoById(id) {
+  return api.get(`/equipo/${id}`).then(res => res.data);
 }
 
 function getEquiposByClienteId(clienteId) {

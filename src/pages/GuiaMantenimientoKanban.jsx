@@ -124,7 +124,7 @@ function normalizarEstado(estadoGuia) {
   return ESTADOS_GUIA.includes(estadoGuia) ? estadoGuia : "creado";
 }
 
-function badgeCriticidad(crit) {
+function badgecreticidad(crit) {
   if (!crit) return "bg-slate-100 text-slate-600 border-slate-200";
   if (crit === "A") return "bg-red-50 text-red-700 border-red-200";
   if (crit === "B") return "bg-yellow-50 text-yellow-800 border-yellow-200";
@@ -161,7 +161,7 @@ function GuiaCard({ guia, onOpen, onMoverPrev, onMoverNext }) {
 
           <div className="flex items-center gap-1.5 shrink-0">
             {guia.creticidad && (
-              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${badgeCriticidad(guia.creticidad)}`}>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${badgecreticidad(guia.creticidad)}`}>
                 CRIT.{guia.creticidad}
               </span>
             )}
@@ -301,7 +301,7 @@ function ModalDetalle({ guia, onClose, onSetEstado }) {
                 )}
 
                 {guia.creticidad && (
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${badgeCriticidad(guia.creticidad)}`}>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${badgecreticidad(guia.creticidad)}`}>
                     CRIT.{guia.creticidad}
                   </span>
                 )}

@@ -577,7 +577,7 @@ export default function ModalCrearGuiaMantenimiento({
                 </FieldGroup>
 
                 <FieldGroup
-                  label="Criticidad"
+                  label="creticidad"
                   hint={!isUbicacion ? "Tomada del equipo" : undefined}
                 >
                   <select
