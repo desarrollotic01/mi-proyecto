@@ -233,6 +233,8 @@ const cerrarModalesOT = () => {
           m.setViewOpen(false);
           m.setViewData(null);
         }}
+        cambiarEstado={m.cambiarEstado}
+  abrirTratamiento={m.abrirTratamiento}
       />
 
       <ModalTratamiento

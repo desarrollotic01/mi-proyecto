@@ -314,13 +314,16 @@ export default function OrdenTrabajo() {
       />
 
       <ModalOrdenTrabajoView
-        isOpen={viewOpen}
-        orden={viewData}
-        onClose={() => {
-          setViewOpen(false);
-          setViewData(null);
-        }}
-      />
+  isOpen={viewOpen}
+  orden={viewData}
+  onClose={() => {
+    setViewOpen(false);
+    setViewData(null);
+  }}
+  onUpdateEstado={handleUpdateEstado}
+  onLiberar={handleLiberar}
+  onAbrirCierreTecnico={handleAbrirCierreTecnico}
+/>
 
       {/* MODAL DE NOTIFICACIÓN (CIERRE TÉCNICO) */}
       <CrearNotificacionModal

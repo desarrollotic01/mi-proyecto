@@ -70,7 +70,7 @@ export default function ModalDetalleGuia({ guia, onClose, onEjecutar, onCancelar
                       guia.creticidad === "B" ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/40" :
                       "bg-slate-700/50 text-slate-400 border-slate-600"
                     }`}>
-                      Criticidad {guia.creticidad}
+                      creticidad {guia.creticidad}
                     </span>
                   )}
                   {guia.tipoMantenimiento && (
@@ -150,7 +150,7 @@ export default function ModalDetalleGuia({ guia, onClose, onEjecutar, onCancelar
                 { label: "Tipo Mant.", value: guia.tipoMantenimiento, icon: Wrench },
                 { label: "Orden Venta", value: guia.ordenVenta, icon: FileText },
                 { label: "Producto", value: guia.producto, icon: Package },
-                { label: "Criticidad", value: guia.creticidad, icon: AlertTriangle },
+                { label: "creticidad", value: guia.creticidad, icon: AlertTriangle },
                 { label: "Periodo", value: guia.periodo?.replace(/_/g, " "), icon: Calendar },
                 { label: "Inicio Alerta", value: safeDate(guia.fechaInicioAlerta), icon: CalendarClock },
                 { label: "Creado", value: safeDatetime(guia.createdAt), icon: Clock },

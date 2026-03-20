@@ -7,7 +7,7 @@ export const updateSolicitudCompra = async (id, data) => {
     return response.data;
   } catch (error) {
     console.error("Error al actualizar solicitud de compra:", error);
-    throw error;
+    throw error;    
   }
 };
 
@@ -17,6 +17,16 @@ export const getSolicitudCompraById = async (id) => {
     return response.data;
   } catch (error) {
     console.error("Error al obtener solicitud de compra:", error);
+    throw error;
+  }
+};
+
+export const createSolicitudCompra = async (data) => {
+  try {
+    const response = await api.post(`/solicitudcompra`, data);
+    return response.data;
+  } catch (error) {
+    console.error("Error al crear solicitud de compra:", error);
     throw error;
   }
 };

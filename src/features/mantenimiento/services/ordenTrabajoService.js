@@ -29,3 +29,16 @@ export const getEquiposDisponiblesPorAviso = (avisoId) =>
 export const liberarOrdenTrabajo = (ordenId) =>
   api.patch(`/orden-trabajo/${ordenId}/liberar`)
      .then(r => r.data);
+
+export const getSolicitudesTratamientoPorOrdenTrabajo = (ordenId) =>
+  api.get(`/orden-trabajo/${ordenId}/solicitudes-tratamiento`).then((r) => r.data);
+
+export const updateOrdenTrabajoCompleta = async (id, data) => {
+  try {
+    const response = await api.patch(`/ordentrabajo/${id}/completa`, data);
+    return response.data;
+  } catch (error) {
+    console.error("Error al actualizar orden de trabajo completa:", error);
+    throw error;
+  }
+};

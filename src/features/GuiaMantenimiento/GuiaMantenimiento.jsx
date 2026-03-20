@@ -285,7 +285,7 @@ export default function GuiaMantenimientoPage() {
               style={{ width:"100%", paddingLeft:32, paddingRight:12, paddingTop:7, paddingBottom:7, border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:13, background:"#f8fafc", color:"#1e293b" }} />
           </div>
 
-          {/* Filtro criticidad */}
+          {/* Filtro creticidad */}
           <div style={{ display:"flex", gap:4 }}>
             {[["all","Todas"],["A","Crit. A"],["B","Media B"],["C","Baja C"]].map(([v,l]) => (
               <button key={v} onClick={()=>setFilterCrit(v)} style={{ padding:"6px 12px", borderRadius:7, fontSize:12, fontWeight:600, cursor:"pointer", border: filterCrit===v ? "none" : "1.5px solid #e2e8f0", background: filterCrit===v ? "#0f172a" : "#fff", color: filterCrit===v ? "#fff" : "#64748b", transition:"all 0.15s" }}>{l}</button>
@@ -373,7 +373,7 @@ export default function GuiaMantenimientoPage() {
                       </span>
                     </td>
 
-                    {/* Criticidad */}
+                    {/* creticidad */}
                     <td className="gam-cell" style={{ textAlign:"center" }}>
                       <CritBadge v={r.creticidad} />
                     </td>
