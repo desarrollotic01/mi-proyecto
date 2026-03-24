@@ -20,7 +20,8 @@ export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit
   const equiposSeguros = Array.isArray(equipos) ? equipos : [];
 
   return (
-    <div className="flex flex-col min-w-[320px] flex-1">
+    <div className="flex flex-col flex-1 min-w-0 w-full rounded-2xl border border-slate-200 bg-white overflow-hidden ...">
+   {/* Contenido de la columna */}
       <div className={`${bgHeader} rounded-t-[1rem] p-3.5 flex items-center justify-between shadow-sm`}>
         <div className="flex items-center gap-2.5">
           <div className="text-white/90">
@@ -39,6 +40,8 @@ export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit
             <Box size={48} className="text-slate-400 mb-3" />
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sin equipos</p>
           </div>
+
+          
         ) : (
           equiposSeguros.map((equipo) => (
             <EquipoCard

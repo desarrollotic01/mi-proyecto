@@ -63,6 +63,8 @@ class ErrorBoundary extends React.Component {
 // =========================================================================
 // COMPONENTE PRINCIPAL
 // =========================================================================
+// ... (Tus importaciones y ErrorBoundary se mantienen exactamente igual)
+
 function EquiposPageContent() {
   const [equipos, setEquipos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -115,32 +117,20 @@ function EquiposPageContent() {
   const handleSave = async (payload) => {
     try {
       let familiaIdFinal = payload.familiaId;
-
-      // Si el modal nos mandó una familia nueva, la creamos primero:
       if (payload.newFamilia) {
         const familiaCreada = await familiaService.createFamilia(payload.newFamilia);
         familiaIdFinal = familiaCreada.id;
       }
-
-      // Armamos los datos definitivos del equipo
-      const datosEquipo = {
-        ...payload,
-        familiaId: familiaIdFinal
-      };
+      const datosEquipo = { ...payload, familiaId: familiaIdFinal };
       delete datosEquipo.newFamilia;
 
-      if (editing) {
-        await equipoService.updateEquipo(editing.id, datosEquipo);
-      } else {
-        await equipoService.createEquipo(datosEquipo);
-      }
+      if (editing) await equipoService.updateEquipo(editing.id, datosEquipo);
+      else await equipoService.createEquipo(datosEquipo);
 
       await loadData();
       setModalOpen(false);
       setEditing(null);
-    } catch (err) {
-      throw err;
-    }
+    } catch (err) { throw err; }
   };
 
   const handleDelete = async (id) => {
@@ -148,22 +138,15 @@ function EquiposPageContent() {
       try {
         await equipoService.deleteEquipo(id);
         await loadData();
-      } catch (err) {
-        alert("Error al eliminar el equipo: " + err.message);
-      }
+      } catch (err) { alert("Error al eliminar el equipo: " + err.message); }
     }
   };
 
   const handleMove = async (equipo, field, newValue) => {
     try {
-      await equipoService.updateEquipo(equipo.id, {
-        ...equipo,
-        [field]: newValue,
-      });
+      await equipoService.updateEquipo(equipo.id, { ...equipo, [field]: newValue });
       await loadData();
-    } catch (err) {
-      alert("Error al mover el equipo: " + err.message);
-    }
+    } catch (err) { alert("Error al mover el equipo: " + err.message); }
   };
 
   const handleCreatePlan = (equipo) => {
@@ -178,26 +161,15 @@ function EquiposPageContent() {
     loadData();
   };
 
-  // Lógica de Filtrado 100% protegida contra nulos
   const filteredEquipos = useMemo(() => {
     if (!Array.isArray(equipos)) return [];
-
     return equipos.filter((eq) => {
       if (!eq) return false;
       const q = searchTerm.toLowerCase().trim();
-      const matchSearch =
-        !q ||
-        eq?.codigo?.toLowerCase().includes(q) ||
-        eq?.numeroOV?.toLowerCase().includes(q) ||
-        eq?.marca?.toLowerCase().includes(q) ||
-        eq?.modelo?.toLowerCase().includes(q) ||
-        eq?.serie?.toLowerCase().includes(q) ||
-        eq?.nombre?.toLowerCase().includes(q) ||
-        eq?.cliente?.razonSocial?.toLowerCase().includes(q);
-
+      const matchSearch = !q || [eq?.codigo, eq?.numeroOV, eq?.marca, eq?.modelo, eq?.serie, eq?.nombre, eq?.cliente?.razonSocial]
+        .some(f => String(f).toLowerCase().includes(q));
       const matchEstado = filterEstado === "Todos" || eq?.estado === filterEstado;
       const matchCliente = filterCliente === "Todos" || String(eq?.clienteId) === String(filterCliente);
-
       return matchSearch && matchEstado && matchCliente;
     });
   }, [equipos, searchTerm, filterEstado, filterCliente]);
@@ -226,24 +198,29 @@ function EquiposPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-6 lg:p-8 w-full font-sans">
-      <div className="max-w-[1800px] mx-auto w-full space-y-6">
+    // ✅ Cambié el padding a p-3 en móvil y p-6/p-8 en pantallas más grandes
+    <div className="min-h-screen bg-[#f8fafc] p-3 sm:p-6 lg:p-8 w-full overflow-x-hidden font-sans">
+      <div className="max-w-[1800px] mx-auto w-full space-y-4 sm:space-y-6">
 
         {/* ENCABEZADO */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-white p-5 rounded-2xl border border-slate-200 shadow-sm gap-4">
-          <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner w-max">
-            <button onClick={() => setViewMode("propiedad")} className={`px-5 py-2.5 rounded-lg text-sm font-black transition-all ${viewMode === "propiedad" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}>
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm gap-4">
+          
+          {/* ✅ Contenedor scrollable horizontal para móviles (no-scrollbar) */}
+          <div className="flex bg-slate-100 p-1 sm:p-1.5 rounded-xl border border-slate-200 shadow-inner w-full lg:w-max overflow-x-auto no-scrollbar">
+            <button onClick={() => setViewMode("propiedad")} className={`flex-1 lg:flex-none min-w-[100px] px-3 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-black transition-all ${viewMode === "propiedad" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}>
               Propiedad
             </button>
-            <button onClick={() => setViewMode("logistica")} className={`px-5 py-2.5 rounded-lg text-sm font-black transition-all ${viewMode === "logistica" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}>
+            <button onClick={() => setViewMode("logistica")} className={`flex-1 lg:flex-none min-w-[100px] px-3 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-black transition-all ${viewMode === "logistica" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}>
               Logística
             </button>
-            <button onClick={() => setViewMode("lista")} className={`px-5 py-2.5 rounded-lg text-sm font-black transition-all flex items-center gap-2 ${viewMode === "lista" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}>
-              <List size={16} strokeWidth={2.5} /> Lista
+            <button onClick={() => setViewMode("lista")} className={`flex-1 lg:flex-none min-w-[100px] px-3 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2 ${viewMode === "lista" ? "bg-blue-600 text-white shadow-md" : "text-slate-500 hover:bg-white hover:text-slate-700"}`}>
+              <List size={16} strokeWidth={2.5} className="hidden sm:block" /> Lista
             </button>
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <button onClick={() => { setEditing(null); setModalOpen(true); }} className="flex-1 md:flex-none px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-500/30 font-black text-sm active:scale-95">
+          
+          {/* ✅ Botón de agregar ocupa todo el ancho en móvil */}
+          <div className="flex items-center gap-3 w-full lg:w-auto">
+            <button onClick={() => { setEditing(null); setModalOpen(true); }} className="w-full lg:w-auto px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-500/30 font-black text-sm active:scale-95">
               <Plus size={18} strokeWidth={3} /> Agregar Equipo
             </button>
           </div>
@@ -252,76 +229,77 @@ function EquiposPageContent() {
         {error && <div className="p-4 bg-red-50 text-red-700 rounded-xl font-bold border border-red-200 flex gap-2"><AlertCircle /> {error}</div>}
 
         {/* ESTADÍSTICAS */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-slate-300 transition-all text-left group">
-            <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total</p><p className="text-2xl font-black text-slate-800 mt-0.5">{filteredEquipos.length}</p></div>
-            <div className="p-3 bg-slate-50 rounded-xl group-hover:bg-slate-100 transition-colors"><Box className="text-slate-600" size={24} /></div>
+        {/* ✅ Adaptado a 2 columnas en móvil (grid-cols-2) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+          <button className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 flex justify-between items-center shadow-sm hover:shadow-md transition-all text-left group">
+            <div><p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">Total</p><p className="text-xl sm:text-2xl font-black text-slate-800 mt-0.5">{filteredEquipos.length}</p></div>
+            <div className="p-2 sm:p-3 bg-slate-50 rounded-xl group-hover:bg-slate-100 transition-colors"><Box className="text-slate-600 sm:w-6 sm:h-6 w-5 h-5" /></div>
           </button>
 
           {viewMode === "propiedad" || viewMode === "lista" ? (
             <>
-              <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-blue-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Vendidos</p><p className="text-2xl font-black text-blue-600 mt-0.5">{vendidos.length}</p></div>
-                <div className="p-3 bg-blue-50 rounded-xl group-hover:bg-blue-100"><ShoppingCart className="text-blue-600" size={24} /></div>
+              <button className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 flex justify-between items-center shadow-sm hover:shadow-md transition-all text-left group">
+                <div><p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">Vendidos</p><p className="text-xl sm:text-2xl font-black text-blue-600 mt-0.5">{vendidos.length}</p></div>
+                <div className="p-2 sm:p-3 bg-blue-50 rounded-xl group-hover:bg-blue-100"><ShoppingCart className="text-blue-600 sm:w-6 sm:h-6 w-5 h-5" /></div>
               </button>
-              <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-orange-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Propios</p><p className="text-2xl font-black text-amber-500 mt-0.5">{propios.length}</p></div>
-                <div className="p-3 bg-amber-50 rounded-xl group-hover:bg-amber-100"><Building2 className="text-amber-500" size={24} /></div>
+              <button className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 flex justify-between items-center shadow-sm hover:shadow-md transition-all text-left group">
+                <div><p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">Propios</p><p className="text-xl sm:text-2xl font-black text-amber-500 mt-0.5">{propios.length}</p></div>
+                <div className="p-2 sm:p-3 bg-amber-50 rounded-xl group-hover:bg-amber-100"><Building2 className="text-amber-500 sm:w-6 sm:h-6 w-5 h-5" /></div>
               </button>
-              <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-purple-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Atendidos</p><p className="text-2xl font-black text-purple-600 mt-0.5">{atendidos.length}</p></div>
-                <div className="p-3 bg-purple-50 rounded-xl group-hover:bg-purple-100"><Wrench className="text-purple-600" size={24} /></div>
+              <button className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 flex justify-between items-center shadow-sm hover:shadow-md transition-all text-left group hidden sm:flex">
+                <div><p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">Atendidos</p><p className="text-xl sm:text-2xl font-black text-purple-600 mt-0.5">{atendidos.length}</p></div>
+                <div className="p-2 sm:p-3 bg-purple-50 rounded-xl group-hover:bg-purple-100"><Wrench className="text-purple-600 sm:w-6 sm:h-6 w-5 h-5" /></div>
               </button>
             </>
           ) : (
             <>
-              <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Almacén</p><p className="text-2xl font-black text-indigo-600 mt-0.5">{almacen.length}</p></div>
-                <div className="p-3 bg-indigo-50 rounded-xl group-hover:bg-indigo-100"><Package className="text-indigo-600" size={24} /></div>
+              <button className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 flex justify-between items-center shadow-sm hover:shadow-md transition-all text-left group">
+                <div><p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">Almacén</p><p className="text-xl sm:text-2xl font-black text-indigo-600 mt-0.5">{almacen.length}</p></div>
+                <div className="p-2 sm:p-3 bg-indigo-50 rounded-xl group-hover:bg-indigo-100"><Package className="text-indigo-600 sm:w-6 sm:h-6 w-5 h-5" /></div>
               </button>
-              <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-orange-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">En Compra</p><p className="text-2xl font-black text-amber-500 mt-0.5">{enCompra.length}</p></div>
-                <div className="p-3 bg-amber-50 rounded-xl group-hover:bg-amber-100"><CreditCard className="text-amber-500" size={24} /></div>
+              <button className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 flex justify-between items-center shadow-sm hover:shadow-md transition-all text-left group">
+                <div><p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">En Compra</p><p className="text-xl sm:text-2xl font-black text-amber-500 mt-0.5">{enCompra.length}</p></div>
+                <div className="p-2 sm:p-3 bg-amber-50 rounded-xl group-hover:bg-amber-100"><CreditCard className="text-amber-500 sm:w-6 sm:h-6 w-5 h-5" /></div>
               </button>
-              <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-green-300 transition-all text-left group">
-                <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Entregados</p><p className="text-2xl font-black text-emerald-600 mt-0.5">{entregado.length}</p></div>
-                <div className="p-3 bg-emerald-50 rounded-xl group-hover:bg-emerald-100"><Truck className="text-emerald-600" size={24} /></div>
+              <button className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 flex justify-between items-center shadow-sm hover:shadow-md transition-all text-left group hidden sm:flex">
+                <div><p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">Entregados</p><p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">{entregado.length}</p></div>
+                <div className="p-2 sm:p-3 bg-emerald-50 rounded-xl group-hover:bg-emerald-100"><Truck className="text-emerald-600 sm:w-6 sm:h-6 w-5 h-5" /></div>
               </button>
             </>
           )}
-          <button className="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center shadow-sm cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all text-left group hidden lg:flex">
-            <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Operativos</p><p className="text-2xl font-black text-emerald-600 mt-0.5">{filteredEquipos.filter(e => e?.estado === "Operativo").length}</p></div>
-            <div className="p-3 bg-emerald-50 rounded-xl group-hover:bg-emerald-100"><Shield className="text-emerald-600" size={24} /></div>
-          </button>
         </div>
 
         {/* BUSCADOR Y FILTROS */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-          <div className="flex flex-col md:flex-row gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 sm:p-4">
+          <div className="flex flex-col md:flex-row gap-3 sm:gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input type="text" placeholder="Buscar por código, nombre u OV..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm shadow-inner transition-all" />
+              <input type="text" placeholder="Buscar por código, nombre u OV..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-11 sm:pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-xs sm:text-sm shadow-inner transition-all" />
             </div>
-            <button onClick={() => setShowFilters(!showFilters)} className={`px-5 py-3 border rounded-xl transition-all flex items-center justify-center gap-2 font-black text-sm ${showFilters ? "bg-blue-50 border-blue-200 text-blue-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
-              <Filter size={18} /> Filtros <ChevronDown size={18} className={`transition-transform ${showFilters ? "rotate-180" : ""}`} />
-            </button>
-            <button onClick={loadData} className="px-5 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-500 transition-colors flex items-center justify-center gap-2" disabled={loading}>
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-            </button>
+            
+            {/* ✅ En móvil, el botón de filtro y refresh comparten la misma fila para ahorrar espacio */}
+            <div className="flex gap-2 w-full md:w-auto">
+              <button onClick={() => setShowFilters(!showFilters)} className={`flex-1 md:flex-none px-4 sm:px-5 py-3 border rounded-xl transition-all flex items-center justify-center gap-2 font-black text-xs sm:text-sm ${showFilters ? "bg-blue-50 border-blue-200 text-blue-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                <Filter size={16} /> Filtros <ChevronDown size={16} className={`transition-transform ${showFilters ? "rotate-180" : ""}`} />
+              </button>
+              <button onClick={loadData} className="px-4 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-500 transition-colors flex items-center justify-center" disabled={loading}>
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
 
           {showFilters && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 mt-4 border-t border-slate-100 animate-in fade-in">
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Cliente</label>
-                <select value={filterCliente} onChange={(e) => setFilterCliente(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-slate-700">
+                <select value={filterCliente} onChange={(e) => setFilterCliente(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-xs sm:text-sm font-bold text-slate-700">
                   <option value="Todos">Todos los clientes</option>
                   {clientes.map((c) => (<option key={c.id} value={c.id}>{c.razonSocial}</option>))}
                 </select>
               </div>
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Estado Operativo</label>
-                <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-slate-700">
+                <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-xs sm:text-sm font-bold text-slate-700">
                   <option value="Todos">Todos los estados</option>
                   <option value="No instalado">No instalado</option>
                   <option value="Operativo">Operativo</option>
@@ -335,7 +313,7 @@ function EquiposPageContent() {
         {/* CONTENIDO: KANBAN O TABLA */}
         {viewMode === "lista" ? (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto animate-in fade-in duration-300">
-            <table className="w-full text-left border-collapse min-w-[1200px]">
+            <table className="w-full text-left border-collapse min-w-[1100px]">
               <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                 <tr>
                   <th className="p-4 w-[15%]">Identificación</th>
@@ -392,13 +370,14 @@ function EquiposPageContent() {
                           <span className={`px-2 py-1 rounded text-[9px] font-black uppercase border flex items-center gap-1 ${equipo?.status === "Almacen" ? "bg-indigo-50 text-indigo-700 border-indigo-100" : "bg-emerald-50 text-emerald-700 border-emerald-100"}`}><Package size={12} /> {equipo?.status || "-"}</span>
                         </div>
                       </td>
+                      {/* ✅ Botones de acción envueltos en flex-wrap con más espacio para celulares */}
                       <td className="p-4 align-middle">
-                          <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => handleOpenPDF(equipo)} className="p-2 text-slate-400 hover:text-indigo-600 rounded-lg" title="Generar PDF"><FileText size={16} strokeWidth={2.5} /></button>
-                          <button onClick={() => { setEquipoParaPlan(equipo); setPlanModalOpen(true); }} className="p-2 text-slate-400 hover:text-emerald-600 rounded-lg" title="Plan"><Wrench size={16} strokeWidth={2.5} /></button>
-                          <button onClick={() => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} className="p-2 text-slate-400 hover:text-blue-600 rounded-lg" title="Detalle"><Eye size={16} strokeWidth={2.5} /></button>
-                          <button onClick={() => { setEditing(equipo); setModalOpen(true); }} className="p-2 text-slate-400 hover:text-amber-600 rounded-lg" title="Editar"><Edit2 size={16} strokeWidth={2.5} /></button>
-                          <button onClick={() => handleDelete(equipo?.id)} className="p-2 text-slate-400 hover:text-red-600 rounded-lg" title="Eliminar"><Trash2 size={16} strokeWidth={2.5} /></button>
+                        <div className="flex flex-wrap items-center justify-end sm:justify-center gap-2">
+                          <button onClick={() => handleOpenPDF(equipo)} className="p-2 text-slate-500 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg border border-transparent hover:border-indigo-100 transition-all" title="Generar PDF"><FileText size={16} strokeWidth={2.5} /></button>
+                          <button onClick={() => { setEquipoParaPlan(equipo); setPlanModalOpen(true); }} className="p-2 text-slate-500 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg border border-transparent hover:border-emerald-100 transition-all" title="Plan"><Wrench size={16} strokeWidth={2.5} /></button>
+                          <button onClick={() => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} className="p-2 text-slate-500 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 rounded-lg border border-transparent hover:border-blue-100 transition-all" title="Detalle"><Eye size={16} strokeWidth={2.5} /></button>
+                          <button onClick={() => { setEditing(equipo); setModalOpen(true); }} className="p-2 text-slate-500 bg-slate-50 hover:bg-amber-50 hover:text-amber-600 rounded-lg border border-transparent hover:border-amber-100 transition-all" title="Editar"><Edit2 size={16} strokeWidth={2.5} /></button>
+                          <button onClick={() => handleDelete(equipo?.id)} className="p-2 text-slate-500 bg-slate-50 hover:bg-red-50 hover:text-red-600 rounded-lg border border-transparent hover:border-red-100 transition-all" title="Eliminar"><Trash2 size={16} strokeWidth={2.5} /></button>
                         </div>
                       </td>
                     </tr>
@@ -408,8 +387,9 @@ function EquiposPageContent() {
             </table>
           </div>
         ) : (
-          <div className="flex gap-4 overflow-x-auto pb-8 pt-2 no-scrollbar min-h-[600px] animate-in fade-in duration-300 items-start">
-                {viewMode === "propiedad" ? (
+          <div className="flex gap-4 overflow-x-auto pb-8 pt-2 no-scrollbar min-h-[600px] items-start snap-x snap-mandatory">
+  {/* Aquí van tus KanbanColumn */}
+    {viewMode === "propiedad" ? (
               <>
                 <KanbanColumn title="Vendidos" icon={ShoppingCart} color="blue" equipos={vendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
                 <KanbanColumn title="Propios" icon={Building2} color="orange" equipos={propios} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
@@ -435,6 +415,8 @@ function EquiposPageContent() {
     </div>
   );
 }
+
+// ... (Export default se mantiene igual)
 
 // Exportamos el componente envuelto en el atrapador de errores
 export default function EquiposPage() {
