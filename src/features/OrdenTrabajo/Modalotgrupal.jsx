@@ -47,9 +47,7 @@ function toDatetimeLocal(value) {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-
   const pad = (n) => String(n).padStart(2, "0");
-
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
     d.getHours()
   )}:${pad(d.getMinutes())}`;
@@ -82,7 +80,6 @@ function mapOrdenTrabajoToModalData(ot) {
           const encargado = Array.isArray(eq?.trabajadores)
             ? eq.trabajadores.find((t) => t?.esEncargado)
             : null;
-
           return {
             id: eq?.id || null,
             equipoId: eq?.equipoId || null,
@@ -172,7 +169,6 @@ function buildOTPayload({
   initialData = null,
 }) {
   return {
-    ...(mode === "edit" && initialData?.id ? { id: initialData.id } : {}),
     numeroOT,
     tipoMantenimiento:
       aviso?.tipoMantenimiento || initialData?.tipoMantenimiento || "Preventivo",
@@ -187,9 +183,8 @@ function buildOTPayload({
     observaciones: formData.observaciones || null,
     avisoId: aviso?.id || initialData?.avisoId || null,
     tratamientoId: tratamientoId || null,
-
     adjuntos: (archivosAdjuntos || []).map((a) => ({
-      id: a.id || undefined,
+      ...(mode === "edit" && a.id ? { id: a.id } : {}),
       nombre: a.nombre || "",
       url: a.url || "",
       extension: a.extension || null,
@@ -199,7 +194,6 @@ function buildOTPayload({
       descripcionPortal: a.descripcionPortal || null,
       ordenPortal: a.ordenPortal ?? 0,
     })),
-
     equipos: (equipos || []).map((eq) => {
       const trabajadores = (eq.trabajadoresAsignados || []).map((trabajadorId) => {
         const existente = Array.isArray(eq.trabajadoresData)
@@ -207,16 +201,14 @@ function buildOTPayload({
               (t) => String(t.trabajadorId) === String(trabajadorId)
             )
           : null;
-
         return {
-          id: existente?.id || undefined,
+          ...(mode === "edit" && existente?.id ? { id: existente.id } : {}),
           trabajadorId,
           esEncargado: String(eq.encargadoId) === String(trabajadorId),
         };
       });
-
       return {
-        id: eq.id || undefined,
+        ...(mode === "edit" && eq.id ? { id: eq.id } : {}),
         equipoId: eq.equipoId || null,
         ubicacionTecnicaId: eq.ubicacionTecnicaId || null,
         descripcionEquipo: eq.descripcionEquipo || null,
@@ -229,17 +221,18 @@ function buildOTPayload({
         observacionesEquipo: eq.observacionesEquipo || null,
         estadoEquipo: eq.estado || "PENDIENTE",
         observaciones: eq.observaciones || null,
-
         trabajadores,
-
         actividades: (eq.actividadesOT || []).map((act) => ({
-          id: act.id || undefined,
+          ...(mode === "edit" && act.id ? { id: act.id } : {}),
           planMantenimientoActividadId: act.planMantenimientoActividadId || null,
           sistema: act.sistema || null,
           subsistema: act.subsistema || null,
           componente: act.componente || null,
           tarea: act.tarea || "",
+          descripcion: act.descripcion || null,
           tipoTrabajo: act.tipoTrabajo || null,
+          rolTecnico: act.rolTecnico || null,
+          cantidadTecnicos: act.cantidadTecnicos ?? 1,
           duracionEstimadaValor:
             act.duracionEstimadaValor === "" ? null : act.duracionEstimadaValor,
           unidadDuracion: act.unidadDuracion || "min",
@@ -249,14 +242,17 @@ function buildOTPayload({
           unidadDuracionReal: act.unidadDuracionReal || "min",
           duracionRealMin: act.duracionRealMin ?? null,
           estado: act.estado || "PENDIENTE",
-          origen: act.origen || (esPreventivo ? "PLAN" : "MANUAL"),
-          descripcion: act.descripcion || null,
+          origen:
+            act.origen && ["PLAN", "MANUAL", "TRATAMIENTO"].includes(act.origen)
+              ? act.origen
+              : esPreventivo
+              ? "PLAN"
+              : "MANUAL",
           tratamientoEquipoActividadId: act.tratamientoEquipoActividadId || null,
           observaciones: act.observaciones || null,
         })),
-
         adjuntos: (eq.adjuntos || []).map((adj) => ({
-          id: adj.id || undefined,
+          ...(mode === "edit" && adj.id ? { id: adj.id } : {}),
           nombre: adj.nombre || "",
           url: adj.url || "",
           extension: adj.extension || null,
@@ -272,7 +268,7 @@ function buildOTPayload({
 }
 
 /* =========================================================
-   COMPONENTE
+   COMPONENTE PRINCIPAL
 ========================================================= */
 
 export default function ModalOTGrupal({
@@ -296,7 +292,6 @@ export default function ModalOTGrupal({
   const [cargandoTrabajadores, setCargandoTrabajadores] = useState(false);
 
   const [equipoDetalleModal, setEquipoDetalleModal] = useState(null);
-
   const [tratamientoData, setTratamientoData] = useState(null);
 
   const [equipos, setEquipos] = useState([]);
@@ -304,6 +299,9 @@ export default function ModalOTGrupal({
   const [cargandoPlanes, setCargandoPlanes] = useState(false);
 
   const [errors, setErrors] = useState({});
+
+  // ── Modal de texto (observación / descripción) ──
+  const [modalTexto, setModalTexto] = useState(null);
 
   const tratamientoAplicadoRef = useRef(false);
 
@@ -352,14 +350,7 @@ export default function ModalOTGrupal({
 
   const getTargetMeta = (targetId) => {
     const target = equiposInfo.find((t) => String(t.id) === String(targetId));
-
-    if (!target) {
-      return {
-        equipo_id: null,
-        ubicacion_tecnica_id: null,
-      };
-    }
-
+    if (!target) return { equipo_id: null, ubicacion_tecnica_id: null };
     return {
       equipo_id: target.tipo === "EQUIPO" ? target.id : null,
       ubicacion_tecnica_id: target.tipo === "UBICACION_TECNICA" ? target.id : null,
@@ -401,22 +392,16 @@ export default function ModalOTGrupal({
   }, [tratamientoData, tratamiento]);
 
   const initialSolicitudesCompra = useMemo(() => {
-    const general =
-      solicitudesCompraArr.find((s) => s?.esGeneral === true) || null;
+    const general = solicitudesCompraArr.find((s) => s?.esGeneral === true) || null;
     const individuales = solicitudesCompraArr.filter((s) => !s?.esGeneral);
-
     const solicitudesPorEquipo = {};
-
     for (const sol of individuales) {
       const key = String(sol.equipo_id || sol.ubicacion_tecnica_id || "");
       if (!key) continue;
-
       solicitudesPorEquipo[key] = {
         department: sol.department || "",
         email: sol.requester || sol.email || "",
-        requiredDate: sol.requiredDate
-          ? String(sol.requiredDate).slice(0, 10)
-          : "",
+        requiredDate: sol.requiredDate ? String(sol.requiredDate).slice(0, 10) : "",
         comments: sol.comments || "",
         lineas: Array.isArray(sol.lineas)
           ? sol.lineas.map((l) => ({
@@ -435,7 +420,6 @@ export default function ModalOTGrupal({
           : [],
       };
     }
-
     return {
       solicitudGeneral: general
         ? {
@@ -500,6 +484,8 @@ export default function ModalOTGrupal({
     return mapSolicitudesAlmacenToModalValue(solicitudesAlmacenArr);
   }, [solicitudesAlmacenArr]);
 
+  // ── Effects ────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!isOpen) {
       tratamientoAplicadoRef.current = false;
@@ -508,6 +494,7 @@ export default function ModalOTGrupal({
       setTratamientoData(null);
       setArchivosAdjuntos([]);
       setErrors({});
+      setModalTexto(null);
       setFormData({
         descripcionGeneral: "",
         descripcionDetallada: "",
@@ -522,9 +509,7 @@ export default function ModalOTGrupal({
 
   useEffect(() => {
     if (!isOpen) return;
-
     setCargandoTrabajadores(true);
-
     Promise.all([
       getTrabajadores().then((data) =>
         setTrabajadores((data || []).filter((t) => t.rol !== "supervisor"))
@@ -537,10 +522,8 @@ export default function ModalOTGrupal({
 
   useEffect(() => {
     if (!isOpen) return;
-
     if (mode === "edit" && initialData) {
       const mapped = mapOrdenTrabajoToModalData(initialData);
-
       setNumeroOTGenerado(mapped.numeroOT || "");
       setArchivosAdjuntos(mapped.archivosAdjuntos || []);
       setEquipos(mapped.equipos || []);
@@ -554,12 +537,10 @@ export default function ModalOTGrupal({
       });
       return;
     }
-
     if (mode === "create" && aviso) {
       const numero = onGenerarNumeroOT
         ? onGenerarNumeroOT()
         : `OT-${Date.now().toString().slice(-6)}`;
-
       setNumeroOTGenerado(numero);
       setFormData({
         descripcionGeneral: aviso.descripcion || "",
@@ -574,7 +555,6 @@ export default function ModalOTGrupal({
 
   useEffect(() => {
     if (!isOpen || !aviso?.id) return;
-
     getTratamientoByAviso(aviso.id)
       .then((data) => setTratamientoData(data))
       .catch((err) => {
@@ -585,23 +565,16 @@ export default function ModalOTGrupal({
 
   useEffect(() => {
     if (!isOpen || !aviso?.id || mode !== "create") return;
-
     const cargarRegistros = async () => {
       try {
-        const equiposResp = await getEquiposDisponiblesPorAviso(aviso.id).catch(
-          () => []
-        );
-
+        const equiposResp = await getEquiposDisponiblesPorAviso(aviso.id).catch(() => []);
         const equiposIniciales = (equiposResp || []).map((rel) => ({
           id: null,
           equipoId: rel.equipo.id,
           ubicacionTecnicaId: null,
           equipoNombre: rel.equipo.nombre || rel.equipo.codigo,
           equipoTipo:
-            rel.equipo.tipoEquipo ||
-            rel.equipo.tipo ||
-            rel.equipo.tipoEquipoPropiedad ||
-            "—",
+            rel.equipo.tipoEquipo || rel.equipo.tipo || rel.equipo.tipoEquipoPropiedad || "—",
           ubicacionTecnicaNombre: "",
           ubicacionTecnicaCodigo: "",
           descripcionEquipo: "",
@@ -627,7 +600,6 @@ export default function ModalOTGrupal({
         const ubicacionesIniciales = (aviso?.ubicacionesRelacion || []).map((rel) => {
           const ut = rel.ubicacionTecnica || rel.ubicacion || {};
           const ubicacionId = rel.ubicacionTecnicaId || rel.ubicacionId || ut.id;
-
           return {
             id: null,
             equipoId: null,
@@ -664,7 +636,6 @@ export default function ModalOTGrupal({
         setEquipos([]);
       }
     };
-
     cargarRegistros();
   }, [isOpen, aviso?.id, aviso?.ubicacionesRelacion, mode]);
 
@@ -675,9 +646,7 @@ export default function ModalOTGrupal({
       !tratamientoData ||
       !equipos.length ||
       tratamientoAplicadoRef.current
-    ) {
-      return;
-    }
+    ) return;
 
     const tratEquipos = Array.isArray(tratamientoData.equipos)
       ? tratamientoData.equipos
@@ -698,7 +667,6 @@ export default function ModalOTGrupal({
           }
           return false;
         });
-
         if (!te) return eq;
 
         const actividadesOT = (te.actividades || []).map((a) =>
@@ -732,16 +700,13 @@ export default function ModalOTGrupal({
           ubicacionTecnicaId: te.ubicacionTecnicaId || eq.ubicacionTecnicaId || null,
           equipoNombre: te.equipo?.nombre || te.equipo?.codigo || eq.equipoNombre,
           equipoTipo: te.equipo?.tipoEquipo || te.equipo?.tipo || eq.equipoTipo,
-          ubicacionTecnicaNombre:
-            te.ubicacionTecnica?.nombre || eq.ubicacionTecnicaNombre,
-          ubicacionTecnicaCodigo:
-            te.ubicacionTecnica?.codigo || eq.ubicacionTecnicaCodigo,
+          ubicacionTecnicaNombre: te.ubicacionTecnica?.nombre || eq.ubicacionTecnicaNombre,
+          ubicacionTecnicaCodigo: te.ubicacionTecnica?.codigo || eq.ubicacionTecnicaCodigo,
           actividadesOT,
           planMantenimientoId: te.planMantenimientoId || null,
           planMantenimiento: te.planMantenimiento || null,
           descripcionEquipo: te.descripcionEquipo || eq.descripcionEquipo || "",
-          descripcionUbicacion:
-            te.descripcionUbicacion || eq.descripcionUbicacion || "",
+          descripcionUbicacion: te.descripcionUbicacion || eq.descripcionUbicacion || "",
         };
       })
     );
@@ -749,9 +714,7 @@ export default function ModalOTGrupal({
 
   useEffect(() => {
     if (!isOpen || !esPreventivo || !equipos.length) return;
-
     let cancelled = false;
-
     const run = async () => {
       setCargandoPlanes(true);
       try {
@@ -764,10 +727,9 @@ export default function ModalOTGrupal({
                 return [key, Array.isArray(planes) ? planes : []];
               }
               if (eq.ubicacionTecnicaId) {
-                const planes =
-                  await planMantenimientoService.getPlanesByUbicacionTecnica(
-                    eq.ubicacionTecnicaId
-                  );
+                const planes = await planMantenimientoService.getPlanesByUbicacionTecnica(
+                  eq.ubicacionTecnicaId
+                );
                 return [key, Array.isArray(planes) ? planes : []];
               }
               return [key, []];
@@ -777,9 +739,7 @@ export default function ModalOTGrupal({
             }
           })
         );
-
         if (cancelled) return;
-
         const map = {};
         for (const [id, planes] of entries) map[id] = planes;
         setPlanesPorEquipo(map);
@@ -787,13 +747,11 @@ export default function ModalOTGrupal({
         if (!cancelled) setCargandoPlanes(false);
       }
     };
-
     run();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [isOpen, esPreventivo, equipos]);
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   const seleccionarPlan = async (equipoIndex, planId) => {
     if (!planId) {
@@ -802,10 +760,8 @@ export default function ModalOTGrupal({
       handleEquipoChange(equipoIndex, "actividadesOT", []);
       return;
     }
-
     try {
       const planSel = await planMantenimientoService.getPlanById(planId);
-
       const acts = (planSel?.actividades || []).map((a) =>
         mkActOT(
           {
@@ -834,7 +790,6 @@ export default function ModalOTGrupal({
           { forceSelected: true, esCorrectivo }
         )
       );
-
       setEquipos((prev) => {
         const updated = [...prev];
         updated[equipoIndex] = {
@@ -889,7 +844,6 @@ export default function ModalOTGrupal({
 
   const addActividadOT = (eqIndex) => {
     if (!esCorrectivo) return;
-
     setEquipos((prev) => {
       const updated = [...prev];
       updated[eqIndex] = {
@@ -915,7 +869,6 @@ export default function ModalOTGrupal({
 
   const removeActividadOT = (eqIndex, actIndex) => {
     if (!esCorrectivo) return;
-
     setEquipos((prev) => {
       const updated = [...prev];
       updated[eqIndex] = {
@@ -948,9 +901,7 @@ export default function ModalOTGrupal({
         updated[equipoIndex] = { ...updated[equipoIndex], subiendoAdjuntos: true };
         return updated;
       });
-
       const data = await adjuntosService.uploadArchivos(files);
-
       setEquipos((prev) => {
         const updated = [...prev];
         updated[equipoIndex] = {
@@ -973,18 +924,11 @@ export default function ModalOTGrupal({
   const handleGuardarSolicitudesCompraDesdeOT = async (result) => {
     try {
       setGuardandoSolicitudCompra(true);
-
       const tratamientoId = tratamiento?.id || tratamientoData?.id;
-      if (!tratamientoId) {
-        throw new Error("No se encontró el tratamiento para guardar la solicitud");
-      }
+      if (!tratamientoId) throw new Error("No se encontró el tratamiento");
 
-      const generalExistente =
-        solicitudesCompraArr.find((s) => s?.esGeneral === true) || null;
-
-      const individualesExistentes = solicitudesCompraArr.filter(
-        (s) => !s?.esGeneral
-      );
+      const generalExistente = solicitudesCompraArr.find((s) => s?.esGeneral === true) || null;
+      const individualesExistentes = solicitudesCompraArr.filter((s) => !s?.esGeneral);
 
       if (result?.solicitudGeneral && !isSolicitudVacia(result.solicitudGeneral)) {
         if (generalExistente) {
@@ -1004,23 +948,15 @@ export default function ModalOTGrupal({
       }
 
       const formsPorEquipo = result?.solicitudesPorEquipo || {};
-
       for (const [key, form] of Object.entries(formsPorEquipo)) {
         if (!form || isSolicitudVacia(form)) continue;
-
         const existente = individualesExistentes.find(
-          (s) =>
-            String(s.equipo_id || s.ubicacion_tecnica_id || "") === String(key)
+          (s) => String(s.equipo_id || s.ubicacion_tecnica_id || "") === String(key)
         );
-
         if (existente) {
-          await updateSolicitudCompra(
-            existente.id,
-            buildSolicitudCompraUpdatePayload(form)
-          );
+          await updateSolicitudCompra(existente.id, buildSolicitudCompraUpdatePayload(form));
         } else {
           const meta = getTargetMeta(key);
-
           await createSolicitudCompra(
             buildSolicitudCompraCreatePayload(form, {
               esGeneral: false,
@@ -1035,7 +971,7 @@ export default function ModalOTGrupal({
       setTratamientoData(updated);
       setShowSolicitudCompraModal(false);
     } catch (error) {
-      console.error("Error guardando solicitudes de compra desde OT:", error);
+      console.error("Error guardando solicitudes de compra:", error);
       alert(
         error?.response?.data?.message ||
           error?.response?.data?.errors?.[0] ||
@@ -1050,18 +986,11 @@ export default function ModalOTGrupal({
   const handleGuardarSolicitudesAlmacenDesdeOT = async (result) => {
     try {
       setGuardandoSolicitudAlmacen(true);
-
       const tratamientoId = tratamiento?.id || tratamientoData?.id;
-      if (!tratamientoId) {
-        throw new Error("No se encontró el tratamiento para guardar la solicitud");
-      }
+      if (!tratamientoId) throw new Error("No se encontró el tratamiento");
 
-      const generalExistente =
-        solicitudesAlmacenArr.find((s) => s?.esGeneral === true) || null;
-
-      const individualesExistentes = solicitudesAlmacenArr.filter(
-        (s) => !s?.esGeneral
-      );
+      const generalExistente = solicitudesAlmacenArr.find((s) => s?.esGeneral === true) || null;
+      const individualesExistentes = solicitudesAlmacenArr.filter((s) => !s?.esGeneral);
 
       if (result?.solicitudGeneral && !isSolicitudVacia(result.solicitudGeneral)) {
         if (generalExistente) {
@@ -1082,23 +1011,15 @@ export default function ModalOTGrupal({
       }
 
       const formsPorEquipo = result?.solicitudesPorEquipo || {};
-
       for (const [key, form] of Object.entries(formsPorEquipo)) {
         if (!form || isSolicitudVacia(form)) continue;
-
         const existente = individualesExistentes.find(
-          (s) =>
-            String(s.equipo_id || s.ubicacion_tecnica_id || "") === String(key)
+          (s) => String(s.equipo_id || s.ubicacion_tecnica_id || "") === String(key)
         );
-
         if (existente) {
-          await updateSolicitudAlmacen(
-            existente.id,
-            buildSolicitudAlmacenUpdatePayload(form)
-          );
+          await updateSolicitudAlmacen(existente.id, buildSolicitudAlmacenUpdatePayload(form));
         } else {
           const meta = getTargetMeta(key);
-
           await createSolicitudAlmacen(
             buildSolicitudAlmacenCreatePayload(form, {
               tratamiento_id: tratamientoId,
@@ -1114,7 +1035,7 @@ export default function ModalOTGrupal({
       setTratamientoData(updated);
       setShowSolicitudAlmacenModal(false);
     } catch (error) {
-      console.error("Error guardando solicitudes de almacén desde OT:", error);
+      console.error("Error guardando solicitudes de almacén:", error);
       alert(
         error?.response?.data?.message ||
           error?.response?.data?.errors?.[0] ||
@@ -1127,16 +1048,9 @@ export default function ModalOTGrupal({
   };
 
   const handleSubmitInternal = () => {
-    const newErrors = validateOTForm({
-      formData,
-      equipos,
-      esPreventivo,
-      esCorrectivo,
-    });
-
+    const newErrors = validateOTForm({ formData, equipos, esPreventivo, esCorrectivo });
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
-
     setMostrarConfirmacion(true);
   };
 
@@ -1173,6 +1087,8 @@ export default function ModalOTGrupal({
     <>
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-3">
         <div className="bg-white rounded-3xl shadow-2xl w-[99vw] max-w-[145rem] h-[97vh] flex flex-col border border-slate-200 overflow-hidden">
+
+          {/* ── Header ── */}
           <div className="px-8 py-6 border-b bg-slate-900 shrink-0 flex items-center justify-between">
             <div>
               <h3 className="text-2xl font-bold text-white">
@@ -1180,7 +1096,6 @@ export default function ModalOTGrupal({
                   ? "Editar Orden de Trabajo Grupal"
                   : "Crear Orden de Trabajo Grupal"}
               </h3>
-
               <div className="flex items-center gap-2 mt-1 flex-wrap text-sm text-slate-300">
                 <span className="font-semibold text-white">{numeroOTGenerado}</span>
                 <span>•</span>
@@ -1209,7 +1124,6 @@ export default function ModalOTGrupal({
                 <FileText className="w-4 h-4" />
                 Info del Aviso
               </button>
-
               <button
                 onClick={onClose}
                 className="p-2.5 hover:bg-white/10 rounded-xl transition"
@@ -1220,8 +1134,11 @@ export default function ModalOTGrupal({
             </div>
           </div>
 
+          {/* ── Body ── */}
           <div className="flex-1 overflow-y-auto bg-slate-50">
             <div className="p-8 space-y-6">
+
+              {/* Información general */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2.5 rounded-xl bg-slate-900">
@@ -1300,6 +1217,7 @@ export default function ModalOTGrupal({
                 </div>
               </div>
 
+              {/* Registros (equipos / ubicaciones) */}
               {equipos.map((registro, index) => (
                 <OTRegistroCard
                   key={`${getRegistroId(registro)}-${index}`}
@@ -1334,9 +1252,26 @@ export default function ModalOTGrupal({
                     updateActividadOT(index, actIdx, field, value)
                   }
                   onRemoveActividad={(actIdx) => removeActividadOT(index, actIdx)}
+                  onOpenObservacion={(actIdx) =>
+                    setModalTexto({
+                      eqIndex: index,
+                      actIndex: actIdx,
+                      campo: "observaciones",
+                      titulo: "Observación",
+                    })
+                  }
+                  onOpenDescripcion={(actIdx) =>
+                    setModalTexto({
+                      eqIndex: index,
+                      actIndex: actIdx,
+                      campo: "descripcion",
+                      titulo: "Descripción",
+                    })
+                  }
                 />
               ))}
 
+              {/* Adjuntos generales */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2.5 rounded-xl bg-slate-700">
@@ -1346,14 +1281,12 @@ export default function ModalOTGrupal({
                     Archivos Adjuntos Generales
                   </h4>
                 </div>
-
                 <input
                   type="file"
                   multiple
                   onChange={(e) => handleUploadAdjuntos(e.target.files)}
                   className="w-full text-sm file:mr-4 file:py-3 file:px-5 file:rounded-xl file:border-0 file:bg-slate-900 file:text-white file:font-medium hover:file:bg-slate-800 cursor-pointer border border-dashed border-slate-300 rounded-xl p-4"
                 />
-
                 {subiendoArchivos && (
                   <div className="mt-4 flex items-center gap-3 text-blue-600 bg-blue-50 p-4 rounded-xl border border-blue-200">
                     <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -1362,6 +1295,7 @@ export default function ModalOTGrupal({
                 )}
               </div>
 
+              {/* Solicitud de compra */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-xl font-semibold text-slate-900">
@@ -1374,13 +1308,30 @@ export default function ModalOTGrupal({
                     disabled={guardandoSolicitudCompra}
                   >
                     <Edit className="w-4 h-4" />
-                    {guardandoSolicitudCompra
-                      ? "Guardando..."
-                      : "Editar solicitud de compra"}
+                    {guardandoSolicitudCompra ? "Guardando..." : "Editar solicitud de compra"}
                   </button>
                 </div>
               </div>
 
+              {/* Solicitud de almacén */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-xl font-semibold text-slate-900">
+                    Solicitud de Almacén
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowSolicitudAlmacenModal(true)}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium flex items-center gap-2"
+                    disabled={guardandoSolicitudAlmacen}
+                  >
+                    <Edit className="w-4 h-4" />
+                    {guardandoSolicitudAlmacen ? "Guardando..." : "Editar solicitud de almacén"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Observaciones generales */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <Label>Observaciones Generales</Label>
                 <textarea
@@ -1391,21 +1342,10 @@ export default function ModalOTGrupal({
                   className={textareaClass()}
                 />
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowSolicitudAlmacenModal(true)}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium flex items-center gap-2"
-                disabled={guardandoSolicitudAlmacen}
-              >
-                <Edit className="w-4 h-4" />
-                {guardandoSolicitudAlmacen
-                  ? "Guardando..."
-                  : "Editar solicitud de almacén"}
-              </button>
             </div>
           </div>
 
+          {/* ── Footer ── */}
           <div className="px-8 py-5 border-t bg-white flex items-center justify-between shrink-0">
             <button
               onClick={onClose}
@@ -1415,7 +1355,6 @@ export default function ModalOTGrupal({
               <X className="w-5 h-5" />
               Cancelar
             </button>
-
             <button
               onClick={handleSubmitInternal}
               className="px-8 py-3 bg-slate-900 text-white rounded-xl font-medium shadow-sm hover:bg-slate-800 transition flex items-center gap-3"
@@ -1428,6 +1367,7 @@ export default function ModalOTGrupal({
         </div>
       </div>
 
+      {/* ── Modales secundarios ── */}
       <ModalInfoAviso
         isOpen={mostrarInfoAviso}
         onClose={() => setMostrarInfoAviso(false)}
@@ -1462,41 +1402,54 @@ export default function ModalOTGrupal({
         initialValue={initialSolicitudesAlmacen}
       />
 
+      {/* Modal de texto (observación / descripción de actividad) */}
+      {modalTexto && (
+        <ModalTextoActividad
+          titulo={modalTexto.titulo}
+          valor={
+            equipos[modalTexto.eqIndex]?.actividadesOT?.[modalTexto.actIndex]?.[
+              modalTexto.campo
+            ] || ""
+          }
+          onClose={() => setModalTexto(null)}
+          onGuardar={(nuevoValor) => {
+            updateActividadOT(
+              modalTexto.eqIndex,
+              modalTexto.actIndex,
+              modalTexto.campo,
+              nuevoValor
+            );
+            setModalTexto(null);
+          }}
+        />
+      )}
+
+      {/* Confirmación de guardado */}
       {mostrarConfirmacion && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200">
             <h3 className="text-xl font-semibold text-slate-900 mb-2">
               {mode === "edit" ? "¿Confirmar cambios?" : "¿Confirmar creación?"}
             </h3>
-
             <p className="text-sm text-slate-600 mb-6">
               {mode === "edit" ? (
                 <>
                   Se actualizará la OT{" "}
-                  <span className="font-semibold text-slate-900">
-                    {numeroOTGenerado}
-                  </span>{" "}
+                  <span className="font-semibold text-slate-900">{numeroOTGenerado}</span>{" "}
                   para{" "}
-                  <span className="font-semibold text-slate-900">
-                    {equipos.length}
-                  </span>{" "}
+                  <span className="font-semibold text-slate-900">{equipos.length}</span>{" "}
                   registros.
                 </>
               ) : (
                 <>
                   Se creará la OT{" "}
-                  <span className="font-semibold text-slate-900">
-                    {numeroOTGenerado}
-                  </span>{" "}
+                  <span className="font-semibold text-slate-900">{numeroOTGenerado}</span>{" "}
                   para{" "}
-                  <span className="font-semibold text-slate-900">
-                    {equipos.length}
-                  </span>{" "}
+                  <span className="font-semibold text-slate-900">{equipos.length}</span>{" "}
                   registros.
                 </>
               )}
             </p>
-
             <div className="flex gap-3">
               <button
                 onClick={() => setMostrarConfirmacion(false)}
@@ -1520,6 +1473,59 @@ export default function ModalOTGrupal({
         </div>
       )}
     </>
+  );
+}
+
+/* =========================================================
+   SUBCOMPONENTES LOCALES
+========================================================= */
+
+function ModalTextoActividad({ titulo, valor, onClose, onGuardar }) {
+  const [texto, setTexto] = useState(valor);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <h3 className="text-base font-semibold text-slate-900">{titulo}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 hover:bg-slate-100 rounded-lg transition"
+          >
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5">
+          <textarea
+            rows={6}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder={`Ingrese ${titulo.toLowerCase()}...`}
+            className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-slate-200"
+            autoFocus
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-slate-300 rounded-xl text-sm font-medium hover:bg-slate-50 transition"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => onGuardar(texto)}
+            className="px-5 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition"
+          >
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
