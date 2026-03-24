@@ -1,8 +1,7 @@
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { 
-  FileText, User, Calendar, AlertCircle, Wrench, Package, 
-  CheckCircle, XCircle, Clock, FileCheck, MapPin, Phone, Mail,
-  Briefcase, DollarSign, Layers, Link2, AlertTriangle
+  FileText, User, Calendar, Wrench, Package, 
+  CheckCircle, XCircle, Clock, FileCheck, Layers, MapPin, AlertTriangle, ChevronRight
 } from "lucide-react";
 import { ESTADOS_AV } from "../config/camposMantenimiento";
 
@@ -19,68 +18,40 @@ export default function MantenimientoKanban({
   equiposData = [],
   ordenesTrabajoData = [],
 }) {
+  
   const getColumnIcon = (colId) => {
     const icons = {
       CREADO: Clock,
       TRATADO: Wrench,
       CON_OT: FileText,
-      FINALIZADO: CheckCircle,
-      FINALIZADO_SIN_FACTURACION: FileCheck,
       RECHAZADO: XCircle,
+      FINALIZADO: CheckCircle,
+      FACTURADO: FileText, 
+      FINALIZADO_SIN_FACTURACION: FileCheck,
     };
     return icons[colId] || FileText;
   };
 
   const getColumnColor = (colId) => {
     const colors = {
-      CREADO: "from-blue-500 to-blue-600",
-      TRATADO: "from-yellow-500 to-yellow-600",
-      CON_OT: "from-purple-500 to-purple-600",
-      FINALIZADO: "from-green-500 to-green-600",
-      FINALIZADO_SIN_FACTURACION: "from-gray-500 to-gray-600",
-      RECHAZADO: "from-red-500 to-red-600",
+      CREADO: "bg-[#334155]", 
+      TRATADO: "bg-[#2563eb]", 
+      CON_OT: "bg-[#6d28d9]",  
+      RECHAZADO: "bg-[#b91c1c]", 
+      FINALIZADO: "bg-[#059669]", 
+      FACTURADO: "bg-[#475569]", 
+      FINALIZADO_SIN_FACTURACION: "bg-[#1e293b]", 
     };
-    return colors[colId] || "from-gray-500 to-gray-600";
+    return colors[colId] || "bg-slate-500";
   };
 
   const getPriorityColor = (priority) => {
     const colors = {
-      Alta: "bg-red-100 text-red-700 border-red-300",
-      Media: "bg-yellow-100 text-yellow-700 border-yellow-300",
-      Baja: "bg-green-100 text-green-700 border-green-300",
+      Alta: "bg-red-500/20 text-red-500 border border-red-500/30",
+      Media: "bg-yellow-500/20 text-yellow-600 border border-yellow-500/30",
+      Baja: "bg-green-500/20 text-green-600 border border-green-500/30",
     };
-    return colors[priority] || "bg-gray-100 text-gray-700 border-gray-300";
-  };
-
-  const getEquipoData = (equipoId) => {
-    return equiposData.find(e => e.id === equipoId);
-  };
-
-  const DesgloseEstados = ({ desglose }) => {
-    if (!desglose || !desglose.esMultiple) return null;
-
-    return (
-      <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-          <Layers className="w-3 h-3" />
-          <span>Desglose de OTs ({desglose.total})</span>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-1">
-          {Object.entries(desglose.porEstado).map(([estado, cantidad]) => (
-            <div 
-              key={estado}
-              className={`flex items-center justify-between px-2 py-1 rounded text-xs ${
-                ESTADOS_AV[estado]?.badge || 'bg-gray-100 text-gray-700'
-              }`}
-            >
-              <span className="font-semibold">{ESTADOS_AV[estado]?.label}</span>
-              <span className="font-bold">{cantidad}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return colors[priority] || "bg-slate-100 text-slate-500 border border-slate-200";
   };
 
   const getTargetKey = (obj) => {
@@ -92,31 +63,22 @@ export default function MantenimientoKanban({
 
   const reorganizarColumnasPorOTs = (columns) => {
     const nuevasColumnas = {};
-
-    Object.keys(columns).forEach((colId) => {
-      nuevasColumnas[colId] = { items: [] };
-    });
+    Object.keys(columns).forEach((colId) => { nuevasColumnas[colId] = { items: [] }; });
 
     Object.values(columns).forEach((col) => {
       col.items.forEach((item) => {
-        const otsDelAviso = ordenesTrabajoData.filter(
-          (ot) => String(ot.avisoId) === String(item.id)
-        );
-
-        // Targets reales del aviso
+        const otsDelAviso = ordenesTrabajoData.filter((ot) => String(ot.avisoId) === String(item.id));
         const targetsAviso = new Set();
-
+        
         (item.equiposRelacion || []).forEach((rel) => {
           const key = getTargetKey(rel);
           if (key) targetsAviso.add(key);
         });
-
         (item.ubicacionesRelacion || []).forEach((rel) => {
           const key = getTargetKey(rel);
           if (key) targetsAviso.add(key);
         });
 
-        // Si no tiene OTs, se queda en su estado real
         if (!otsDelAviso.length) {
           nuevasColumnas[item.estado]?.items.push({
             ...item,
@@ -131,9 +93,7 @@ export default function MantenimientoKanban({
           return;
         }
 
-        // Targets cubiertos por las OTs
         const targetsConOT = new Set();
-
         otsDelAviso.forEach((ot) => {
           (ot.equipos || []).forEach((targetOT) => {
             const key = getTargetKey(targetOT);
@@ -144,12 +104,8 @@ export default function MantenimientoKanban({
         const totalTargetsAviso = targetsAviso.size;
         const cantidadTargetsConOT = targetsConOT.size;
         const equiposPendientes = Math.max(0, totalTargetsAviso - cantidadTargetsConOT);
-
-        const estaCompleto =
-          totalTargetsAviso > 0 && cantidadTargetsConOT >= totalTargetsAviso;
-
-        const esParcial =
-          cantidadTargetsConOT > 0 && cantidadTargetsConOT < totalTargetsAviso;
+        const estaCompleto = totalTargetsAviso > 0 && cantidadTargetsConOT >= totalTargetsAviso;
+        const esParcial = cantidadTargetsConOT > 0 && cantidadTargetsConOT < totalTargetsAviso;
 
         const porEstado = {};
         otsDelAviso.forEach((ot) => {
@@ -157,11 +113,7 @@ export default function MantenimientoKanban({
           porEstado[estadoOT] = (porEstado[estadoOT] || 0) + 1;
         });
 
-        // Si hay al menos una OT y cubre todos los targets => CON_OT
-        // Si hay OT parcial => TRATADO
-        // Si por alguna razón no se pudo calcular targets del aviso, al menos mostrar CON_OT
         let columnaDestino = "TRATADO";
-
         if (totalTargetsAviso === 0) {
           columnaDestino = "CON_OT";
         } else if (estaCompleto) {
@@ -196,14 +148,14 @@ export default function MantenimientoKanban({
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      {/* CORRECCIÓN RESPONSIVE AQUÍ:
-        Se reemplazó el grid por flex con scroll horizontal (overflow-x-auto) 
-        y alturas basadas en dvh para evitar el desborde en móviles.
+      {/* MAGIA RESPONSIVE CONTENEDOR: 
+          - Móvil/Tablet: scroll horizontal (overflow-x-auto) 
+          - Desktop (lg): sin scroll (overflow-hidden) 
       */}
-      <div className="flex items-start overflow-x-auto overflow-y-hidden gap-4 pb-4 px-2 w-full h-[calc(100dvh-160px)] md:h-[calc(100vh-200px)] snap-x snap-mandatory">
+      <div className="flex w-full gap-3 pb-4 h-[calc(100dvh-130px)] lg:h-[calc(100vh-160px)] overflow-x-auto lg:overflow-hidden px-2 lg:px-1 snap-x snap-mandatory lg:snap-none">
         {Object.entries(columnasReorganizadas).map(([colId, col]) => {
           const Icon = getColumnIcon(colId);
-          const gradient = getColumnColor(colId);
+          const bgColor = getColumnColor(colId);
           
           return (
             <Droppable droppableId={colId} key={colId}>
@@ -211,43 +163,45 @@ export default function MantenimientoKanban({
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  // Se asigna un ancho relativo en móvil (85vw) y fijo en desktop (320px)
-                  className={`flex flex-col rounded-2xl transition-all shadow-lg max-h-full w-[85vw] sm:w-[320px] lg:w-[340px] flex-shrink-0 snap-center md:snap-align-none ${
-                    snapshot.isDraggingOver
-                      ? "bg-blue-50 ring-2 ring-blue-400"
-                      : "bg-white border-2 border-slate-200"
-                  }`}
+                  // MAGIA RESPONSIVE COLUMNA:
+                  // - Móvil: 85% del ancho de la pantalla (w-[85vw])
+                  // - Tablet: ancho fijo de 320px (md:w-[320px])
+                  // - Desktop: se estira para llenar la pantalla equitativamente (lg:flex-1 lg:w-auto)
+                  className={`flex flex-col rounded-2xl border transition-all h-full shrink-0 snap-center lg:snap-align-none
+                    w-[85vw] md:w-[320px] lg:w-auto lg:flex-1 lg:min-w-0
+                    ${snapshot.isDraggingOver ? "border-blue-500/50 bg-slate-50 shadow-inner" : "border-slate-200 bg-transparent"}
+                  `}
                 >
-                  {/* HEADER DE COLUMNA INTACTO */}
-                  <div className={`p-5 rounded-t-xl bg-gradient-to-br ${gradient} text-white shadow-md flex-shrink-0 sticky top-0 z-10`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-white/25 rounded-xl backdrop-blur-sm border border-white/30">
-                          <Icon className="w-5 h-5" strokeWidth={2.5} />
-                        </div>
-                        <h3 className="font-bold text-base truncate pr-2">
-                          {ESTADOS_AV[colId]?.label}
-                        </h3>
+                  {/* HEADER */}
+                  <div className={`p-2.5 md:p-3 rounded-t-xl ${bgColor} text-white flex items-center justify-between min-h-[60px] md:min-h-[72px] shrink-0 mx-[-1px] mt-[-1px]`}>
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <div className="w-7 h-7 md:w-8 md:h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                        <Icon size={14} className="text-white md:w-4 md:h-4" />
                       </div>
-                      <span className="px-3 py-1.5 bg-white/25 rounded-full text-sm font-bold backdrop-blur-sm border border-white/30">
-                        {col.items.length}
-                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <h3 className="font-bold text-[11px] md:text-xs lg:text-sm capitalize truncate">
+                          {ESTADOS_AV[colId]?.label || colId}
+                        </h3>
+                        <span className="text-[9px] md:text-[10px] text-white/80 font-medium">
+                          {col.items.length} {col.items.length === 1 ? 'guía' : 'guías'}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Contador circular */}
+                    <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-black/20 flex items-center justify-center text-[10px] md:text-xs font-bold shrink-0">
+                      {col.items.length}
                     </div>
                   </div>
 
-                  {/* TARJETAS */}
-                  <div className="flex-1 min-h-0 p-4 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50 to-white">
+                  {/* CONTENEDOR DE TARJETAS */}
+                  <div className="flex-1 min-h-0 p-2 md:p-2.5 space-y-3 overflow-y-auto rounded-b-xl border-x border-b border-slate-200 bg-slate-50/50">
                     {col.items.map((item, i) => {
                       const tieneDesglose = item._desglose && item._desglose.total > 1;
                       const esParcial = item._esParcial;
                       const estadoReal = item._estadoReal || item.estado;
 
                       return (
-                        <Draggable
-                          draggableId={item.id}
-                          index={i}
-                          key={item.id}
-                        >
+                        <Draggable draggableId={item.id} index={i} key={item.id}>
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}
@@ -258,316 +212,93 @@ export default function MantenimientoKanban({
                                 setViewStep(1);
                                 setViewOpen(true);
                               }}
-                              className={`bg-white rounded-xl border-2 shadow-md transition-all duration-200 cursor-pointer group relative flex flex-col ${
-                                snapshot.isDragging
-                                  ? "border-blue-500 shadow-2xl scale-[1.02] rotate-1 ring-4 ring-blue-200 z-50"
-                                  : tieneDesglose
-                                  ? "border-purple-300 hover:border-purple-400 hover:shadow-xl"
-                                  : esParcial
-                                  ? "border-orange-300 hover:border-orange-400 hover:shadow-xl"
-                                  : "border-slate-200 hover:border-blue-300 hover:shadow-lg"
+                              className={`bg-white rounded-2xl border border-slate-200 overflow-hidden transition-all duration-200 cursor-pointer group hover:scale-[1.01] hover:shadow-lg relative flex flex-col ${
+                                snapshot.isDragging ? "shadow-2xl scale-[1.02] rotate-1 z-50 ring-2 ring-blue-400" : ""
                               }`}
                             >
-                              {/* Indicador de OT múltiple */}
-                              {tieneDesglose && (
-                                <div className="absolute -top-2 -right-2 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-full px-2.5 py-1 text-xs font-bold shadow-lg border-2 border-white flex items-center gap-1 z-10">
-                                  <Layers className="w-3 h-3" />
-                                  {item._desglose.total} OTs
+                              <div className={`h-1 w-full ${bgColor}`} />
+
+                              <div className="p-3 md:p-3.5 space-y-2.5">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-xs font-mono text-slate-500 font-bold">#{item.numeroAviso}</span>
+                                      {item.prioridad && (
+                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${getPriorityColor(item.prioridad)}`}>
+                                          {item.prioridad}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="font-bold text-slate-800 text-xs md:text-sm leading-tight line-clamp-2">
+                                      {item.cliente || "Sin cliente"}
+                                    </p>
+                                  </div>
+                                  <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 shrink-0 mt-1 transition hidden sm:block" />
                                 </div>
-                              )}
 
-                              {/* CARD CONTENT INTACTO */}
-                              <div className="flex-1 p-4 space-y-3">
-                                {/* CONTENIDO DINÁMICO */}
-                                {columnOrder.map((key) => {
-                                  if (!cardFields[key]) return null;
+                                <div className="flex flex-col gap-1.5 pt-1">
+                                  <div className="flex items-center gap-2">
+                                    <Wrench size={12} className="text-slate-400 shrink-0" />
+                                    <span className="text-[10px] md:text-xs text-slate-600 truncate">{item.tipoMantenimiento || "Sin tipo"}</span>
+                                  </div>
+                                  {item.ubicacionTecnica && (
+                                    <div className="flex items-center gap-2">
+                                      <MapPin size={12} className="text-slate-400 shrink-0" />
+                                      <span className="text-[10px] md:text-xs text-slate-600 truncate">{item.ubicacionTecnica}</span>
+                                    </div>
+                                  )}
+                                </div>
 
-                                  switch (key) {
-                                    case "numeroAviso":
-                                      return (
-                                        <div key={key} className="flex items-center gap-2">
-                                          <FileText className="w-4 h-4 text-blue-600" />
-                                          <span className="font-bold text-slate-900 text-lg">
-                                            #{item.numeroAviso}
-                                          </span>
-                                        </div>
-                                      );
+                                <div className="flex items-center justify-between px-2.5 py-1.5 md:py-2 rounded-xl bg-slate-50 border border-slate-100 mt-2">
+                                  <div className="flex items-center gap-1.5">
+                                    <Calendar size={12} className="text-slate-500" />
+                                    <span className="text-slate-600 text-[10px] md:text-xs font-medium">
+                                      {item.fechaAtencion
+                                        ? new Date(item.fechaAtencion).toLocaleDateString("es-PE", { day: "2-digit", month: "short" })
+                                        : "Sin fecha"}
+                                    </span>
+                                  </div>
+                                  {tieneDesglose && (
+                                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[9px] md:text-[10px] font-bold border border-purple-200">
+                                      <Layers size={10} />
+                                      {item._desglose.total} OTs
+                                    </span>
+                                  )}
+                                </div>
 
-                                    case "cliente":
-                                      return (
-                                        <div key={key} className="flex items-start gap-2">
-                                          <User className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                                          <span className="text-sm text-slate-700 font-medium line-clamp-2">
-                                            {item.cliente || "Sin cliente"}
-                                          </span>
-                                        </div>
-                                      );
-
-                                    case "estado":
-                                      return (
-                                        <span
-                                          key={key}
-                                          className={`inline-flex items-center px-3 py-1.5 text-xs font-bold border-2 rounded-lg shadow-sm ${
-                                            ESTADOS_AV[estadoReal]?.badge
-                                          }`}
-                                        >
-                                          {ESTADOS_AV[estadoReal]?.label}
-                                        </span>
-                                      );
-
-                                    case "fecha":
-                                      return (
-                                        <div key={key} className="flex items-center gap-2 text-sm text-slate-600">
-                                          <Calendar className="w-4 h-4" />
-                                          <span>
-                                            {item.fechaAtencion
-                                              ? new Date(item.fechaAtencion).toLocaleDateString("es-PE", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                })
-                                              : "Sin fecha"}
-                                          </span>
-                                        </div>
-                                      );
-
-                                    case "prioridad":
-                                      return item.prioridad ? (
-                                        <div key={key} className="flex items-center gap-2">
-                                          <AlertCircle className="w-4 h-4 text-slate-400" />
-                                          <span
-                                            className={`text-xs font-bold px-2.5 py-1 rounded-lg border-2 ${getPriorityColor(
-                                              item.prioridad
-                                            )}`}
-                                          >
-                                            {item.prioridad}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "solicitante":
-                                      return item.solicitante ? (
-                                        <div key={key} className="text-xs text-slate-600 flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
-                                          <User className="w-3 h-3 flex-shrink-0" />
-                                          <span className="truncate">{item.solicitante}</span>
-                                        </div>
-                                      ) : null;
-
-                                    case "tipoMantenimiento":
-                                      return item.tipoMantenimiento ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <Wrench className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                          <span className="text-xs text-slate-700 font-medium truncate">
-                                            {item.tipoMantenimiento}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "tipoAviso":
-                                      return (
-                                        <div key={key} className="flex items-center gap-1">
-                                          <span
-                                            className={`text-xs font-bold px-2.5 py-1 rounded-lg border-2 flex-shrink-0 ${
-                                              item.tipoAviso === "mantenimiento"
-                                                ? "bg-blue-50 text-blue-700 border-blue-300"
-                                                : "bg-green-50 text-green-700 border-green-300"
-                                            }`}
-                                          >
-                                            {item.tipoAviso === "mantenimiento" ? "🔧 Mantenimiento" : "📦 Instalación"}
-                                          </span>
-                                        </div>
-                                      );
-
-                                    case "equipo":
-                                      if (!item.equiposRelacion || item.equiposRelacion.length === 0) return null;
-                                      
-                                      const primerEquipoRel = item.equiposRelacion[0];
-                                      const primerEquipo = primerEquipoRel?.equipo;
-                                      
-                                      return primerEquipo ? (
-                                        <div key={key} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1.5 rounded-lg">
-                                          <Package className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                                          <span className="text-xs text-slate-700 font-medium line-clamp-1">
-                                            {primerEquipo.nombre}
-                                          </span>
-                                          {item.equiposRelacion.length > 1 && (
-                                            <span className="text-xs text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded-full ml-auto font-bold flex-shrink-0">
-                                              +{item.equiposRelacion.length - 1}
-                                            </span>
-                                          )}
-                                        </div>
-                                      ) : null;
-
-                                    case "ordenVenta":
-                                      return item.ordenVenta ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <Briefcase className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                          <span className="text-xs text-slate-600 truncate">
-                                            <span className="font-bold">OV:</span> {item.ordenVenta}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "centroCosto":
-                                      return item.centroCosto ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <DollarSign className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                          <span className="text-xs text-slate-600 truncate">
-                                            <span className="font-bold">CC:</span> {item.centroCosto}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "producto":
-                                      return item.producto ? (
-                                        <div key={key} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
-                                          <Package className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                          <span className="text-xs text-slate-700 line-clamp-1">
-                                            {item.producto}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "descripcionResumida":
-                                      return item.descripcionResumida ? (
-                                        <div key={key} className="text-sm text-slate-700 line-clamp-2 italic border-l-4 border-blue-400 pl-3 py-1 bg-blue-50 rounded-r">
-                                          {item.descripcionResumida}
-                                        </div>
-                                      ) : null;
-
-                                    case "ubicacionTecnica":
-                                      return item.ubicacionTecnica ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                          <span className="text-xs text-slate-600 line-clamp-1">
-                                            {item.ubicacionTecnica}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "nombreContacto":
-                                      return item.nombreContacto ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <User className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                          <span className="text-xs text-slate-600 truncate">
-                                            {item.nombreContacto}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "correoContacto":
-                                      return item.correoContacto ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                          <span className="text-xs text-slate-600 truncate">
-                                            {item.correoContacto}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "numeroContacto":
-                                      return item.numeroContacto ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                          <span className="text-xs text-slate-600 truncate">
-                                            {item.numeroContacto}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    default:
-                                      return item[key] ? (
-                                        <div key={key} className="text-xs text-slate-600 truncate">
-                                          {item[key]}
-                                        </div>
-                                      ) : null;
-                                  }
-                                })}
-
-                                {/* DESGLOSE DE ESTADOS INTACTO */}
-                                <DesgloseEstados desglose={item._desglose} />
-
-                                {/* BADGE DE ORDEN PARCIAL con barra de progreso */}
                                 {esParcial && (
-                                  <div className="pt-3 border-t border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 -mx-4 -mb-4 px-4 pb-3 rounded-b-xl mt-auto">
-                                    <div className="flex items-center justify-between mb-2 gap-2">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0" />
-                                        <span className="text-[11px] sm:text-xs font-bold text-orange-800 truncate">
-                                          Orden de Trabajo Parcial
-                                        </span>
-                                      </div>
-                                      <span className="px-2 py-1 bg-orange-200 text-orange-800 rounded-full text-xs font-bold whitespace-nowrap">
-                                        {item._equiposPendientes} pdtes.
+                                  <div className="space-y-1 mt-2">
+                                    <div className="flex items-center justify-between text-[9px] md:text-[10px] text-orange-600 font-bold">
+                                      <span className="flex items-center gap-1">
+                                        <AlertTriangle size={10} /> OT Parcial
                                       </span>
+                                      <span>{item._desglose?.equiposConOT || 0}/{item._desglose?.equiposTotales || 0}</span>
                                     </div>
-                                    <div className="w-full bg-orange-200 rounded-full h-2 overflow-hidden">
+                                    <div className="h-1 bg-orange-100 rounded-full overflow-hidden">
                                       <div 
-                                        className="bg-orange-600 h-full rounded-full transition-all duration-300"
-                                        style={{ 
-                                          width: `${((item._desglose?.equiposConOT || 0) / (item._desglose?.equiposTotales || 1)) * 100}%` 
-                                        }}
+                                        className="h-full bg-orange-500 rounded-full transition-all"
+                                        style={{ width: `${((item._desglose?.equiposConOT || 0) / (item._desglose?.equiposTotales || 1)) * 100}%` }}
                                       />
-                                    </div>
-                                    <div className="text-xs text-orange-700 mt-1 text-center font-medium">
-                                      {item._desglose?.equiposConOT || 0} de {item._desglose?.equiposTotales || 0} equipos con OT
                                     </div>
                                   </div>
                                 )}
                               </div>
 
-                              {/* BOTONES DE ACCIÓN: flex-wrap añadido para evitar que colapsen en pantallas chicas */}
-                              <div
-                                className="px-4 pb-4 flex flex-wrap sm:flex-nowrap gap-2 flex-shrink-0"
-                                onClick={(e) => e.stopPropagation()}
-                              >
+                              <div className="px-3 md:px-3.5 pb-3 md:pb-3.5 flex flex-wrap sm:flex-nowrap gap-2" onClick={(e) => e.stopPropagation()}>
                                 {estadoReal === "CREADO" && (
-                                  <>
-                                    <button
-                                      onClick={() => abrirTratamiento(item)}
-                                      className="flex-1 min-w-[120px] px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs font-bold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
-                                    >
-                                      <Wrench className="w-4 h-4" />
-                                      Tratar
-                                    </button>
-
-                                    <button
-                                      onClick={() => cambiarEstado(item, "RECHAZADO")}
-                                      className="flex-1 min-w-[120px] px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
-                                    >
-                                      <XCircle className="w-4 h-4" />
-                                      Rechazar
-                                    </button>
-                                  </>
+                                  <button onClick={() => abrirTratamiento(item)} className="flex-1 py-1.5 md:py-2 bg-blue-50 text-blue-600 border border-blue-200 text-[10px] md:text-[11px] font-bold rounded-lg hover:bg-blue-600 hover:text-white transition-colors">
+                                    Tratar
+                                  </button>
                                 )}
-
                                 {estadoReal === "TRATADO" && (
-                                  <button
-                                    onClick={() => cambiarEstado(item, "CON_OT")}
-                                    className="w-full px-4 py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-bold rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
-                                  >
-                                    <FileText className="w-4 h-4" />
+                                  <button onClick={() => cambiarEstado(item, "CON_OT")} className="flex-1 py-1.5 md:py-2 bg-purple-50 text-purple-600 border border-purple-200 text-[10px] md:text-[11px] font-bold rounded-lg hover:bg-purple-600 hover:text-white transition-colors">
                                     Generar OT
                                   </button>
                                 )}
-
                                 {estadoReal === "CON_OT" && (
-                                  <>
-                                    <button
-                                      onClick={() => cambiarEstado(item, "FINALIZADO")}
-                                      className="flex-1 min-w-[120px] px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs font-bold rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
-                                    >
-                                      <CheckCircle className="w-4 h-4" />
-                                      Finalizar
-                                    </button>
-
-                                    <button
-                                      onClick={() => cambiarEstado(item, "FINALIZADO_SIN_FACTURACION")}
-                                      className="flex-1 min-w-[120px] px-4 py-2.5 bg-gradient-to-r from-slate-500 to-slate-600 text-white text-xs font-bold rounded-lg hover:from-slate-600 hover:to-slate-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
-                                    >
-                                      <FileCheck className="w-4 h-4" />
-                                      Sin Fact.
-                                    </button>
-                                  </>
+                                  <button onClick={() => cambiarEstado(item, "FINALIZADO")} className="flex-1 py-1.5 md:py-2 bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] md:text-[11px] font-bold rounded-lg hover:bg-emerald-600 hover:text-white transition-colors">
+                                    Finalizar
+                                  </button>
                                 )}
                               </div>
                             </div>
@@ -578,14 +309,13 @@ export default function MantenimientoKanban({
 
                     {provided.placeholder}
 
-                    {/* EMPTY STATE INTACTO */}
                     {col.items.length === 0 && !snapshot.isDraggingOver && (
-                      <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                        <div className="bg-slate-100 rounded-2xl p-6 mb-4">
-                          <Package className="w-16 h-16 opacity-30" />
+                      <div className="flex flex-col items-center justify-center h-full pt-10 pb-16 opacity-60">
+                        <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-3 shadow-sm">
+                          <Package size={24} className="text-slate-300 md:w-8 md:h-8" />
                         </div>
-                        <p className="text-sm font-bold">Sin avisos</p>
-                        <p className="text-xs text-slate-400 mt-1">Esta columna está vacía</p>
+                        <p className="text-xs md:text-sm font-bold text-slate-500">Sin avisos</p>
+                        <p className="text-[10px] md:text-xs mt-1 text-slate-400">Esta columna está vacía</p>
                       </div>
                     )}
                   </div>
