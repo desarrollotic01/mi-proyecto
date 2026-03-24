@@ -5,7 +5,12 @@ import {
   Globe, Shield, FileText, ChevronDown 
 } from "lucide-react";
 
+
+
+
+//Cartas de equipos en el dashboard
 export default function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, onOpenPDF, moveCategory }) {
+  // ESCUDO PROTECTOR: Evita pantalla en blanco si el equipo viene nulo
   if (!equipo) return null;
 
   const [showMoveMenu, setShowMoveMenu] = useState(false);
@@ -28,90 +33,88 @@ export default function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, o
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all group relative flex flex-col h-full border-l-[5px] border-l-blue-500">
+    <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition-all group relative flex flex-col h-full border-l-4 border-l-blue-500">
       
-      {/* HEADER: Código + Acciones */}
-      <div className="flex justify-between items-start mb-3 gap-2">
-        <span className="text-xs font-black px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md uppercase tracking-wide border border-slate-200">
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-600 rounded uppercase tracking-tighter">
           {equipo?.codigo || "S/C"}
         </span>
-        
-        {/* ✅ MOBILE FIX: Siempre visibles en celular (opacity-100), se ocultan en PC hasta hacer hover */}
-        <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-slate-100">
-          <button onClick={() => onOpenPDF && onOpenPDF(equipo)} title="PDF" className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"><FileText size={16}/></button>
-          <button onClick={() => onCreatePlan(equipo)} title="Plan" className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md"><Wrench size={16}/></button>
-          <button onClick={() => onView(equipo)} title="Ver" className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md"><Eye size={16}/></button>
-          <button onClick={() => onEdit(equipo)} title="Editar" className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md"><Edit2 size={16}/></button>
-          <button onClick={() => onDelete(equipo?.id)} title="Borrar" className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md"><Trash2 size={16}/></button>
+        <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg p-1 shadow-sm border">
+          <button onClick={() => onOpenPDF && onOpenPDF(equipo)} title="PDF" className="p-1 text-slate-400 hover:text-indigo-600"><FileText size={14}/></button>
+          <button onClick={() => onCreatePlan(equipo)} title="Plan" className="p-1 text-slate-400 hover:text-emerald-600"><Wrench size={14}/></button>
+          <button onClick={() => onView(equipo)} title="Ver" className="p-1 text-slate-400 hover:text-blue-600"><Eye size={14}/></button>
+          <button onClick={() => onEdit(equipo)} title="Editar" className="p-1 text-slate-400 hover:text-amber-600"><Edit2 size={14}/></button>
+          <button onClick={() => onDelete(equipo?.id)} title="Borrar" className="p-1 text-slate-400 hover:text-red-600"><Trash2 size={14}/></button>
         </div>
       </div>
 
-      {/* CUERPO: Nombre y Cliente */}
-      <div className="mb-3">
-        <h4 className="text-base font-black text-slate-800 leading-tight line-clamp-2 mb-1">
+      {/* CUERPO */}
+      <div className="mb-2">
+        <h4 className="text-[13px] font-black text-slate-800 leading-tight line-clamp-1 group-hover:line-clamp-none transition-all">
           {equipo?.nombre || "Sin Nombre"}
         </h4>
-        <div className="flex items-center gap-1.5 text-slate-500">
-          <User size={12} className="text-slate-400 shrink-0" />
-          <p className="text-xs font-bold truncate">{equipo?.cliente?.razonSocial || "Sin Cliente"}</p>
+        <div className="flex items-center gap-1 mt-1 text-slate-500">
+          <User size={10} />
+          <p className="text-[10px] font-bold truncate uppercase">{equipo?.cliente?.razonSocial || "Sin Cliente"}</p>
         </div>
       </div>
 
-      {/* ✅ CAJA DE DATOS TÉCNICOS: Destacada en gris suave */}
-      <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 grid grid-cols-2 gap-x-3 gap-y-2 mb-4">
+      {/* INFO DETALLADA */}
+      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 py-2 border-y border-slate-50 mb-2">
         <div className="flex flex-col">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Marca</span>
-          <span className="text-xs font-bold text-slate-700 truncate">{equipo?.marca || "-"}</span>
+          <span className="text-[9px] font-black text-slate-400 uppercase">Marca</span>
+          <span className="text-[10px] font-bold text-slate-700 truncate">{equipo?.marca || "-"}</span>
         </div>
         <div className="flex flex-col">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Modelo</span>
-          <span className="text-xs font-bold text-slate-700 truncate">{equipo?.modelo || "-"}</span>
+          <span className="text-[9px] font-black text-slate-400 uppercase">Modelo</span>
+          <span className="text-[10px] font-bold text-slate-700 truncate">{equipo?.modelo || "-"}</span>
         </div>
         <div className="flex flex-col">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Serie</span>
-          <span className="text-xs font-mono font-bold text-blue-600 truncate">{equipo?.serie || "-"}</span>
+          <span className="text-[9px] font-black text-slate-400 uppercase">Serie</span>
+          <span className="text-[10px] font-mono font-bold text-blue-600 truncate">{equipo?.serie || "-"}</span>
         </div>
         <div className="flex flex-col">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Sede</span>
-          <span className="text-xs font-bold text-slate-700 truncate">{equipo?.sede || "-"}</span>
+          <span className="text-[9px] font-black text-slate-400 uppercase">Sede</span>
+          <span className="text-[10px] font-bold text-slate-700 truncate">{equipo?.sede || "-"}</span>
         </div>
       </div>
 
-      {/* STATUS BADGES: Más redondeados */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      {/* STATUS BADGES */}
+      <div className="flex flex-wrap gap-1 mb-2">
         {isPropiedad ? (
-          <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 font-black text-[10px] uppercase border border-amber-200 flex items-center gap-1.5 shadow-sm">
-            <RefreshCw size={12}/> {equipo?.status || "-"}
+          <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 font-black text-[9px] uppercase border border-amber-100 flex items-center gap-1">
+            <RefreshCw size={10}/> {equipo?.status || "-"}
           </span>
         ) : (
-          <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-black text-[10px] uppercase border border-blue-200 flex items-center gap-1.5 shadow-sm">
-            <Globe size={12}/> {equipo?.tipoEquipoPropiedad || "-"}
+          <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-black text-[9px] uppercase border border-blue-100 flex items-center gap-1">
+            <Globe size={10}/> {equipo?.tipoEquipoPropiedad || "-"}
           </span>
         )}
-        <span className={`px-2 py-1 rounded-lg font-black text-[10px] uppercase border shadow-sm flex items-center gap-1.5 ${
-          equipo?.estado === 'Operativo' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+        <span className={`px-1.5 py-0.5 rounded-md font-black text-[9px] uppercase border flex items-center gap-1 ${
+          equipo?.estado === 'Operativo' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'
         }`}>
-          <Shield size={12}/> {equipo?.estado || "-"}
+          <Shield size={10}/> {equipo?.estado || "-"}
         </span>
       </div>
 
-      {/* FOOTER: Botón de mover grande y fácil de tocar */}
-      <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100">
-        <div className="flex items-center gap-1.5 text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
-          <FileText size={12}/>
-          <span className="text-[10px] font-black uppercase">{equipo?.numeroOV || "-"}</span>
+      {/* FOOTER */}
+      <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-50">
+        <div className="flex items-center gap-1 text-slate-400">
+          <FileText size={10}/>
+          <span className="text-[10px] font-bold uppercase">{equipo?.numeroOV || "-"}</span>
         </div>
         
         <div className="relative">
           <button 
             onClick={() => setShowMoveMenu(!showMoveMenu)} 
-            className="flex items-center gap-1.5 text-xs font-black text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors uppercase shadow-sm active:scale-95"
+            className="flex items-center gap-1 text-[9px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors uppercase"
           >
-            Mover <ChevronDown size={14} strokeWidth={2.5}/>
+            Mover <ChevronDown size={10} strokeWidth={3}/>
           </button>
           
           {showMoveMenu && (
-            <div className="absolute bottom-full right-0 mb-2 bg-white shadow-xl border border-slate-200 rounded-xl p-1.5 z-50 min-w-[140px] animate-in fade-in slide-in-from-bottom-2">
+            <div className="absolute bottom-full right-0 mb-2 bg-white shadow-xl border border-slate-200 rounded-lg p-1 z-50 min-w-[120px]">
               <div className="fixed inset-0" onClick={() => setShowMoveMenu(false)}></div>
               {moveOptions.map(opt => (
                 <button 
@@ -120,7 +123,7 @@ export default function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, o
                     onMove(equipo, isPropiedad ? "tipoEquipoPropiedad" : "status", opt); 
                     setShowMoveMenu(false); 
                   }} 
-                  className="relative w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-2.5 transition-colors uppercase"
+                  className="relative w-full text-left px-2 py-1.5 text-[9px] font-black text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded flex items-center gap-2 transition-colors uppercase"
                 >
                   {getIcon(opt)} {opt}
                 </button>
