@@ -16,8 +16,6 @@ import {
   MapPinned,
   Eye,
   MessageSquare,
-  AlignLeft,
-  StickyNote,
 } from "lucide-react";
 
 import {
@@ -80,6 +78,9 @@ const TARGET_TYPES = {
 const INPUT_CLASS =
   "w-full min-h-[46px] border border-slate-600 rounded-xl px-6 py-2.5 text-sm bg-white text-slate-900 outline-none focus:ring-2 focus:ring-slate-200 focus:border-slate-300 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed";
 
+const READONLY_CLASS =
+  "w-full min-h-[46px] flex items-center border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-600";
+
 const ensureId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
@@ -125,6 +126,7 @@ const emptySolicitudForm = () => ({
 const normalizeSolicitudForm = (form) => {
   const f = form || emptySolicitudForm();
   const lineas = Array.isArray(f.lineas) ? f.lineas : [];
+
   return {
     ...emptySolicitudForm(),
     ...f,
@@ -152,14 +154,6 @@ const createPreventivaExtra = () => ({
   origen: "MANUAL_EXTRA",
 });
 
-/* ══════════════════════════════════════════════
-   GRID COLUMNS — definido una sola vez
-══════════════════════════════════════════════ */
-const GRID_COLS = "1fr 1fr 1fr 1.5fr 1fr 1fr 0.7fr 0.7fr 0.7fr 88px 88px 40px";
-
-/* ══════════════════════════════════════════════
-   COMPONENTE PRINCIPAL
-══════════════════════════════════════════════ */
 export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) {
   const [equipos, setEquipos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -188,7 +182,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
   const [obsModal, setObsModal] = useState({
     open: false,
-    mode: null,
+    mode: null, 
     field: "observaciones",
     targetId: null,
     idx: null,
@@ -211,7 +205,9 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
   const equiposMap = useMemo(() => {
     const map = new Map();
-    for (const e of equipos || []) map.set(String(e.id), e);
+    for (const e of equipos || []) {
+      map.set(String(e.id), e);
+    }
     return map;
   }, [equipos]);
 
@@ -220,6 +216,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
       const id = getRelEquipoId(rel);
       const equipoFull = id ? equiposMap.get(String(id)) : null;
       const equipoInfo = equipoFull || rel?.equipo || {};
+
       return {
         id: String(id),
         type: TARGET_TYPES.EQUIPO,
@@ -242,6 +239,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     const ubicacionesTargets = (aviso?.ubicacionesRelacion || []).map((rel) => {
       const id = getRelUbicacionId(rel);
       const ut = rel?.ubicacionTecnica || rel?.ubicacion || {};
+
       return {
         id: String(id),
         type: TARGET_TYPES.UBICACION,
@@ -260,8 +258,9 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     return [...equiposTargets, ...ubicacionesTargets].filter((t) => !!t.id);
   }, [aviso, equiposMap]);
 
-  const getPlanesDisponibles = (targetId) =>
-    planesPorTarget[String(targetId)] || [];
+  const getPlanesDisponibles = (targetId) => {
+    return planesPorTarget[String(targetId)] || [];
+  };
 
   const toggleCollapse = (key) =>
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -278,59 +277,115 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
   };
 
   const getActividadesFromPlan = (planSel) => {
-  const acts =
-    planSel?.actividades ||
-    planSel?.PlanMantenimientoActividades ||
-    planSel?.planMantenimientoActividades ||
-    planSel?.actividadesPlan ||
-    [];
+    return (
+      planSel?.actividades ||
+      planSel?.PlanMantenimientoActividades ||
+      planSel?.planMantenimientoActividades ||
+      planSel?.actividadesPlan ||
+      []
+    );
+  };
 
-  return [...acts].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
-};
+  const getItemsFromActividad = (act) => {
+    return (
+      act?.items ||
+      act?.PlanActividadItems ||
+      act?.plan_actividad_items ||
+      act?.actividadItems ||
+      []
+    );
+  };
 
-  const getItemsFromActividad = (act) =>
-    act?.items ||
-    act?.PlanActividadItems ||
-    act?.plan_actividad_items ||
-    act?.actividadItems ||
-    [];
-
-  const getPlanRootItems = (planSel) =>
-    planSel?.items || planSel?.planItems || planSel?.PlanItems || [];
+  const getPlanRootItems = (planSel) => {
+    return planSel?.items || planSel?.planItems || planSel?.PlanItems || [];
+  };
 
   const planItemsToLineas = (planSel) => {
     const lineas = [];
-    for (const it of getPlanRootItems(planSel)) {
-      lineas.push(normalizeLinea({ ...it, origen: "PLAN" }));
+
+    const itemsPlan = getPlanRootItems(planSel);
+    for (const it of itemsPlan) {
+      lineas.push(
+        normalizeLinea({
+          id: ensureId(),
+          itemId: it.itemId || it.id || "",
+          itemCode: it.itemCode || "",
+          description: it.description || "Recurso de plan",
+          quantity: it.quantity ?? it.cantidad ?? 1,
+          warehouseCode: it.warehouseCode || "01",
+          costingCode: it.costingCode || "",
+          projectCode: it.projectCode || "",
+          rubro: it.rubro || "",
+          rubroSapCode: it.rubroSapCode || "",
+          paqueteTrabajo: it.paqueteTrabajo || "",
+          observacion: it.observacion || "",
+          origen: "PLAN",
+        })
+      );
     }
-    for (const act of getActividadesFromPlan(planSel)) {
-      for (const it of getItemsFromActividad(act)) {
+
+    const actividades = getActividadesFromPlan(planSel);
+
+    for (const act of actividades) {
+      const items = getItemsFromActividad(act);
+
+      for (const it of items) {
         lineas.push(
           normalizeLinea({
-            ...it,
+            id: ensureId(),
+            itemId: it.itemId || it.id || "",
+            itemCode: it.itemCode || "",
             description: it.description || act.tarea || "Recurso de plan",
+            quantity: it.quantity ?? it.cantidad ?? 1,
+            warehouseCode: it.warehouseCode || "01",
+            costingCode: it.costingCode || "",
+            projectCode: it.projectCode || "",
+            rubro: it.rubro || "",
+            rubroSapCode: it.rubroSapCode || "",
+            paqueteTrabajo: it.paqueteTrabajo || "",
+            observacion: it.observacion || "",
             origen: "PLAN",
           })
         );
       }
     }
+
     const keyOf = (l) =>
-      `${(l.itemId || "").trim()}__${(l.itemCode || "").trim()}__${(l.description || "").trim()}__${(l.warehouseCode || "").trim()}__${(l.costCenter || "").trim()}__${(l.projectCode || "").trim()}__${(l.rubroSapCode || "").toString().trim()}__${(l.paqueteTrabajo || "").trim()}__${l.origen || ""}`;
+      `${(l.itemId || "").trim()}__${(l.itemCode || "").trim()}__${(
+        l.description || ""
+      ).trim()}__${(l.warehouseCode || "").trim()}__${(
+        l.costCenter || ""
+      ).trim()}__${(l.projectCode || "").trim()}__${(
+        l.rubroSapCode || ""
+      )
+        .toString()
+        .trim()}__${(l.paqueteTrabajo || "").trim()}__${l.origen || ""}`;
+
     const map = new Map();
+
     for (const l of lineas) {
       const k = keyOf(l);
-      if (!map.has(k)) map.set(k, { ...l });
-      else map.get(k).quantity += Number(l.quantity) || 0;
+
+      if (!map.has(k)) {
+        map.set(k, { ...l });
+      } else {
+        const actual = map.get(k);
+        actual.quantity += Number(l.quantity) || 0;
+      }
     }
+
     return Array.from(map.values()).filter((l) => l.itemCode || l.description);
   };
 
   const hydrateFromTratamiento = async (tratamiento) => {
     if (!tratamiento) return;
+
     setTratamientoExistente(tratamiento);
 
     const solicitudesCompraDb = tratamiento?.solicitudesCompra || [];
-    const solicitudCompraGeneralDb = solicitudesCompraDb.find((s) => s.esGeneral) || null;
+    const solicitudCompraGeneralDb =
+      solicitudesCompraDb.find((s) => s.esGeneral) || null;
+
     const solicitudesCompraPorTargetDb = {};
     for (const s of solicitudesCompraDb.filter((x) => !x.esGeneral)) {
       const key = String(s.equipo_id || s.ubicacion_tecnica_id);
@@ -339,9 +394,23 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         email: s.requester || "",
         requiredDate: s.requiredDate ? String(s.requiredDate).slice(0, 10) : "",
         comments: s.comments || "",
-        lineas: (s.lineas || []).map((l) => normalizeLinea({ ...l, costCenter: l.costingCode })),
+        lineas: (s.lineas || []).map((l) =>
+          normalizeLinea({
+            itemId: l.itemId,
+            itemCode: l.itemCode,
+            description: l.description,
+            quantity: l.quantity,
+            warehouseCode: l.warehouseCode,
+            costCenter: l.costingCode,
+            projectCode: l.projectCode,
+            rubro: l.rubro,
+            rubroSapCode: l.rubroSapCode,
+            paqueteTrabajo: l.paqueteTrabajo,
+          })
+        ),
       });
     }
+
     setSolicitudesCompra({
       solicitudGeneral: normalizeSolicitudForm(
         solicitudCompraGeneralDb
@@ -353,7 +422,18 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                 : "",
               comments: solicitudCompraGeneralDb.comments || "",
               lineas: (solicitudCompraGeneralDb.lineas || []).map((l) =>
-                normalizeLinea({ ...l, costCenter: l.costingCode })
+                normalizeLinea({
+                  itemId: l.itemId,
+                  itemCode: l.itemCode,
+                  description: l.description,
+                  quantity: l.quantity,
+                  warehouseCode: l.warehouseCode,
+                  costCenter: l.costingCode,
+                  projectCode: l.projectCode,
+                  rubro: l.rubro,
+                  rubroSapCode: l.rubroSapCode,
+                  paqueteTrabajo: l.paqueteTrabajo,
+                })
               ),
             }
           : emptySolicitudForm()
@@ -362,7 +442,9 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     });
 
     const solicitudesAlmacenDb = tratamiento?.solicitudesAlmacen || [];
-    const solicitudAlmacenGeneralDb = solicitudesAlmacenDb.find((s) => s.esGeneral) || null;
+    const solicitudAlmacenGeneralDb =
+      solicitudesAlmacenDb.find((s) => s.esGeneral) || null;
+
     const solicitudesAlmacenPorTargetDb = {};
     for (const s of solicitudesAlmacenDb.filter((x) => !x.esGeneral)) {
       const key = String(s.equipo_id || s.ubicacion_tecnica_id);
@@ -371,9 +453,23 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         email: s.requester || "",
         requiredDate: s.requiredDate ? String(s.requiredDate).slice(0, 10) : "",
         comments: s.comments || "",
-        lineas: (s.lineas || []).map((l) => normalizeLinea({ ...l, costCenter: l.costingCode })),
+        lineas: (s.lineas || []).map((l) =>
+          normalizeLinea({
+            itemId: l.itemId,
+            itemCode: l.itemCode,
+            description: l.description,
+            quantity: l.quantity,
+            warehouseCode: l.warehouseCode,
+            costCenter: l.costingCode,
+            projectCode: l.projectCode,
+            rubro: l.rubro,
+            rubroSapCode: l.rubroSapCode,
+            paqueteTrabajo: l.paqueteTrabajo,
+          })
+        ),
       });
     }
+
     setSolicitudesAlmacen({
       solicitudGeneral: normalizeSolicitudForm(
         solicitudAlmacenGeneralDb
@@ -385,7 +481,18 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                 : "",
               comments: solicitudAlmacenGeneralDb.comments || "",
               lineas: (solicitudAlmacenGeneralDb.lineas || []).map((l) =>
-                normalizeLinea({ ...l, costCenter: l.costingCode })
+                normalizeLinea({
+                  itemId: l.itemId,
+                  itemCode: l.itemCode,
+                  description: l.description,
+                  quantity: l.quantity,
+                  warehouseCode: l.warehouseCode,
+                  costCenter: l.costingCode,
+                  projectCode: l.projectCode,
+                  rubro: l.rubro,
+                  rubroSapCode: l.rubroSapCode,
+                  paqueteTrabajo: l.paqueteTrabajo,
+                })
               ),
             }
           : emptySolicitudForm()
@@ -400,6 +507,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     for (const te of tratamiento?.equipos || []) {
       const targetId = String(te.equipoId || te.ubicacionTecnicaId);
       const acts = te.actividades || [];
+
       if (te.planMantenimientoId) {
         planesSeleccionados[targetId] = te.planMantenimientoId;
         preventivoPorEquipo[targetId] = {
@@ -408,11 +516,10 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
           codigoPlan: te.planMantenimiento?.codigoPlan || "",
           actividades: acts.map((a) => ({
             idLocal: a.id || ensureId(),
-            planMantenimientoActividadId:
-              a.origen === "PLAN" && a.planMantenimientoActividadId
-                ? String(a.planMantenimientoActividadId).trim()
-                : null,
-            codigoActividad: a.codigoActividad || null,
+planMantenimientoActividadId:
+  a.origen === "PLAN" && a.planMantenimientoActividadId
+    ? String(a.planMantenimientoActividadId).trim()
+    : null,            codigoActividad: a.codigoActividad || null,
             sistema: a.sistema || "",
             subsistema: a.subsistema || "",
             componente: a.componente || "",
@@ -448,12 +555,18 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
       }
     }
 
-    setData({ actividadesManuales, planesSeleccionados, preventivoPorEquipo });
+    setData({
+      actividadesManuales,
+      planesSeleccionados,
+      preventivoPorEquipo,
+    });
   };
 
   useEffect(() => {
     if (!isOpen || !aviso) return;
+
     let active = true;
+
     const load = async () => {
       setErrorMsg("");
       setSolicitudesCompra(null);
@@ -461,7 +574,12 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
       setCollapsed({});
       setTratamientoExistente(null);
       setPlanesPorTarget({});
-      setData({ actividadesManuales: {}, planesSeleccionados: {}, preventivoPorEquipo: {} });
+      setData({
+        actividadesManuales: {},
+        planesSeleccionados: {},
+        preventivoPorEquipo: {},
+      });
+
       try {
         const eData = await equipoService.getEquipos();
         if (!active) return;
@@ -471,88 +589,151 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         setEquipos([]);
       }
     };
+
     load();
-    return () => { active = false; };
+
+    return () => {
+      active = false;
+    };
   }, [isOpen, aviso?.id]);
 
   useEffect(() => {
     if (!isOpen || !aviso || !targets.length) return;
+
     let active = true;
+
     const cargarPlanesPorTarget = async () => {
       setLoadingPlanes(true);
+
       try {
         const resultados = await Promise.all(
           targets.map(async (target) => {
             try {
               let planes = [];
+
               if (target.type === TARGET_TYPES.EQUIPO) {
                 planes = await planMantenimientoService.getPlanesByEquipo(target.id);
               } else {
-                planes = await planMantenimientoService.getPlanesByUbicacionTecnica(target.id);
+                planes =
+                  await planMantenimientoService.getPlanesByUbicacionTecnica(
+                    target.id
+                  );
               }
+
               return [String(target.id), Array.isArray(planes) ? planes : []];
-            } catch {
+            } catch (error) {
+              console.error(
+                `Error cargando planes para ${target.type} ${target.id}:`,
+                error
+              );
               return [String(target.id), []];
             }
           })
         );
+
         if (!active) return;
-        setPlanesPorTarget(Object.fromEntries(resultados));
-      } catch {
+
+        const mapa = Object.fromEntries(resultados);
+        setPlanesPorTarget(mapa);
+      } catch (error) {
+        console.error("Error cargando planes por target:", error);
         if (active) setPlanesPorTarget({});
       } finally {
         if (active) setLoadingPlanes(false);
       }
     };
+
     cargarPlanesPorTarget();
-    return () => { active = false; };
+
+    return () => {
+      active = false;
+    };
   }, [isOpen, aviso?.id, targets]);
 
   useEffect(() => {
     if (!isOpen || !aviso || targets.length === 0) return;
+
     let active = true;
+
     const loadTratamiento = async () => {
       try {
         const tratamiento = await getTratamientoByAviso(aviso.id);
         if (!active) return;
-        if (tratamiento?.id) await hydrateFromTratamiento(tratamiento);
-        else setTratamientoExistente(null);
+        if (tratamiento?.id) {
+          await hydrateFromTratamiento(tratamiento);
+        } else {
+          setTratamientoExistente(null);
+        }
       } catch {
         if (!active) return;
         setTratamientoExistente(null);
       }
     };
+
     loadTratamiento();
-    return () => { active = false; };
+
+    return () => {
+      active = false;
+    };
   }, [isOpen, aviso?.id, targets.length]);
 
-  const abrirModalCampo = (targetId, idx, act, mode, field) => {
-    const label = field === "descripcion" ? "Descripción" : "Observación";
-    setObsModal({
-      open: true,
-      mode,
-      field,
-      targetId,
-      idx,
-      value: act?.[field] || "",
-      title: `${label} — Actividad #${idx + 1}`,
-    });
-  };
+ const abrirModalCampo = (targetId, idx, act, mode, field) => {
+  const label = field === "descripcion" ? "Descripción" : "Observación";
 
-  const guardarModalCampo = () => {
-    if (!obsModal.open) return;
-    if (obsModal.mode === "correctivo") {
-      actualizarActividad(obsModal.targetId, obsModal.idx, obsModal.field, obsModal.value);
-    }
-    if (obsModal.mode === "preventivo") {
-      updatePreventivoActividad(obsModal.targetId, obsModal.idx, obsModal.field, obsModal.value);
-    }
-    setObsModal({ open: false, mode: null, field: "observaciones", targetId: null, idx: null, value: "", title: "" });
-  };
+  setObsModal({
+    open: true,
+    mode,
+    field,
+    targetId,
+    idx,
+    value: act?.[field] || "",
+    title: `${label} - Actividad #${idx + 1}`,
+  });
+};
 
-  const cerrarModalObservacion = () => {
-    setObsModal({ open: false, mode: null, field: "observaciones", targetId: null, idx: null, value: "", title: "" });
-  };
+const guardarModalCampo = () => {
+  if (!obsModal.open) return;
+
+  if (obsModal.mode === "correctivo") {
+    actualizarActividad(
+      obsModal.targetId,
+      obsModal.idx,
+      obsModal.field,
+      obsModal.value
+    );
+  }
+
+  if (obsModal.mode === "preventivo") {
+    updatePreventivoActividad(
+      obsModal.targetId,
+      obsModal.idx,
+      obsModal.field,
+      obsModal.value
+    );
+  }
+
+  setObsModal({
+    open: false,
+    mode: null,
+    field: "observaciones",
+    targetId: null,
+    idx: null,
+    value: "",
+    title: "",
+  });
+};
+
+const cerrarModalObservacion = () => {
+  setObsModal({
+    open: false,
+    mode: null,
+    field: "observaciones",
+    targetId: null,
+    idx: null,
+    value: "",
+    title: "",
+  });
+};
 
   const seleccionarPlan = async (targetId, planId) => {
     setData((prev) => ({
@@ -563,24 +744,39 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     if (!planId) {
       setSolicitudesAlmacen((prev) => {
         if (!prev) return prev;
-        const base = { ...prev, solicitudesPorEquipo: { ...(prev.solicitudesPorEquipo || {}) } };
+        const base = {
+          ...prev,
+          solicitudesPorEquipo: { ...(prev.solicitudesPorEquipo || {}) },
+        };
         const actual = base.solicitudesPorEquipo?.[targetId];
         if (!actual) return prev;
+
         return {
           ...base,
           solicitudesPorEquipo: {
             ...base.solicitudesPorEquipo,
-            [targetId]: { ...actual, lineas: (actual.lineas || []).filter((l) => l.origen !== "PLAN") },
+            [targetId]: {
+              ...actual,
+              lineas: (actual.lineas || []).filter((l) => l.origen !== "PLAN"),
+            },
           },
         };
       });
+
       setData((prev) => {
         const copyPrev = { ...(prev.preventivoPorEquipo || {}) };
         delete copyPrev[targetId];
+
         const copySel = { ...(prev.planesSeleccionados || {}) };
         delete copySel[targetId];
-        return { ...prev, planesSeleccionados: copySel, preventivoPorEquipo: copyPrev };
+
+        return {
+          ...prev,
+          planesSeleccionados: copySel,
+          preventivoPorEquipo: copyPrev,
+        };
       });
+
       return;
     }
 
@@ -593,36 +789,53 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
           solicitudGeneral: normalizeSolicitudForm(emptySolicitudForm()),
           solicitudesPorEquipo: {},
         };
+
         const actual = base.solicitudesPorEquipo?.[targetId] || {
           department: base.solicitudGeneral?.department || "",
-          email: base.solicitudGeneral?.email || base.solicitudGeneral?.requester || "",
-          requiredDate: base.solicitudGeneral?.requiredDate || new Date().toISOString().slice(0, 10),
+          email:
+            base.solicitudGeneral?.email ||
+            base.solicitudGeneral?.requester ||
+            "",
+          requiredDate:
+            base.solicitudGeneral?.requiredDate ||
+            new Date().toISOString().slice(0, 10),
           comments: "",
           lineas: [],
         };
+
         const manuales = (actual.lineas || []).filter((l) => l.origen !== "PLAN");
+
         const keyOf = (l) =>
-          `${(l.itemCode || "").trim()}__${(l.description || "").trim()}__${(l.rubro || "").trim()}__${(l.paqueteTrabajo || "").trim()}__${l.origen || ""}`;
+          `${(l.itemCode || "").trim()}__${(l.description || "").trim()}__${(
+            l.rubro || ""
+          ).trim()}__${(l.paqueteTrabajo || "").trim()}__${l.origen || ""}`;
+
         const map = new Map();
         for (const l of [...manuales, ...lineasAuto]) {
           const k = keyOf(l);
           if (!map.has(k)) map.set(k, { ...l });
           else map.get(k).quantity += Number(l.quantity) || 0;
         }
+
         return {
           ...base,
           solicitudesPorEquipo: {
             ...(base.solicitudesPorEquipo || {}),
-            [targetId]: { ...actual, lineas: Array.from(map.values()) },
+            [targetId]: {
+              ...actual,
+              lineas: Array.from(map.values()),
+            },
           },
         };
       });
 
       const actividades = getActividadesFromPlan(planSel);
+
       const editable = (actividades || []).map((a) => {
         const unidad = a?.unidadDuracion || "min";
         const valor = Number(a?.duracionEstimadaValor ?? 0);
         const planActividadId = a?.id ? String(a.id).trim() : null;
+
         return {
           idLocal: ensureId(),
           planMantenimientoActividadId: planActividadId,
@@ -663,28 +876,40 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     setData((prev) => {
       const prevEq = prev.preventivoPorEquipo?.[targetId];
       if (!prevEq) return prev;
+
       const acts = [...(prevEq.actividades || [])];
       const actual = acts[idx];
       if (!actual) return prev;
+
       const esPlan = !!actual.planMantenimientoActividadId;
+
       if (
         esPlan &&
         !["cantidadTecnicos", "duracionEstimadaValor", "unidadDuracion", "observaciones"].includes(campo)
       ) {
         return prev;
       }
+
       acts[idx] = { ...acts[idx], [campo]: valor };
+
       if (campo === "cantidadTecnicos") {
         const n = Number(valor);
-        acts[idx].cantidadTecnicos = Number.isFinite(n) ? Math.max(1, Math.floor(n)) : 1;
+        acts[idx].cantidadTecnicos = Number.isFinite(n)
+          ? Math.max(1, Math.floor(n))
+          : 1;
       }
+
       if (campo === "duracionEstimadaValor") {
         const n = Number(valor);
         acts[idx].duracionEstimadaValor = Number.isFinite(n) ? n : 0;
       }
+
       return {
         ...prev,
-        preventivoPorEquipo: { ...prev.preventivoPorEquipo, [targetId]: { ...prevEq, actividades: acts } },
+        preventivoPorEquipo: {
+          ...prev.preventivoPorEquipo,
+          [targetId]: { ...prevEq, actividades: acts },
+        },
       };
     });
   };
@@ -705,15 +930,23 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     setData((prev) => {
       const lista = [...(prev.actividadesManuales[targetId] || [])];
       lista[idx] = { ...lista[idx], [campo]: valor };
+
       if (campo === "cantidadTecnicos") {
         const n = Number(valor);
-        lista[idx].cantidadTecnicos = Number.isFinite(n) ? Math.max(1, Math.floor(n)) : 1;
+        lista[idx].cantidadTecnicos = Number.isFinite(n)
+          ? Math.max(1, Math.floor(n))
+          : 1;
       }
+
       if (campo === "duracionEstimadaValor") {
         const n = Number(valor);
         lista[idx].duracionEstimadaValor = Number.isFinite(n) ? n : 0;
       }
-      return { ...prev, actividadesManuales: { ...prev.actividadesManuales, [targetId]: lista } };
+
+      return {
+        ...prev,
+        actividadesManuales: { ...prev.actividadesManuales, [targetId]: lista },
+      };
     });
 
   const eliminarActividad = (targetId, idx) =>
@@ -721,7 +954,9 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
       ...prev,
       actividadesManuales: {
         ...prev.actividadesManuales,
-        [targetId]: (prev.actividadesManuales[targetId] || []).filter((_, i) => i !== idx),
+        [targetId]: (prev.actividadesManuales[targetId] || []).filter(
+          (_, i) => i !== idx
+        ),
       },
     }));
 
@@ -729,11 +964,15 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     setData((prev) => {
       const pack = prev.preventivoPorEquipo?.[targetId];
       if (!pack) return prev;
+
       return {
         ...prev,
         preventivoPorEquipo: {
           ...prev.preventivoPorEquipo,
-          [targetId]: { ...pack, actividades: [...(pack.actividades || []), createPreventivaExtra()] },
+          [targetId]: {
+            ...pack,
+            actividades: [...(pack.actividades || []), createPreventivaExtra()],
+          },
         },
       };
     });
@@ -743,53 +982,85 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     setData((prev) => {
       const pack = prev.preventivoPorEquipo?.[targetId];
       if (!pack) return prev;
+
       const act = pack.actividades?.[idx];
-      if (act?.planMantenimientoActividadId) return prev;
+      if (act?.planMantenimientoActividadId) {
+        return prev;
+      }
+
       return {
         ...prev,
         preventivoPorEquipo: {
           ...prev.preventivoPorEquipo,
-          [targetId]: { ...pack, actividades: (pack.actividades || []).filter((_, i) => i !== idx) },
+          [targetId]: {
+            ...pack,
+            actividades: (pack.actividades || []).filter((_, i) => i !== idx),
+          },
         },
       };
     });
   };
 
   const validateBeforeSave = () => {
-    if (!targets.length) return "El aviso no tiene equipos ni ubicaciones asociadas.";
+    if (!targets.length) {
+      return "El aviso no tiene equipos ni ubicaciones asociadas.";
+    }
+
     if (esPreventivo) {
       for (const target of targets) {
         const planId = data.planesSeleccionados?.[target.id];
-        if (!planId)
-          return `Selecciona un plan para ${target.type === TARGET_TYPES.EQUIPO ? "el equipo" : "la ubicación técnica"}: ${target.nombre}`;
+        if (!planId) {
+          return `Selecciona un plan para ${
+            target.type === TARGET_TYPES.EQUIPO ? "el equipo" : "la ubicación técnica"
+          }: ${target.nombre}`;
+        }
+
         const acts = data.preventivoPorEquipo?.[target.id]?.actividades || [];
-        if (!acts.length) return `No se cargaron actividades del plan para ${target.nombre}.`;
+        if (!acts.length) {
+          return `No se cargaron actividades del plan para ${target.nombre}.`;
+        }
+
         for (const [i, a] of acts.entries()) {
-          if (!a.tarea || !String(a.tarea).trim()) return `${target.nombre}: actividad #${i + 1} sin tarea.`;
-          if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0)
+          if (!a.tarea || !String(a.tarea).trim()) {
+            return `${target.nombre}: actividad #${i + 1} sin tarea.`;
+          }
+          if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0) {
             return `${target.nombre}: actividad #${i + 1} cantidadTecnicos inválida.`;
+          }
         }
       }
     }
+
     if (esCorrectivo) {
       for (const target of targets) {
         const acts = data.actividadesManuales?.[target.id] || [];
-        if (acts.length === 0) return `${target.nombre}: agrega al menos 1 actividad.`;
+        if (acts.length === 0) {
+          return `${target.nombre}: agrega al menos 1 actividad.`;
+        }
+
         for (const [idx, a] of acts.entries()) {
-          if (!a.tarea || !String(a.tarea).trim()) return `${target.nombre}: actividad #${idx + 1} sin tarea.`;
-          if (a.tipoTrabajo && !TIPOS_TRABAJO_CORRECTIVO.includes(a.tipoTrabajo))
+          if (!a.tarea || !String(a.tarea).trim()) {
+            return `${target.nombre}: actividad #${idx + 1} sin tarea.`;
+          }
+          if (a.tipoTrabajo && !TIPOS_TRABAJO_CORRECTIVO.includes(a.tipoTrabajo)) {
             return `${target.nombre}: tipoTrabajo inválido (solo REPARACION/CAMBIO).`;
-          if (!a.rolTecnico) return `${target.nombre}: actividad #${idx + 1} sin rolTecnico.`;
-          if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0)
+          }
+          if (!a.rolTecnico) {
+            return `${target.nombre}: actividad #${idx + 1} sin rolTecnico.`;
+          }
+          if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0) {
             return `${target.nombre}: actividad #${idx + 1} cantidadTecnicos inválida.`;
+          }
         }
       }
     }
+
     return "";
   };
 
   const buildSolicitudForBackend = (form) => {
     const f = normalizeSolicitudForm(form);
+
     return {
       department: f.department || "",
       requester: f.email?.trim() || "",
@@ -815,16 +1086,22 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
   const buildSolicitudesPorEquipoForBackend = (obj = {}) => {
     const result = {};
-    for (const [key, form] of Object.entries(obj || {})) result[key] = buildSolicitudForBackend(form);
+
+    for (const [key, form] of Object.entries(obj || {})) {
+      result[key] = buildSolicitudForBackend(form);
+    }
+
     return result;
   };
 
   const buildPayload = () => {
     const actividadesManualesNormalizadas = {};
+
     for (const [targetId, acts] of Object.entries(data.actividadesManuales || {})) {
       actividadesManualesNormalizadas[targetId] = (acts || []).map((a) => {
         const unidad = a.unidadDuracion || "min";
         const valor = Number(a.duracionEstimadaValor) || 0;
+
         return {
           sistema: a.sistema || null,
           subsistema: a.subsistema || null,
@@ -842,10 +1119,13 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         };
       });
     }
+
     const actividadesPlanEditadas = {};
+
     for (const target of targets) {
       const pack = data.preventivoPorEquipo?.[target.id];
       if (!pack?.actividades?.length) continue;
+
       actividadesPlanEditadas[target.id] = pack.actividades.map((a) => ({
         planMantenimientoActividadId: a.planMantenimientoActividadId || null,
         codigoActividad: a.codigoActividad || null,
@@ -864,37 +1144,57 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         origen: a.origen || (a.planMantenimientoActividadId ? "PLAN" : "MANUAL_EXTRA"),
       }));
     }
+
     return {
       tratamiento: {
         actividadesManuales: actividadesManualesNormalizadas,
         planesSeleccionados: data.planesSeleccionados,
         actividadesPlanEditadas,
       },
+
       solicitudCompraGeneral: solicitudesCompra?.solicitudGeneral
         ? buildSolicitudForBackend(solicitudesCompra.solicitudGeneral)
         : null,
-      solicitudesCompraPorEquipo: buildSolicitudesPorEquipoForBackend(solicitudesCompra?.solicitudesPorEquipo || {}),
+
+      solicitudesCompraPorEquipo: buildSolicitudesPorEquipoForBackend(
+        solicitudesCompra?.solicitudesPorEquipo || {}
+      ),
+
       solicitudAlmacenGeneral: solicitudesAlmacen?.solicitudGeneral
         ? buildSolicitudForBackend(solicitudesAlmacen.solicitudGeneral)
         : null,
-      solicitudesAlmacenPorEquipo: buildSolicitudesPorEquipoForBackend(solicitudesAlmacen?.solicitudesPorEquipo || {}),
+
+      solicitudesAlmacenPorEquipo: buildSolicitudesPorEquipoForBackend(
+        solicitudesAlmacen?.solicitudesPorEquipo || {}
+      ),
     };
   };
 
   const handleGuardar = async () => {
     setErrorMsg("");
     const msg = validateBeforeSave();
-    if (msg) { setErrorMsg(msg); return; }
+    if (msg) {
+      setErrorMsg(msg);
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = buildPayload();
-      if (tratamientoExistente?.id) await saveTratamientoDraft(tratamientoExistente.id, payload);
-      else await createTratamiento(aviso.id, payload);
+
+      if (tratamientoExistente?.id) {
+        await saveTratamientoDraft(tratamientoExistente.id, payload);
+      } else {
+        await createTratamiento(aviso.id, payload);
+      }
+
       onSuccess?.();
       onClose?.();
     } catch (err) {
       console.log("BACKEND ERROR:", err?.response?.data);
-      setErrorMsg(err?.response?.data?.message || err?.message || "Error guardando tratamiento.");
+      setErrorMsg(
+        err?.response?.data?.message || err?.message || "Error guardando tratamiento."
+      );
     } finally {
       setLoading(false);
     }
@@ -903,18 +1203,29 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
   const handleGuardarCambios = async () => {
     setErrorMsg("");
     const msg = validateBeforeSave();
-    if (msg) { setErrorMsg(msg); return; }
-    if (!tratamientoExistente?.id) {
-      setErrorMsg("Todavía no existe un tratamiento creado para este aviso. Primero debes guardar el tratamiento.");
+    if (msg) {
+      setErrorMsg(msg);
       return;
     }
+
+    if (!tratamientoExistente?.id) {
+      setErrorMsg(
+        "Todavía no existe un tratamiento creado para este aviso. Primero debes guardar el tratamiento."
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       await saveTratamientoDraft(tratamientoExistente.id, buildPayload());
       alert("✅ Cambios guardados como PENDIENTE.");
     } catch (err) {
       console.log("BACKEND ERROR:", err?.response?.data);
-      setErrorMsg(err?.response?.data?.message || err?.message || "Error guardando cambios (pendiente).");
+      setErrorMsg(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Error guardando cambios (pendiente)."
+      );
     } finally {
       setLoading(false);
     }
@@ -926,15 +1237,15 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     <>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex justify-center items-center p-3">
         <div className="bg-white w-[98vw] max-w-[110rem] h-[96vh] rounded-2xl shadow-2xl flex flex-col border border-slate-200">
-
-          {/* ── Header ── */}
           <div className="px-8 py-6 border-b bg-slate-50 flex justify-between items-center shrink-0">
             <div className="flex gap-4 items-center">
               <div className="p-3 bg-slate-900 rounded-xl">
                 <FileText className="text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-black text-slate-900">Tratamiento del Aviso</h2>
+                <h2 className="text-2xl font-black text-slate-900">
+                  Tratamiento del Aviso
+                </h2>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <p className="text-sm text-slate-600">Aviso #{aviso.numeroAviso}</p>
                   {aviso.tipoMantenimiento && (
@@ -950,15 +1261,20 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                 </div>
               </div>
             </div>
+
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => { setWizardStep(1); setShowAvisoView(true); }}
+                onClick={() => {
+                  setWizardStep(1);
+                  setShowAvisoView(true);
+                }}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
               >
                 <Eye className="w-4 h-4" />
                 Ver información del aviso
               </button>
+
               <button
                 onClick={onClose}
                 className="p-2 hover:bg-white rounded-xl transition-colors border border-transparent hover:border-slate-200"
@@ -968,7 +1284,6 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
             </div>
           </div>
 
-          {/* ── Body ── */}
           <div className="flex-1 overflow-y-auto px-10 py-8 space-y-8">
             {errorMsg && (
               <div className="border border-rose-200 bg-rose-50 text-rose-700 rounded-2xl p-4 text-sm font-medium">
@@ -976,22 +1291,28 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               </div>
             )}
 
-            {/* Información del aviso */}
             <Section title="Información del Aviso">
               <Grid>
                 {Object.entries(CAMPOS_AVISO).map(([key, label]) =>
                   aviso[key] ? <Info key={key} label={label} value={aviso[key]} /> : null
                 )}
               </Grid>
+
               {aviso.descripcion && (
                 <div className="mt-4">
-                  <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Descripción</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-1">
+                    Descripción
+                  </p>
                   <p className="text-sm text-slate-800">{aviso.descripcion}</p>
                 </div>
               )}
+
               {targets.length > 0 && (
                 <div className="mt-5">
-                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Objetivos Asociados</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
+                    Objetivos Asociados
+                  </p>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                     {targets.map((t) => (
                       <div
@@ -999,16 +1320,26 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                         className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl"
                       >
                         <div className="p-2 bg-slate-900 rounded-lg shrink-0">
-                          {t.type === TARGET_TYPES.EQUIPO
-                            ? <Package className="w-5 h-5 text-white" />
-                            : <MapPinned className="w-5 h-5 text-white" />}
+                          {t.type === TARGET_TYPES.EQUIPO ? (
+                            <Package className="w-5 h-5 text-white" />
+                          ) : (
+                            <MapPinned className="w-5 h-5 text-white" />
+                          )}
                         </div>
+
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-900 truncate">{t.nombre}</p>
-                          <p className="text-xs text-slate-500 font-medium truncate">
-                            {t.type === TARGET_TYPES.EQUIPO ? "Equipo" : "Ubicación técnica"} · {t.tag}
+                          <p className="font-semibold text-slate-900 truncate">
+                            {t.nombre}
                           </p>
-                          {t.ubicacion && <p className="text-xs text-slate-500">📍 {t.ubicacion}</p>}
+                          <p className="text-xs text-slate-500 font-medium truncate">
+                            {t.type === TARGET_TYPES.EQUIPO
+                              ? "Equipo"
+                              : "Ubicación técnica"}{" "}
+                            · {t.tag}
+                          </p>
+                          {t.ubicacion && (
+                            <p className="text-xs text-slate-500">📍 {t.ubicacion}</p>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1017,10 +1348,12 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               )}
             </Section>
 
-            {/* ── CORRECTIVO ── */}
             {esCorrectivo && (
               <Section title="Actividades por objetivo (Correctivo)">
-                <p className="text-sm text-slate-600">Crea actividades manuales por cada objetivo.</p>
+                <p className="text-sm text-slate-600">
+                  Crea actividades manuales por cada objetivo.
+                </p>
+
                 <div className="space-y-3">
                   {targets.map((target) => {
                     const actividades = data.actividadesManuales[target.id] || [];
@@ -1028,36 +1361,47 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                     const abierto = !collapsed[key];
 
                     return (
-                      <div key={key} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
-                        {/* Cabecera colapsable */}
+                      <div
+                        key={key}
+                        className="border border-slate-200 rounded-xl bg-white overflow-hidden"
+                      >
                         <button
                           type="button"
                           onClick={() => toggleCollapse(key)}
                           className="w-full flex items-center justify-between gap-4 px-4 py-4 bg-white hover:bg-slate-50 transition border-b border-slate-200"
                         >
                           <div className="min-w-0 text-left">
-                            <p className="font-semibold text-slate-900 truncate">{target.nombre}</p>
+                            <p className="font-semibold text-slate-900 truncate">
+                              {target.nombre}
+                            </p>
                             <p className="text-xs text-slate-500 truncate">
-                              {target.type === TARGET_TYPES.EQUIPO ? "Equipo" : "Ubicación técnica"} · {target.tag}
+                              {target.type === TARGET_TYPES.EQUIPO
+                                ? "Equipo"
+                                : "Ubicación técnica"}{" "}
+                              · {target.tag}
                             </p>
                           </div>
+
                           <div className="flex items-center gap-2">
                             <span className="text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
-                              {actividades.length} actividad{actividades.length !== 1 ? "es" : ""}
+                              {actividades.length} actividad
+                              {actividades.length !== 1 ? "es" : ""}
                             </span>
-                            {abierto
-                              ? <ChevronUp className="w-5 h-5 text-slate-500" />
-                              : <ChevronDown className="w-5 h-5 text-slate-500" />}
+
+                            {abierto ? (
+                              <ChevronUp className="w-5 h-5 text-slate-500" />
+                            ) : (
+                              <ChevronDown className="w-5 h-5 text-slate-500" />
+                            )}
                           </div>
                         </button>
 
                         {abierto && (
-                          <div className="p-4 space-y-2">
-                            {/* Toolbar */}
-                            <div className="flex items-center justify-between gap-2 mb-2">
-                              <p className="text-xs text-slate-500">
-                                Agrega y edita las actividades correctivas para este objetivo.
-                              </p>
+                          <div className="p-4 space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-xs text-slate-500">
+                                Cada actividad se edita en bloques.
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => agregarActividad(target.id)}
@@ -1068,28 +1412,31 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                               </button>
                             </div>
 
-                            {/* ── LISTA con header o estado vacío ── */}
-                            {actividades.length === 0 ? (
+                            {actividades.length === 0 && (
                               <div className="border border-dashed border-slate-300 rounded-xl p-6 text-center text-slate-500">
                                 <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                                <p className="text-sm">Aún no hay actividades. Agrega una.</p>
-                              </div>
-                            ) : (
-                              <div style={{ overflowX: "auto" }}>
-                                <ActividadesCorrectivasHeader />
-                                {actividades.map((act, idx) => (
-                                  <ActividadCorrectivaRow
-                                    key={act.idLocal || `${target.id}-${idx}`}
-                                    idx={idx}
-                                    act={act}
-                                    onChange={(campo, valor) => actualizarActividad(target.id, idx, campo, valor)}
-                                    onDelete={() => eliminarActividad(target.id, idx)}
-                                    onOpenObservacion={() => abrirModalCampo(target.id, idx, act, "correctivo", "observaciones")}
-                                    onOpenDescripcion={() => abrirModalCampo(target.id, idx, act, "correctivo", "descripcion")}
-                                  />
-                                ))}
+                                <p className="text-sm">Aún no hay actividades.</p>
                               </div>
                             )}
+
+                            {actividades.map((act, idx) => (
+                              <ActividadCorrectivaExcel
+                                key={act.idLocal || `${target.id}-${idx}`}
+                                idx={idx}
+                                act={act}
+                                onChange={(campo, valor) =>
+                                  actualizarActividad(target.id, idx, campo, valor)
+                                }
+                                onDelete={() => eliminarActividad(target.id, idx)}
+                                onOpenObservacion={() =>
+  abrirModalCampo(target.id, idx, act, "correctivo", "observaciones")
+}
+onOpenDescripcion={() =>
+  abrirModalCampo(target.id, idx, act, "correctivo", "descripcion")
+}
+                                toMinutes={toMinutes}
+                              />
+                            ))}
                           </div>
                         )}
                       </div>
@@ -1099,57 +1446,93 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               </Section>
             )}
 
-            {/* ── PREVENTIVO ── */}
             {esPreventivo && (
               <Section title="Plan por objetivo + edición de actividades">
                 <p className="text-sm text-slate-600">
-                  Selecciona un plan y luego edita las actividades. Las actividades del plan solo
-                  permiten editar tiempo, unidad y cantidad de técnicos.
+                  Selecciona un plan y luego edita las actividades. Las actividades
+                  del plan solo permiten editar tiempo, unidad y cantidad de técnicos.
                 </p>
+
                 <div className="space-y-4">
                   {targets.map((target) => {
                     const planes = getPlanesDisponibles(target.id);
                     const planIdSel = data.planesSeleccionados[target.id] || "";
                     const pack = data.preventivoPorEquipo?.[target.id];
                     const actividades = pack?.actividades || [];
+
                     const key = `prev-${target.type}-${target.id}`;
                     const abierto = !collapsed[key];
 
                     const totalMin = actividades.reduce(
-                      (acc, a) => acc + (toMinutes(a.duracionEstimadaValor, a.unidadDuracion) || 0),
+                      (acc, a) =>
+                        acc + (toMinutes(a.duracionEstimadaValor, a.unidadDuracion) || 0),
                       0
                     );
-                    const roles = [...new Set(actividades.map((a) => a.rolTecnico).filter(Boolean))];
-                    const totalTecnicos = actividades.reduce((acc, a) => acc + (Number(a.cantidadTecnicos) || 0), 0);
+
+                    const roles = [
+                      ...new Set(actividades.map((a) => a.rolTecnico).filter(Boolean)),
+                    ];
+
+                    const totalTecnicos = actividades.reduce(
+                      (acc, a) => acc + (Number(a.cantidadTecnicos) || 0),
+                      0
+                    );
+
                     const tiempoFormateado =
                       totalMin >= 60
-                        ? `${Math.floor(totalMin / 60)}h ${totalMin % 60 ? `${totalMin % 60}m` : ""}`
+                        ? `${Math.floor(totalMin / 60)}h ${
+                            totalMin % 60 ? `${totalMin % 60}m` : ""
+                          }`
                         : `${totalMin}m`;
 
                     return (
-                      <div key={key} className="border border-slate-200 rounded-xl bg-white overflow-hidden">
-                        {/* Cabecera con selector de plan */}
+                      <div
+                        key={key}
+                        className="border border-slate-200 rounded-xl bg-white overflow-hidden"
+                      >
                         <div className="p-4 border-b border-slate-200 bg-white">
                           <div className="flex items-start justify-between gap-4 flex-wrap">
                             <div className="min-w-0">
-                              <p className="font-semibold text-slate-900 truncate">{target.nombre}</p>
+                              <p className="font-semibold text-slate-900 truncate">
+                                {target.nombre}
+                              </p>
                               <p className="text-xs text-slate-500 truncate">
-                                {target.type === TARGET_TYPES.EQUIPO ? "Equipo" : "Ubicación técnica"} · {target.tag}
+                                {target.type === TARGET_TYPES.EQUIPO
+                                  ? "Equipo"
+                                  : "Ubicación técnica"}{" "}
+                                · {target.tag}
                               </p>
                               {target.ubicacion && (
                                 <p className="text-xs text-slate-500">📍 {target.ubicacion}</p>
                               )}
                             </div>
+
                             {planIdSel && (
                               <div className="flex flex-wrap gap-2">
-                                <SummaryCard icon={ClipboardList} label="Actividades" value={actividades.length} />
-                                <SummaryCard icon={Clock} label="Tiempo total" value={tiempoFormateado} />
+                                <SummaryCard
+                                  icon={ClipboardList}
+                                  label="Actividades"
+                                  value={actividades.length}
+                                />
+                                <SummaryCard
+                                  icon={Clock}
+                                  label="Tiempo total"
+                                  value={tiempoFormateado}
+                                />
                                 <SummaryCard
                                   icon={Layers}
                                   label="Roles"
-                                  value={roles.length ? roles.map((r) => r.replace(/_/g, " ")).join(", ") : "—"}
+                                  value={
+                                    roles.length
+                                      ? roles.map((r) => r.replace(/_/g, " ")).join(", ")
+                                      : "—"
+                                  }
                                 />
-                                <SummaryCard icon={CheckCircle} label="Técnicos" value={totalTecnicos} />
+                                <SummaryCard
+                                  icon={CheckCircle}
+                                  label="Técnicos"
+                                  value={totalTecnicos}
+                                />
                               </div>
                             )}
                           </div>
@@ -1167,9 +1550,13 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                                 </option>
                               ))}
                             </SelectField>
+
                             {loadingPlanes && (
-                              <p className="text-xs text-slate-500 mt-2">Cargando planes...</p>
+                              <p className="text-xs text-slate-500 mt-2">
+                                Cargando planes...
+                              </p>
                             )}
+
                             {!loadingPlanes && planes.length === 0 && (
                               <p className="text-xs text-amber-700 mt-2">
                                 Este objetivo no tiene planes asociados.
@@ -1184,6 +1571,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                                     {pack?.codigoPlan || "-"} {pack?.nombrePlan || ""}
                                   </b>
                                 </div>
+
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <button
                                     type="button"
@@ -1193,15 +1581,22 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                                     <Plus className="w-4 h-4" />
                                     Agregar actividad extra
                                   </button>
+
                                   <button
                                     type="button"
                                     onClick={() => toggleCollapse(key)}
                                     className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm text-slate-700 transition"
                                   >
                                     {abierto ? (
-                                      <><ChevronUp className="w-4 h-4" /> Ocultar actividades</>
+                                      <>
+                                        <ChevronUp className="w-4 h-4" />
+                                        Ocultar actividades
+                                      </>
                                     ) : (
-                                      <><ChevronDown className="w-4 h-4" /> Ver / Editar actividades</>
+                                      <>
+                                        <ChevronDown className="w-4 h-4" />
+                                        Ver / Editar actividades
+                                      </>
                                     )}
                                   </button>
                                 </div>
@@ -1210,30 +1605,35 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
                           </div>
                         </div>
 
-                        {/* ── LISTA PREVENTIVA con header ── */}
-                        {planIdSel && abierto && (
+                        {planIdSel && actividades.length > 0 && abierto && (
+                          <div className="p-4 space-y-4 bg-slate-50">
+                            {actividades.map((act, idx) => (
+                              <ActividadPreventivaExcel
+                                key={act.idLocal || act.planMantenimientoActividadId || idx}
+                                act={act}
+                                idx={idx}
+                                onChange={(campo, valor) =>
+                                  updatePreventivoActividad(target.id, idx, campo, valor)
+                                }
+                                onDelete={() => eliminarActividadPreventiva(target.id, idx)}
+                                onOpenObservacion={() =>
+  abrirModalCampo(target.id, idx, act, "preventivo", "observaciones")
+}
+onOpenDescripcion={() =>
+  abrirModalCampo(target.id, idx, act, "preventivo", "descripcion")
+}
+                                toMinutes={toMinutes}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {planIdSel && actividades.length === 0 && abierto && (
                           <div className="p-4 bg-slate-50">
-                            {actividades.length === 0 ? (
-                              <div className="border border-dashed border-slate-300 rounded-xl p-6 text-center text-slate-500">
-                                <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                                <p className="text-sm">No se cargaron actividades del plan.</p>
-                              </div>
-                            ) : (
-                              <div style={{ overflowX: "auto" }}>
-                                <ActividadesPreventivasHeader />
-                                {actividades.map((act, idx) => (
-                                  <ActividadPreventivaRow
-                                    key={act.idLocal || act.planMantenimientoActividadId || idx}
-                                    act={act}
-                                    idx={idx}
-                                    onChange={(campo, valor) => updatePreventivoActividad(target.id, idx, campo, valor)}
-                                    onDelete={() => eliminarActividadPreventiva(target.id, idx)}
-                                    onOpenObservacion={() => abrirModalCampo(target.id, idx, act, "preventivo", "observaciones")}
-                                    onOpenDescripcion={() => abrirModalCampo(target.id, idx, act, "preventivo", "descripcion")}
-                                  />
-                                ))}
-                              </div>
-                            )}
+                            <div className="border border-dashed border-slate-300 rounded-xl p-6 text-center text-slate-500">
+                              <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                              <p className="text-sm">No se cargaron actividades del plan.</p>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1244,7 +1644,6 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
             )}
           </div>
 
-          {/* ── Footer ── */}
           <div className="px-8 py-6 border-t bg-white flex justify-between items-center shrink-0">
             <button
               onClick={onClose}
@@ -1252,6 +1651,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
             >
               Cancelar
             </button>
+
             <div className="flex gap-3 flex-wrap justify-end">
               <button
                 onClick={() => setShowSolicitudCompra(true)}
@@ -1263,9 +1663,16 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               >
                 <ShoppingCart className="w-4 h-4" />
                 {solicitudesCompra
-                  ? `Compra cargada ✓${cantSolicitudesCompraIndividuales > 0 ? ` (+${cantSolicitudesCompraIndividuales} objetivo${cantSolicitudesCompraIndividuales > 1 ? "s" : ""})` : ""}`
+                  ? `Compra cargada ✓${
+                      cantSolicitudesCompraIndividuales > 0
+                        ? ` (+${cantSolicitudesCompraIndividuales} objetivo${
+                            cantSolicitudesCompraIndividuales > 1 ? "s" : ""
+                          })`
+                        : ""
+                    }`
                   : "Solicitud de Compra"}
               </button>
+
               <button
                 onClick={() => setShowSolicitudAlmacen(true)}
                 className={`flex items-center gap-2 px-6 py-3 border rounded-xl transition-colors ${
@@ -1276,24 +1683,36 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               >
                 <Package className="w-4 h-4" />
                 {solicitudesAlmacen
-                  ? `Solicitud de Almacén ✓${cantSolicitudesAlmacenIndividuales > 0 ? ` (+${cantSolicitudesAlmacenIndividuales} objetivo${cantSolicitudesAlmacenIndividuales > 1 ? "s" : ""})` : ""}`
+                  ? `Almacén cargado ✓${
+                      cantSolicitudesAlmacenIndividuales > 0
+                        ? ` (+${cantSolicitudesAlmacenIndividuales} objetivo${
+                            cantSolicitudesAlmacenIndividuales > 1 ? "s" : ""
+                          })`
+                        : ""
+                    }`
                   : "Solicitud de Almacén"}
               </button>
+
               <button
                 onClick={handleGuardarCambios}
                 disabled={loading}
                 className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl hover:bg-slate-800 disabled:opacity-60 transition-colors"
               >
                 <CheckCircle className="w-4 h-4" />
-                {loading ? "Guardando..." : "Guardar"}
+                {loading ? "Guardando..." : "Guardar Cambios (Pendiente)"}
               </button>
+
               <button
                 onClick={handleGuardar}
                 disabled={loading}
                 className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition-colors"
               >
                 <Save className="w-4 h-4" />
-                {loading ? "Guardando..." : tratamientoExistente?.id ? "Actualizar Tratamiento" : "Pasar a tratar"}
+                {loading
+                  ? "Guardando..."
+                  : tratamientoExistente?.id
+                  ? "Actualizar Tratamiento"
+                  : "Cambio de estado a Tratado"}
               </button>
             </div>
           </div>
@@ -1303,24 +1722,38 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
       <ModalSolicitudCompra
         isOpen={showSolicitudCompra}
         onClose={() => setShowSolicitudCompra(false)}
-        onConfirm={(result) => { setSolicitudesCompra(result); setShowSolicitudCompra(false); setErrorMsg(""); }}
+        onConfirm={(result) => {
+          setSolicitudesCompra(result);
+          setShowSolicitudCompra(false);
+          setErrorMsg("");
+        }}
         targets={targets}
         equiposRelacion={aviso?.equiposRelacion || []}
         ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
         equiposInfo={equipos}
         initialValue={solicitudesCompra}
       />
+
       <ModalSolicitudAlmacen
         isOpen={showSolicitudAlmacen}
         onClose={() => setShowSolicitudAlmacen(false)}
-        onConfirm={(result) => { setSolicitudesAlmacen(result); setShowSolicitudAlmacen(false); setErrorMsg(""); }}
+        onConfirm={(result) => {
+          setSolicitudesAlmacen(result);
+          setShowSolicitudAlmacen(false);
+          setErrorMsg("");
+        }}
         targets={targets}
         equiposRelacion={aviso?.equiposRelacion || []}
         ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
         equiposInfo={equipos}
         initialValue={solicitudesAlmacen}
       />
-      <ModalConfiguracionCampos isOpen={showConfigCampos} onClose={() => setShowConfigCampos(false)} />
+
+      <ModalConfiguracionCampos
+        isOpen={showConfigCampos}
+        onClose={() => setShowConfigCampos(false)}
+      />
+
       <ModalMantenimientoView
         isOpen={showAvisoView}
         onClose={() => setShowAvisoView(false)}
@@ -1328,287 +1761,420 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         setWizardStep={setWizardStep}
         data={aviso}
       />
+
       <ModalObservacionActividad
-        isOpen={obsModal.open}
-        title={obsModal.title}
-        field={obsModal.field}
-        value={obsModal.value}
-        onChange={(value) => setObsModal((prev) => ({ ...prev, value }))}
-        onClose={cerrarModalObservacion}
-        onSave={guardarModalCampo}
-      />
+  isOpen={obsModal.open}
+  title={obsModal.title}
+  value={obsModal.value}
+  onChange={(value) =>
+    setObsModal((prev) => ({
+      ...prev,
+      value,
+    }))
+  }
+  onClose={cerrarModalObservacion}
+  onSave={guardarModalCampo}
+/>
     </>
   );
 }
 
 /* ══════════════════════════════════════════════
-   HEADERS
+   ACTIVIDADES
 ══════════════════════════════════════════════ */
 
-function ActividadesCorrectivasHeader() {
+function ActividadCorrectivaExcel({
+  idx,
+  act,
+  onChange,
+  onDelete,
+  onOpenObservacion,
+  onOpenDescripcion,
+  toMinutes,
+}) {
+  const tieneObs = !!String(act.observaciones || "").trim();
+  const tieneDesc = !!String(act.descripcion || "").trim();
+
   return (
-    <div
-      className="grid items-center gap-1 mb-1 px-3 py-2 bg-slate-900 rounded-xl text-xs font-semibold text-slate-300 uppercase tracking-wide"
-      style={{ gridTemplateColumns: GRID_COLS }}
-    >
-      <span>Sistema</span>
-      <span>Subsistema</span>
-      <span>Componente</span>
-      <span>Tarea</span>
-      <span>Tipo trabajo</span>
-      <span>Rol técnico</span>
-      <span>Técnicos</span>
-      <span>Duración</span>
-      <span>Unidad</span>
-      <span>Desc.</span>
-      <span>Obs.</span>
-      <span />
-    </div>
+      <div className="grid grid-cols-1 md:grid-cols-1 xl:grid-cols-12 gap-1 items-end">
+
+
+<CompactField label="Sistema"> 
+        <input
+          placeholder="Sistema"
+          value={act.sistema ?? ""}
+          onChange={(e) => onChange("sistema", e.target.value)}
+          className={INPUT_CLASS}
+        />
+ </CompactField>
+
+
+<CompactField label="Subsistema">
+        <input
+          placeholder="Subsistema"
+          value={act.subsistema ?? ""}
+          onChange={(e) => onChange("subsistema", e.target.value)}
+          className={INPUT_CLASS}
+        />
+</CompactField>
+
+<CompactField label="Componente">
+        <input
+          placeholder="Componente"
+          value={act.componente ?? ""}
+          onChange={(e) => onChange("componente", e.target.value)}
+          className={INPUT_CLASS}
+        />
+</CompactField>
+
+<CompactField label="Tarea" className="xl:col-span-2">
+
+        <input
+          placeholder="Tarea"
+          value={act.tarea ?? ""}
+          onChange={(e) => onChange("tarea", e.target.value)}
+          className={INPUT_CLASS}
+        />
+</CompactField>
+
+<CompactField label="Tipo de trabajo">
+
+        <select
+          value={act.tipoTrabajo ?? "REPARACION"}
+          onChange={(e) => onChange("tipoTrabajo", e.target.value)}
+          className={INPUT_CLASS}
+        >
+          {TIPOS_TRABAJO_CORRECTIVO.map((t) => (
+            <option key={t} value={t}>
+              {t === "REPARACION" ? "Reparación" : "Cambio"}
+            </option>
+          ))}
+        </select>
+
+</CompactField>
+
+<CompactField label="Rol técnico">
+
+        <select
+          value={act.rolTecnico ?? "tecnico_mecanico"}
+          onChange={(e) => onChange("rolTecnico", e.target.value)}
+          className={INPUT_CLASS}
+        >
+          {ROLES_TECNICOS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+
+</CompactField>
+
+<CompactField label="Cantidad de técnicos">
+        <input
+          type="number"
+          placeholder="Tec"
+          value={act.cantidadTecnicos ?? ""}
+          onChange={(e) => onChange("cantidadTecnicos", Number(e.target.value))}
+          className={INPUT_CLASS}
+        />
+</CompactField>
+
+<CompactField label="Duración">
+
+        <input
+          type="number"
+          placeholder="Duración"
+          value={act.duracionEstimadaValor ?? ""}
+          onChange={(e) => onChange("duracionEstimadaValor", Number(e.target.value))}
+          className={INPUT_CLASS}
+        />
+</CompactField>
+
+<CompactField label="Unidad de duración">
+        <select
+          value={act.unidadDuracion ?? "min"}
+          onChange={(e) => onChange("unidadDuracion", e.target.value)}
+          className={INPUT_CLASS}
+        >
+          <option value="min">Min</option>
+          <option value="h">Hrs</option>
+        </select>
+
+</CompactField>
+
+
+<CompactField label="Descripción">
+
+        {/* DESCRIPCIÓN */}
+        <button
+          onClick={onOpenDescripcion}
+          className={`px-2 py-2 rounded border text-xs ${
+            tieneDesc
+              ? "bg-blue-50 border-blue-300 text-blue-700"
+              : "bg-white border-slate-200"
+          }`}
+        >
+          Descripción
+        </button>
+
+</CompactField>
+
+<CompactField label="Observación">
+
+        {/* OBSERVACIÓN */}
+        <button
+          onClick={onOpenObservacion}
+          className={`px-2 py-2 rounded border text-xs ${
+            tieneObs
+              ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+              : "bg-white border-slate-200"
+          }`}
+        >
+          Observación
+        </button>
+</CompactField>
+
+
+        <button
+          onClick={onDelete}
+          className="text-red-500 text-xs"
+        >
+          Eliminar
+        </button>
+      </div>
   );
 }
 
-function ActividadesPreventivasHeader() {
-  return (
-    <div
-      className="grid items-center gap-1 mb-1 px-3 py-2 bg-slate-900 rounded-xl text-xs font-semibold text-slate-300 uppercase tracking-wide"
-      style={{ gridTemplateColumns: GRID_COLS }}
-    >
-      <span>Sistema</span>
-      <span>Subsistema</span>
-      <span>Componente</span>
-      <span>Tarea</span>
-      <span>Tipo trabajo</span>
-      <span>Rol técnico</span>
-      <span>Técnicos</span>
-      <span>Duración</span>
-      <span>Unidad</span>
-      <span>Desc.</span>
-      <span>Obs.</span>
-      <span />
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════
-   FILA CORRECTIVA
-══════════════════════════════════════════════ */
-
-function ActividadCorrectivaRow({ idx, act, onChange, onDelete, onOpenObservacion, onOpenDescripcion }) {
-  const tieneObs  = !!String(act.observaciones || "").trim();
-  const tieneDesc = !!String(act.descripcion   || "").trim();
-
-  const inputCls =
-    "w-full px-2 py-1.5 border border-slate-200 rounded-lg bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200";
-
-  return (
-    <div
-      className="grid items-center gap-1 px-3 py-2 border border-slate-100 rounded-xl mb-1 bg-white hover:bg-slate-50 transition-colors"
-      style={{ gridTemplateColumns: GRID_COLS }}
-    >
-      <input placeholder="Sistema"    value={act.sistema    ?? ""} onChange={(e) => onChange("sistema",    e.target.value)} className={inputCls} />
-      <input placeholder="Subsistema" value={act.subsistema ?? ""} onChange={(e) => onChange("subsistema", e.target.value)} className={inputCls} />
-      <input placeholder="Componente" value={act.componente ?? ""} onChange={(e) => onChange("componente", e.target.value)} className={inputCls} />
-      <input placeholder="Tarea"      value={act.tarea      ?? ""} onChange={(e) => onChange("tarea",      e.target.value)} className={inputCls} />
-
-      <select value={act.tipoTrabajo ?? "REPARACION"} onChange={(e) => onChange("tipoTrabajo", e.target.value)} className={inputCls}>
-        {TIPOS_TRABAJO_CORRECTIVO.map((t) => (
-          <option key={t} value={t}>{t === "REPARACION" ? "Reparación" : "Cambio"}</option>
-        ))}
-      </select>
-
-      <select value={act.rolTecnico ?? "tecnico_mecanico"} onChange={(e) => onChange("rolTecnico", e.target.value)} className={inputCls}>
-        {ROLES_TECNICOS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-      </select>
-
-      <input type="number" min={1}   value={act.cantidadTecnicos    ?? ""} onChange={(e) => onChange("cantidadTecnicos",    Number(e.target.value))} className={inputCls} />
-      <input type="number" min={0}   value={act.duracionEstimadaValor ?? ""} onChange={(e) => onChange("duracionEstimadaValor", Number(e.target.value))} className={inputCls} />
-
-      <select value={act.unidadDuracion ?? "min"} onChange={(e) => onChange("unidadDuracion", e.target.value)} className={inputCls}>
-        <option value="min">Min</option>
-        <option value="h">Hrs</option>
-      </select>
-
-      {/* Botón Descripción */}
-      <button
-        onClick={onOpenDescripcion}
-        title={tieneDesc ? act.descripcion : "Sin descripción"}
-        className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-          tieneDesc
-            ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
-            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-        }`}
-      >
-        <AlignLeft className="w-3.5 h-3.5 shrink-0" />
-        {tieneDesc ? "Ver" : "—"}
-      </button>
-
-      {/* Botón Observación */}
-      <button
-        onClick={onOpenObservacion}
-        title={tieneObs ? act.observaciones : "Sin observación"}
-        className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-          tieneObs
-            ? "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
-            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-        }`}
-      >
-        <StickyNote className="w-3.5 h-3.5 shrink-0" />
-        {tieneObs ? "Ver" : "—"}
-      </button>
-
-      <button
-        onClick={onDelete}
-        className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors mx-auto"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════
-   FILA PREVENTIVA
-══════════════════════════════════════════════ */
-
-function ActividadPreventivaRow({ act, idx, onChange, onDelete, onOpenObservacion, onOpenDescripcion }) {
-  const esPlan    = !!act.planMantenimientoActividadId;
-  const tieneObs  = !!String(act.observaciones || "").trim();
-  const tieneDesc = !!String(act.descripcion   || "").trim();
+function ActividadPreventivaExcel({
+  act,
+  idx,
+  onChange,
+  onDelete,
+  onOpenObservacion,
+  onOpenDescripcion,
+}) {
+  const esPlan = !!act.planMantenimientoActividadId;
 
   const puedeEditar = (campo) => {
     if (!esPlan) return true;
+
     return ["cantidadTecnicos", "duracionEstimadaValor", "unidadDuracion", "observaciones"].includes(campo);
   };
 
-  const inputCls = (campo) =>
-    `w-full px-2 py-1.5 border rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200 transition-colors ${
-      puedeEditar(campo)
-        ? "border-slate-200 bg-white"
-        : "border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed"
-    }`;
+  const tieneObs = !!String(act.observaciones || "").trim();
+  const tieneDesc = !!String(act.descripcion || "").trim();
 
   return (
-    <div
-      className={`grid items-center gap-1 px-3 py-2 border rounded-xl mb-1 transition-colors ${
-        esPlan
-          ? "border-slate-100 bg-white hover:bg-slate-50"
-          : "border-indigo-100 bg-indigo-50/30 hover:bg-indigo-50"
-      }`}
-      style={{ gridTemplateColumns: GRID_COLS }}
-    >
-      <input value={act.sistema    ?? ""} disabled={!puedeEditar("sistema")}    onChange={(e) => onChange("sistema",    e.target.value)} className={inputCls("sistema")} />
-      <input value={act.subsistema ?? ""} disabled={!puedeEditar("subsistema")} onChange={(e) => onChange("subsistema", e.target.value)} className={inputCls("subsistema")} />
-      <input value={act.componente ?? ""} disabled={!puedeEditar("componente")} onChange={(e) => onChange("componente", e.target.value)} className={inputCls("componente")} />
-      <input value={act.tarea      ?? ""} disabled={!puedeEditar("tarea")}      onChange={(e) => onChange("tarea",      e.target.value)} className={inputCls("tarea")} />
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-2 items-end">
 
-      <select value={act.tipoTrabajo ?? "REVISION"} disabled={!puedeEditar("tipoTrabajo")} onChange={(e) => onChange("tipoTrabajo", e.target.value)} className={inputCls("tipoTrabajo")}>
-        {TIPOS_TRABAJO_PREVENTIVO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-      </select>
+<CompactField label="Sistema">
+        <input
+          value={act.sistema ?? ""}
+          disabled={!puedeEditar("sistema")}
+          onChange={(e) => onChange("sistema", e.target.value)}
+          className={INPUT_CLASS}
+        />
+</CompactField>
 
-      <select value={act.rolTecnico ?? "tecnico_mecanico"} disabled={!puedeEditar("rolTecnico")} onChange={(e) => onChange("rolTecnico", e.target.value)} className={inputCls("rolTecnico")}>
-        {ROLES_TECNICOS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-      </select>
+<CompactField label="Subsistema">
+        <input
+          value={act.subsistema ?? ""}
+          disabled={!puedeEditar("subsistema")}
+          onChange={(e) => onChange("subsistema", e.target.value)}
+          className={INPUT_CLASS}
+        />
+</CompactField>
 
-      <input type="number" min={1} value={act.cantidadTecnicos     ?? ""} disabled={!puedeEditar("cantidadTecnicos")}     onChange={(e) => onChange("cantidadTecnicos",     Number(e.target.value))} className={inputCls("cantidadTecnicos")} />
-      <input type="number" min={0} value={act.duracionEstimadaValor ?? ""} disabled={!puedeEditar("duracionEstimadaValor")} onChange={(e) => onChange("duracionEstimadaValor", Number(e.target.value))} className={inputCls("duracionEstimadaValor")} />
+<CompactField label="Componente">
+        <input
+          value={act.componente ?? ""}
+          disabled={!puedeEditar("componente")}
+          onChange={(e) => onChange("componente", e.target.value)}
+          className={INPUT_CLASS}
+        />
+</CompactField>
 
-      <select value={act.unidadDuracion ?? "min"} disabled={!puedeEditar("unidadDuracion")} onChange={(e) => onChange("unidadDuracion", e.target.value)} className={inputCls("unidadDuracion")}>
-        <option value="min">Min</option>
-        <option value="h">Hrs</option>
-      </select>
+<CompactField label="Tarea" className="xl:col-span-2" >
+        <input
+          value={act.tarea ?? ""}
+          disabled={!puedeEditar("tarea")}
+          onChange={(e) => onChange("tarea", e.target.value)}
+          className={INPUT_CLASS}
+        />
+</CompactField>
 
-      {/* Botón Descripción */}
-      <button
-        onClick={onOpenDescripcion}
-        disabled={esPlan}
-        title={tieneDesc ? act.descripcion : esPlan ? "No editable en actividades de plan" : "Sin descripción"}
-        className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-          tieneDesc
-            ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
-            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-        } ${esPlan ? "opacity-40 cursor-not-allowed" : ""}`}
-      >
-        <AlignLeft className="w-3.5 h-3.5 shrink-0" />
-        {tieneDesc ? "Ver" : "—"}
-      </button>
+<CompactField label="Tipo de trabajo">
+        <select
+          value={act.tipoTrabajo ?? "REVISION"}
+          disabled={!puedeEditar("tipoTrabajo")}
+          onChange={(e) => onChange("tipoTrabajo", e.target.value)}
+          className={INPUT_CLASS}
+        >
+          {TIPOS_TRABAJO_PREVENTIVO.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+</CompactField>
 
-      {/* Botón Observación */}
-      <button
-        onClick={onOpenObservacion}
-        title={tieneObs ? act.observaciones : "Sin observación"}
-        className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-          tieneObs
-            ? "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
-            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-        }`}
-      >
-        <StickyNote className="w-3.5 h-3.5 shrink-0" />
-        {tieneObs ? "Ver" : "—"}
-      </button>
+<CompactField label="Rol técnico">
+        <select
+          value={act.rolTecnico ?? "tecnico_mecanico"}
+          disabled={!puedeEditar("rolTecnico")}
+          onChange={(e) => onChange("rolTecnico", e.target.value)}
+          className={INPUT_CLASS}
+        >
+          {ROLES_TECNICOS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </select>
 
-      <div className="flex justify-center">
-        {!esPlan ? (
-          <button
-            onClick={onDelete}
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
+  </CompactField>
+
+
+<CompactField label="Cantidad de técnicos">
+        <input
+          type="number"
+          value={act.cantidadTecnicos ?? ""}
+          disabled={!puedeEditar("cantidadTecnicos")}
+          onChange={(e) => onChange("cantidadTecnicos", Number(e.target.value))}
+          className={INPUT_CLASS}
+        />
+
+</CompactField>
+
+<CompactField label="Duración">
+        <input
+          type="number"
+          value={act.duracionEstimadaValor ?? ""}
+          disabled={!puedeEditar("duracionEstimadaValor")}
+          onChange={(e) => onChange("duracionEstimadaValor", Number(e.target.value))}
+          className={INPUT_CLASS}
+        />
+</CompactField>
+
+<CompactField label="Unidad de duración">
+
+        <select
+          value={act.unidadDuracion ?? "min"}
+          disabled={!puedeEditar("unidadDuracion")}
+          onChange={(e) => onChange("unidadDuracion", e.target.value)}
+          className={INPUT_CLASS}
+        >
+          <option value="min">Min</option>
+          <option value="h">Hrs</option>
+        </select>
+
+</CompactField>
+
+<CompactField label="Descripción">
+        {/* DESCRIPCIÓN SOLO MANUAL */}
+        <button
+          onClick={onOpenDescripcion}
+          disabled={esPlan}
+          className={`px-2 py-2 rounded border text-xs ${
+            tieneDesc
+              ? "bg-blue-50 border-blue-300 text-blue-700"
+              : "bg-white border-slate-200"
+          } ${esPlan && "opacity-50 cursor-not-allowed"}`}
+        >
+          Descripción
+        </button>
+
+  </CompactField>
+
+<CompactField label="Observación">
+        {/* OBSERVACIÓN SIEMPRE */}
+        <button
+          onClick={onOpenObservacion}
+          className={`px-2 py-2 rounded border text-xs ${
+            tieneObs
+              ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+              : "bg-white border-slate-200"
+          }`}
+        >
+          Observación
+        </button>
+  </CompactField>
+
+          
+
+        {!esPlan && (
+          <button onClick={onDelete} className="text-red-500 text-xs">
+            Eliminar
           </button>
-        ) : (
-          <div className="w-8 h-8" />
         )}
       </div>
-    </div>
+  
   );
 }
 
 /* ══════════════════════════════════════════════
-   MODAL OBSERVACIÓN / DESCRIPCIÓN
+   MODAL OBSERVACION
 ══════════════════════════════════════════════ */
 
-function ModalObservacionActividad({ isOpen, title, field, value, onChange, onClose, onSave }) {
+function ModalObservacionActividad({
+  isOpen,
+  title,
+  value,
+  onChange,
+  onClose,
+  onSave,
+}) {
   if (!isOpen) return null;
-  const esDesc = field === "descripcion";
+
   return (
     <div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4">
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${esDesc ? "bg-blue-600" : "bg-slate-900"}`}>
-              {esDesc
-                ? <AlignLeft className="w-4 h-4 text-white" />
-                : <StickyNote className="w-4 h-4 text-white" />}
+            <div className="p-2 rounded-xl bg-slate-900">
+              <MessageSquare className="w-4 h-4 text-white" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">{title}</h3>
               <p className="text-xs text-slate-500">
-                {esDesc ? "Descripción detallada de la actividad." : "Observaciones o notas adicionales."}
+                Escribe o edita la observación de la actividad.
               </p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 transition">
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-slate-100 transition"
+          >
             <X className="w-4 h-4 text-slate-600" />
           </button>
         </div>
+
         <div className="p-5">
           <textarea
             rows={6}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder={esDesc ? "Escribe la descripción..." : "Escribe la observación..."}
-            className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm bg-white text-slate-900 outline-none focus:ring-2 focus:ring-slate-200 resize-none min-h-[140px]"
+            placeholder="Escribe la observación..."
+            className={`${INPUT_CLASS} resize-none min-h-[140px]`}
           />
         </div>
+
         <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition"
+          >
             Cancelar
           </button>
           <button
             type="button"
             onClick={onSave}
-            className={`px-4 py-2 rounded-xl text-white transition ${esDesc ? "bg-blue-600 hover:bg-blue-700" : "bg-slate-900 hover:bg-slate-800"}`}
+            className="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition"
           >
-            {esDesc ? "Guardar descripción" : "Guardar observación"}
+            Guardar observación
           </button>
         </div>
       </div>
@@ -1620,6 +2186,17 @@ function ModalObservacionActividad({ isOpen, title, field, value, onChange, onCl
    UI HELPERS
 ══════════════════════════════════════════════ */
 
+function CompactField({ label, children, className = "" }) {
+  return (
+    <div className={className}>
+      <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 function SummaryCard({ label, value, icon: Icon }) {
   return (
     <div className="border border-slate-200 rounded-xl bg-slate-50 px-3 py-2.5 min-w-[150px]">
@@ -1627,7 +2204,9 @@ function SummaryCard({ label, value, icon: Icon }) {
         {Icon ? <Icon className="w-3.5 h-3.5" /> : null}
         <span>{label}</span>
       </div>
-      <div className="mt-1 text-sm font-semibold text-slate-900 break-words">{value}</div>
+      <div className="mt-1 text-sm font-semibold text-slate-900 break-words">
+        {value}
+      </div>
     </div>
   );
 }
@@ -1643,7 +2222,9 @@ function Section({ title, children }) {
 
 function Grid({ children }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-2">{children}</div>
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-2">
+      {children}
+    </div>
   );
 }
 
@@ -1656,10 +2237,21 @@ function Info({ label, value }) {
   );
 }
 
+function Badge({ text, icon: Icon }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-700">
+      {Icon ? <Icon className="w-3 h-3" /> : null}
+      {String(text || "").replace(/_/g, " ")}
+    </span>
+  );
+}
+
 function BaseField({ label, children }) {
   return (
     <div className="w-full">
-      <label className="block text-xs font-semibold text-slate-500 mb-1">{label}</label>
+      <label className="block text-xs font-semibold text-slate-500 mb-1">
+        {label}
+      </label>
       {children}
     </div>
   );
