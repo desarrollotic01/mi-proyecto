@@ -35,7 +35,7 @@ export const getSolicitudesTratamientoPorOrdenTrabajo = (ordenId) =>
 
 export const updateOrdenTrabajoCompleta = async (id, data) => {
   try {
-    const response = await api.patch(`/ordentrabajo/${id}/completa`, data);
+    const response = await api.patch(`/orden-trabajo/${id}/completa`, data);
     return response.data;
   } catch (error) {
     console.error("Error al actualizar orden de trabajo completa:", error);
