@@ -20,7 +20,8 @@ export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit
   const equiposSeguros = Array.isArray(equipos) ? equipos : [];
 
   return (
-    <div className="flex flex-col flex-1 min-w-0 w-full rounded-2xl border border-slate-200 bg-white overflow-hidden ...">
+    <div className="flex flex-col rounded-2xl border border-slate-200 bg-white overflow-hidden
+      shrink-0 w-[85vw] md:w-[320px] lg:flex-1 lg:w-auto lg:min-w-0 snap-center">
    {/* Contenido de la columna */}
       <div className={`${bgHeader} rounded-t-[1rem] p-3.5 flex items-center justify-between shadow-sm`}>
         <div className="flex items-center gap-2.5">
