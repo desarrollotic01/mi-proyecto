@@ -325,7 +325,7 @@ export default function PlanMantenimientoExcelPage() {
       {/* TOPBAR */}
       <div className="flex-none flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shadow-sm">
         <div>
-          <h1 className="text-sm font-extrabold text-gray-900 tracking-tight">Planes de Mantenimiento  - Prueba</h1>
+          <h1 className="text-sm font-extrabold text-gray-900 tracking-tight">Planes de Mantenimiento</h1>
           <p className="text-[11px] text-gray-400 mt-0.5">
             <span className="font-semibold text-gray-700">{planesFiltrados.length}</span> planes ·{" "}
             <span className="font-semibold text-gray-700">{totalActs}</span> actividades

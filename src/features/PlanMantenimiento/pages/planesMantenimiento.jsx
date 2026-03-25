@@ -107,7 +107,7 @@ export default function PlanesMantenimiento() {
                 <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl shadow-lg">
                   <Wrench className="text-white" size={28} />
                 </div>
-                Planes de Mantenimiento Arriba
+                Planes de Mantenimiento
               </h1>
               <p className="text-slate-600 ml-16">Gestiona y organiza tus planes de mantenimiento</p>
             </div>
