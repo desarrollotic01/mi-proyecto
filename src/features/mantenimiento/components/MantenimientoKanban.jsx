@@ -1,3 +1,5 @@
+
+
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { 
   FileText, User, Calendar, AlertCircle, Wrench, Package, 
@@ -5,11 +7,12 @@ import {
   Briefcase, DollarSign, Layers, Link2, AlertTriangle
 } from "lucide-react";
 import { ESTADOS_AV } from "../config/camposMantenimiento";
+import React, { useMemo } from "react";
 
 export default function MantenimientoKanban({
   filteredColumns,
   cardFields,
-  columnOrder,
+  columnOrder,  
   setViewData,
   setViewStep,
   setViewOpen,
@@ -199,6 +202,7 @@ const reorganizarColumnasPorOTs = (columns) => {
         {Object.entries(columnasReorganizadas).map(([colId, col]) => {
           const Icon = getColumnIcon(colId);
           const gradient = getColumnColor(colId);
+          
           
           return (
             <Droppable droppableId={colId} key={colId}>
@@ -468,12 +472,20 @@ const reorganizarColumnasPorOTs = (columns) => {
                                         </div>
                                       ) : null;
 
-                                    default:
-                                      return item[key] ? (
-                                        <div key={key} className="text-xs text-slate-600">
-                                          {item[key]}
-                                        </div>
-                                      ) : null;
+                                  default: {
+  if (!item[key]) return null;
+  
+  // Si el valor es un objeto/arreglo, lo convierte a texto para que no rompa React
+  const contenido = typeof item[key] === 'object' 
+    ? JSON.stringify(item[key]) 
+    : item[key];
+
+  return (
+    <div key={key} className="text-xs text-slate-600 truncate">
+      {contenido}
+    </div>
+  );
+}
                                   }
                                 })}
 
