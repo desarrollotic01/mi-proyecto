@@ -203,7 +203,6 @@ const reorganizarColumnasPorOTs = (columns) => {
           const Icon = getColumnIcon(colId);
           const gradient = getColumnColor(colId);
           
-          
           return (
             <Droppable droppableId={colId} key={colId}>
               {(provided, snapshot) => (
