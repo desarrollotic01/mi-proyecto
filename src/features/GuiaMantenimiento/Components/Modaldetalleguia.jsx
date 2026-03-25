@@ -5,19 +5,19 @@ import {
 } from "lucide-react";
 
 const PROG_ESTADO_CFG = {
-  PENDIENTE:  { badge: "bg-yellow-500/20 text-yellow-300 border-yellow-500/40", dot: "bg-yellow-500" },
-  EJECUTADO:  { badge: "bg-green-500/20 text-green-300 border-green-500/40",   dot: "bg-green-500" },
-  CANCELADO:  { badge: "bg-red-500/20 text-red-300 border-red-500/40",         dot: "bg-red-500" },
+  PENDIENTE: { badge: "bg-yellow-500/20 text-yellow-300 border-yellow-500/40", dot: "bg-yellow-500" },
+  EJECUTADO: { badge: "bg-green-500/20 text-green-300 border-green-500/40", dot: "bg-green-500" },
+  CANCELADO: { badge: "bg-red-500/20 text-red-300 border-red-500/40", dot: "bg-red-500" },
 };
 
 const URGENCIA_HEADER = {
-  vencido:    { bg: "from-red-900/80 to-red-800/60",     icon: AlertTriangle, text: "text-red-300", pulse: true },
-  critico:    { bg: "from-orange-900/80 to-orange-800/60", icon: Bell,        text: "text-orange-300", pulse: true },
-  urgente:    { bg: "from-yellow-900/60 to-yellow-800/40", icon: Clock,       text: "text-yellow-300", pulse: false },
-  proximo:    { bg: "from-blue-900/50 to-slate-800/80",  icon: CalendarClock, text: "text-blue-300", pulse: false },
-  normal:     { bg: "from-slate-800/80 to-slate-900/80", icon: CalendarClock, text: "text-slate-400", pulse: false },
-  completado: { bg: "from-green-900/50 to-slate-800/80", icon: CheckCircle2,  text: "text-green-300", pulse: false },
-  sin_fecha:  { bg: "from-slate-800/80 to-slate-900/80", icon: Hash,          text: "text-slate-500", pulse: false },
+  vencido: { bg: "from-red-900/80 to-red-800/60", icon: AlertTriangle, text: "text-red-300", pulse: true },
+  critico: { bg: "from-orange-900/80 to-orange-800/60", icon: Bell, text: "text-orange-300", pulse: true },
+  urgente: { bg: "from-yellow-900/60 to-yellow-800/40", icon: Clock, text: "text-yellow-300", pulse: false },
+  proximo: { bg: "from-blue-900/50 to-slate-800/80", icon: CalendarClock, text: "text-blue-300", pulse: false },
+  normal: { bg: "from-slate-800/80 to-slate-900/80", icon: CalendarClock, text: "text-slate-400", pulse: false },
+  completado: { bg: "from-green-900/50 to-slate-800/80", icon: CheckCircle2, text: "text-green-300", pulse: false },
+  sin_fecha: { bg: "from-slate-800/80 to-slate-900/80", icon: Hash, text: "text-slate-500", pulse: false },
 };
 
 export default function ModalDetalleGuia({ guia, onClose, onEjecutar, onCancelar, calcularUrgencia }) {
@@ -65,11 +65,10 @@ export default function ModalDetalleGuia({ guia, onClose, onEjecutar, onCancelar
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <span className="text-slate-400 text-sm font-mono">{guia.numeroAlerta || "—"}</span>
                   {guia.creticidad && (
-                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                      guia.creticidad === "A" ? "bg-red-500/20 text-red-300 border-red-500/40" :
+                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${guia.creticidad === "A" ? "bg-red-500/20 text-red-300 border-red-500/40" :
                       guia.creticidad === "B" ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/40" :
-                      "bg-slate-700/50 text-slate-400 border-slate-600"
-                    }`}>
+                        "bg-slate-700/50 text-slate-400 border-slate-600"
+                      }`}>
                       creticidad {guia.creticidad}
                     </span>
                   )}
@@ -108,8 +107,8 @@ export default function ModalDetalleGuia({ guia, onClose, onEjecutar, onCancelar
                     {urgencia.diasRestantes < 0
                       ? `Vencida hace ${Math.abs(urgencia.diasRestantes)} día${Math.abs(urgencia.diasRestantes) !== 1 ? "s" : ""}`
                       : urgencia.diasRestantes === 0
-                      ? "¡Vence HOY!"
-                      : `Faltan ${urgencia.diasRestantes} día${urgencia.diasRestantes !== 1 ? "s" : ""}`}
+                        ? "¡Vence HOY!"
+                        : `Faltan ${urgencia.diasRestantes} día${urgencia.diasRestantes !== 1 ? "s" : ""}`}
                   </p>
                 )}
               </div>
@@ -270,13 +269,12 @@ export default function ModalDetalleGuia({ guia, onClose, onEjecutar, onCancelar
                     return (
                       <div
                         key={prog.id}
-                        className={`flex items-center gap-3 p-3.5 rounded-xl border ${
-                          esVencida
-                            ? "bg-red-950/30 border-red-500/40"
-                            : esPendiente && diasRestantes !== null && diasRestantes <= 3
+                        className={`flex items-center gap-3 p-3.5 rounded-xl border ${esVencida
+                          ? "bg-red-950/30 border-red-500/40"
+                          : esPendiente && diasRestantes !== null && diasRestantes <= 3
                             ? "bg-orange-950/20 border-orange-500/30"
                             : "bg-slate-800/60 border-slate-700/50"
-                        }`}
+                          }`}
                       >
                         <span className="text-slate-600 text-xs font-mono w-6 shrink-0">{idx + 1}</span>
                         <div className={`w-2 h-2 rounded-full shrink-0 ${estCfg.dot}`} />
@@ -292,11 +290,10 @@ export default function ModalDetalleGuia({ guia, onClose, onEjecutar, onCancelar
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {esPendiente && diasRestantes !== null && (
-                            <span className={`text-[10px] font-bold ${
-                              diasRestantes < 0 ? "text-red-400" :
+                            <span className={`text-[10px] font-bold ${diasRestantes < 0 ? "text-red-400" :
                               diasRestantes <= 3 ? "text-orange-400" :
-                              diasRestantes <= 7 ? "text-yellow-400" : "text-slate-500"
-                            }`}>
+                                diasRestantes <= 7 ? "text-yellow-400" : "text-slate-500"
+                              }`}>
                               {diasRestantes < 0 ? `+${Math.abs(diasRestantes)}d` : `${diasRestantes}d`}
                             </span>
                           )}

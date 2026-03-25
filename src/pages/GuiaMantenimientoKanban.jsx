@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { guiaMantenimientoService } from "../features/GuiaMantenimiento/services/guiaMantenimientoService";
+import { obtenerAvisosOrigenManual } from "../features/mantenimiento/services/avisoServices";
 import {
   LayoutGrid,
   Search,
@@ -471,7 +472,51 @@ export default function GuiasMantenimientoKanban() {
     try {
       silencioso ? setRefreshing(true) : setLoading(true);
       const data = await guiaMantenimientoService.getGuias();
-      setGuias(Array.isArray(data) ? data : []);
+
+      // También traer avisos (origen manual) y normalizarlos como "guías"
+      let avisos = [];
+      try {
+        const respAvisos = await obtenerAvisosOrigenManual();
+        avisos = Array.isArray(respAvisos) ? respAvisos : [];
+      } catch (err) {
+        console.warn("No se pudo cargar avisos para mostrarlos en Alertas:", err);
+        avisos = [];
+      }
+
+      // Mapeo simple de estados del backend de aviso → estado esperado por esta página
+      const ESTADO_AVISO_MAP = {
+        CREADO: "creado",
+        TRATADO: "tratado",
+        CON_OT: "con OT",
+        RECHAZADO: "rechazado",
+        FINALIZADO: "finalizado",
+        FINALIZADO_SIN_FACTURACION: "finalizado sin facturacion",
+      };
+
+      const avisosComoGuias = avisos.map((a) => ({
+        // prefijo id para evitar colisiones con guías reales
+        id: `av-${a.id}`,
+        numeroAlerta: a.numeroAviso || a.numero || `AV-${a.id}`,
+        producto: a.producto || a.descripcion || "",
+        descripcion: a.descripcion || a.descripcionResumida || "",
+        ordenVenta: a.ordenVenta || a.ordenCliente || "",
+        equipo: a.equiposRelacion?.[0]?.equipo || null,
+        equipoId: a.equiposRelacion?.[0]?.equipoId || a.equipoId || null,
+        fechaInicioAlerta: a.fechaAtencion || a.fechaSugerida || a.createdAt || null,
+        createdAt: a.createdAt || new Date().toISOString(),
+        updatedAt: a.updatedAt || a.createdAt || new Date().toISOString(),
+        // mapear estadoAviso (BACK) a estadoGuia (FRONT)
+        estadoGuia: ESTADO_AVISO_MAP[a.estadoAviso] || ESTADO_AVISO_MAP[a.estado] || "creado",
+        // pasar otros campos útiles
+        creticidad: a.creticidad,
+        planMantenimiento: a.planMantenimiento,
+        ubicacionTecnica: a.ubicacionTecnica,
+        solicitante: a.solicitante,
+        adjuntos: a.adjuntos,
+      }));
+
+      const guiasData = Array.isArray(data) ? data : [];
+      setGuias([...guiasData, ...avisosComoGuias]);
     } catch (e) {
       console.error("Error cargando guías:", e);
       setGuias([]);
