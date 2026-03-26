@@ -1235,8 +1235,8 @@ const cerrarModalObservacion = () => {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex justify-center items-center p-3">
-        <div className="bg-white w-[98vw] max-w-[110rem] h-[96vh] rounded-2xl shadow-2xl flex flex-col border border-slate-200">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex justify-center items-center p-3">
+  <div className="bg-white w-[98vw] max-w-[110rem] h-[96vh] rounded-2xl shadow-2xl flex flex-col border border-slate-200">
           <div className="px-8 py-6 border-b bg-slate-50 flex justify-between items-center shrink-0">
             <div className="flex gap-4 items-center">
               <div className="p-3 bg-slate-900 rounded-xl">
