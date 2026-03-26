@@ -5,6 +5,7 @@ import {
   Search, Image as ImageIcon, UploadCloud 
 } from "lucide-react";
 import { planMantenimientoService } from "../PlanMantenimiento/services/planMantenimientoService";
+import { ModalBase, Button } from "../../components/ui";
 
 // 👇 AYUDANTES PARA LIMPIAR DATOS Y EVITAR ERRORES
 const normalizeStr = (v) => {
@@ -215,60 +216,79 @@ const handleSubmit = async () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl transform transition-all my-8">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
-          <div>
-            <h3 className="text-2xl font-bold text-gray-900">
-              {initialData ? "Editar Equipo" : "Nuevo Equipo"}
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              {initialData ? "Actualiza la información del equipo" : "Completa los datos del nuevo equipo"}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors" disabled={loading}>
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+    <ModalBase
+      isOpen={isOpen}
+      onClose={onClose}
+      title={initialData ? "Editar Equipo" : "Nuevo Equipo"}
+      subtitle={initialData ? "Actualiza la información del equipo" : "Completa los datos del nuevo equipo"}
+      size="xl"
+      loading={loading}
+    >
+      {/* Tabs */}
+      <div className="border-b border-gray-100 bg-gray-50 px-6">
+        <div className="flex gap-1 overflow-x-auto">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-colors whitespace-nowrap ${
+                  activeTab === tab.id ? "text-blue-600 border-b-2 border-blue-600 bg-white" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+                {tab.id === 'planes' && form.planesMantenimientoIds.length > 0 && (
+                  <span className="ml-1 bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{form.planesMantenimientoIds.length}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
+      </div>
 
-        {/* Tabs */}
-        <div className="border-b border-gray-100 bg-gray-50 px-6">
-          <div className="flex gap-1 overflow-x-auto">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-3 font-medium text-sm transition-colors whitespace-nowrap ${
-                    activeTab === tab.id ? "text-blue-600 border-b-2 border-blue-600 bg-white" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                  {tab.id === 'planes' && form.planesMantenimientoIds.length > 0 && (
-                    <span className="ml-1 bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{form.planesMantenimientoIds.length}</span>
-                  )}
-                </button>
-              );
-            })}
+      {/* Form */}
+      <div className="p-6">
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-700">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <p className="text-sm">{error}</p>
           </div>
-        </div>
+        )}
 
-        {/* Form */}
-        <div className="p-6 max-h-[calc(100vh-280px)] overflow-y-auto">
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-700">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <p className="text-sm">{error}</p>
+        {/* TAB: General */}
+        {activeTab === "general" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-1">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Código <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Ej: EQ-001"
+                value={form.codigo}
+                onChange={(e) => setForm({ ...form, codigo: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                disabled={loading}
+              />
             </div>
-          )}
 
-          {/* TAB: General */}
-          {activeTab === "general" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Nombre del Equipo <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Ej: Control de acceso vehicular principal"
+                maxLength={60}
+                value={form.nombre}
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500 mt-1">{form.nombre.length}/60 caracteres</p>
+            </div>
               <div className="lg:col-span-1">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Código <span className="text-red-500">*</span>
@@ -681,20 +701,23 @@ const handleSubmit = async () => {
 
         {/* Actions */}
         <div className="flex justify-end gap-3 p-5 border-t border-gray-100 bg-gray-50 rounded-b-2xl sticky bottom-0 z-10">
-          <button onClick={onClose} className="px-6 py-2.5 border border-gray-300 text-gray-700 bg-white rounded-xl font-bold hover:bg-gray-100 transition-colors shadow-sm" disabled={loading}>
-            Cancelar
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={loading || !form.codigo || !form.numeroOV || !form.clienteId || !form.nombre || !form.paisId || !form.tipoEquipoPropiedad}
+          <Button 
+            onClick={onClose} 
+            variant="outline" 
+            disabled={loading}
           >
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="primary"
+            loading={loading}
+            disabled={!form.codigo || !form.numeroOV || !form.clienteId || !form.nombre || !form.paisId || !form.tipoEquipoPropiedad}
+          >
             {initialData ? "Actualizar Equipo" : "Guardar Equipo"}
-          </button>
+          </Button>
         </div>
 
-      </div>
-    </div>
+      </ModalBase>
   );
 }

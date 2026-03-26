@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { clienteService } from "../../mantenimiento/services/clienteService.js";
+import { PageHeader, Button } from "../../../components/ui";
 
 import ContactosModal from "../Components/ContactosModal.jsx";
 import PortalModal from "../Components/PortalModal.jsx";
@@ -145,19 +146,20 @@ export default function ClientesPage() {
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-[1800px] mx-auto">
         {/* Header Section */}
-        <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-green-100 rounded-2xl">
-              <FileSpreadsheet className="w-7 h-7 text-green-700" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Listado de Clientes</h1>
-              <p className="text-gray-600">
-                Vista general tipo Excel con todos los campos principales
-              </p>
-            </div>
-          </div>
-        </div>
+        <PageHeader
+          title="Listado de Clientes"
+          subtitle="Vista general tipo Excel con todos los campos principales"
+          icon={FileSpreadsheet}
+          actions={[
+            {
+              label: "Recargar",
+              onClick: loadClientes,
+              variant: "secondary",
+              icon: RefreshCw,
+              loading: loading
+            }
+          ]}
+        />
 
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700">
@@ -261,17 +263,16 @@ export default function ClientesPage() {
                       
                       {/* 4. BOTÓN PARA ABRIR LA FICHA MODERNA */}
                       <td className="px-4 py-3 border-r border-gray-100 text-center">
-                        <button
+                        <Button
                           onClick={() => {
                             setSelectedClienteInfo(c);
                             setInfoModalOpen(true);
                           }}
-                          className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          icon={Eye}
                           title="Ver Ficha Detallada"
-                        >
-                          <Eye size={18} />
-                        </button>
+                        />
                       </td>
 
                       <td className="px-4 py-3 border-r border-gray-100 text-gray-500">
@@ -318,42 +319,43 @@ export default function ClientesPage() {
                       <td className="px-4 py-3 border-r border-gray-100 text-gray-600">{formatDate(c.updatedAt)}</td>
 
                       <td className="px-4 py-3 border-r border-gray-100 text-center">
-                        <button
+                        <Button
                           onClick={() => {
                             setSelectedClienteContactos(c);
                             setContactosModalOpen(true);
                           }}
-                          className="inline-flex items-center justify-center px-3 py-2 text-blue-600 hover:bg-blue-100 rounded-lg font-semibold gap-2"
-                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          icon={Users}
                         >
-                          <Users size={16} /> Ver ({Array.isArray(c.contactos) ? c.contactos.length : 0})
-                        </button>
+                          Ver ({Array.isArray(c.contactos) ? c.contactos.length : 0})
+                        </Button>
                       </td>
 
                       <td className="px-4 py-3 border-r border-gray-100 text-center">
-                        <button
+                        <Button
                           onClick={() => {
                             setSelectedClienteSedes(c);
                             setSedesModalOpen(true);
                           }}
-                          className="inline-flex items-center justify-center px-3 py-2 text-emerald-600 hover:bg-emerald-100 rounded-lg font-semibold gap-2"
-                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          icon={Building2}
                         >
-                          <Building2 size={16} /> Sedes
-                        </button>
+                          Sedes
+                        </Button>
                       </td>
 
                       <td className="px-4 py-3 text-center">
-                        <button
+                        <Button
                           onClick={() => {
                             setSelectedClientePortal(c);
                             setPortalModalOpen(true);
                           }}
-                          className="inline-flex items-center justify-center p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg"
-                          type="button"
-                        >
-                          <LinkIcon size={16} />
-                        </button>
+                          variant="ghost"
+                          size="sm"
+                          icon={LinkIcon}
+                        />
                       </td>
                     </tr>
                   ))
@@ -375,8 +377,20 @@ export default function ClientesPage() {
 
               {totalPages > 1 && (
                 <div className="flex items-center gap-1">
-                  <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="p-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"><ChevronLeft size={16} /></button>
-                  <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 rounded-lg border bg-white hover:bg-gray-50 disabled:opacity-50"><ChevronRight size={16} /></button>
+                  <Button 
+                    onClick={() => paginate(currentPage - 1)} 
+                    disabled={currentPage === 1}
+                    variant="outline"
+                    size="sm"
+                    icon={ChevronLeft}
+                  />
+                  <Button 
+                    onClick={() => paginate(currentPage + 1)} 
+                    disabled={currentPage === totalPages}
+                    variant="outline"
+                    size="sm"
+                    icon={ChevronRight}
+                  />
                 </div>
               )}
             </div>

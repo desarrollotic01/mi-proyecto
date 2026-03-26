@@ -15,8 +15,8 @@ export default function Campo({
     value !== undefined
       ? value
       : name && formData
-      ? formData[name] || ""
-      : "";
+        ? formData[name] || ""
+        : "";
 
   return (
     <div className="flex flex-col ">
@@ -40,7 +40,7 @@ export default function Campo({
           ))}
         </select>
 
-      /* TEXTAREA */
+        /* TEXTAREA */
       ) : tipo === "textarea" ? (
         <textarea
           name={name}
@@ -51,7 +51,7 @@ export default function Campo({
           className="border rounded px-5 py-2 resize-none"
         />
 
-      /* INPUT */
+        /* INPUT */
       ) : (
         <input
           type={type}
