@@ -20,6 +20,7 @@ import ModalConfiguracionCampos from "../../../components/ModalConfiguracionCamp
 import ModalSeleccionEquiposOT from "../../OrdenTrabajo/Modalseleccionequiposot";
 
 import "../../../styles/fullcalendar.css";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
 export default function Mantenimiento() {
   const m = useMantenimiento();
@@ -153,6 +154,75 @@ const cerrarModalesOT = () => {
     }));
 
   /* ================= UI ================= */
+  
+  // 🆕 PANTALLA DE LOADING
+  if (m.loading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-700 font-medium">Cargando avisos...</p>
+          <p className="text-sm text-gray-500 mt-2">Obteniendo información del servidor</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 🆕 PANTALLA DE ERROR
+  if (m.error) {
+    const getErrorMessage = (code) => {
+      switch (code) {
+        case 404:
+          return {
+            title: "Error 404",
+            subtitle: "No encontrado",
+            description: "No se pudieron encontrar los datos solicitados."
+          };
+        case 406:
+          return {
+            title: "Error 406",
+            subtitle: "Formato no aceptable",
+            description: "El servidor no puede generar una respuesta en el formato solicitado."
+          };
+        case 500:
+          return {
+            title: "Error 500",
+            subtitle: "Fallo de servidor",
+            description: "Ocurrió un error interno en el servidor. Intenta nuevamente."
+          };
+        default:
+          return {
+            title: `Error ${code || "Desconocido"}`,
+            subtitle: "Error de conexión",
+            description: "No se pudo conectar con el servidor. Verifica tu conexión."
+          };
+      }
+    };
+
+    const errorInfo = getErrorMessage(m.error);
+
+    return (
+      <div className="h-full flex items-center justify-center bg-gray-50 p-6">
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-10 h-10 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {errorInfo.title}: {errorInfo.subtitle}
+          </h2>
+          <p className="text-gray-600 mb-6">{errorInfo.description}</p>
+          <button
+            onClick={m.cargarAvisos}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto font-medium"
+          >
+            <RefreshCw className="w-5 h-5" />
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* HEADER + FILTROS - STICKY */}

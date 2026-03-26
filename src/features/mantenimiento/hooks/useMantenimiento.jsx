@@ -153,6 +153,9 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
 
   const [formData, setFormData] = useState(initialFormData);
 
+  /* ================= LOADING & ERROR STATES ================= */
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const abrirOrdenTrabajo = async (ordenId) => {
   try {
@@ -178,15 +181,19 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
   };
 
   const cargarOrdenesTrabajo = async () => {
-  try {
-    const ots = await getAllOrdenesTrabajo();
-    setOrdenesTrabajoCompletas(ots || []);
-  } catch (error) {
-    console.error("Error cargando órdenes de trabajo:", error);
-    setOrdenesTrabajoCompletas([]);
-  }
-};
-
+    setLoading(true);
+    setError(null);
+    try {
+      const ots = await getAllOrdenesTrabajo();
+      setOrdenesTrabajoCompletas(ots || []);
+    } catch (err) {
+      console.error("Error cargando órdenes de trabajo:", err);
+      setError(err?.response?.status || 500);
+      setOrdenesTrabajoCompletas([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 🆕 FUNCIÓN PARA TRANSFORMAR AVISOS DEL BACKEND
   const transformarAviso = (aviso) => {
@@ -204,36 +211,41 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
   };
 
   /* ================= LOAD AVISOS ================= */
- const cargarAvisos = async () => {
-  try {
-    const response = await obtenerAvisosOrigenManual();
-    const avisos = Array.isArray(response) ? response : [];
+  const cargarAvisos = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await obtenerAvisosOrigenManual();
+      const avisos = Array.isArray(response) ? response : [];
 
-    const cols = Object.keys(ESTADOS_AV).reduce((acc, k) => {
-      acc[k] = { name: ESTADOS_AV[k].label, items: [] };
-      return acc;
-    }, {});
+      const cols = Object.keys(ESTADOS_AV).reduce((acc, k) => {
+        acc[k] = { name: ESTADOS_AV[k].label, items: [] };
+        return acc;
+      }, {});
 
-    avisos.forEach((aviso) => {
-      const key = ESTADO_KEY_MAP[aviso.estadoAviso];
-      if (!key) return;
+      avisos.forEach((aviso) => {
+        const key = ESTADO_KEY_MAP[aviso.estadoAviso];
+        if (!key) return;
 
-      const avisoTransformado = transformarAviso(aviso);
-      cols[key].items.push({ ...avisoTransformado, estado: key });
-    });
+        const avisoTransformado = transformarAviso(aviso);
+        cols[key].items.push({ ...avisoTransformado, estado: key });
+      });
 
-    setColumns(cols);
-  } catch (error) {
-    console.error("Error cargando avisos:", error);
+      setColumns(cols);
+    } catch (err) {
+      console.error("Error cargando avisos:", err);
+      setError(err?.response?.status || 500);
 
-    const cols = Object.keys(ESTADOS_AV).reduce((acc, k) => {
-      acc[k] = { name: ESTADOS_AV[k].label, items: [] };
-      return acc;
-    }, {});
+      const cols = Object.keys(ESTADOS_AV).reduce((acc, k) => {
+        acc[k] = { name: ESTADOS_AV[k].label, items: [] };
+        return acc;
+      }, {});
 
-    setColumns(cols);
-  }
-};
+      setColumns(cols);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     cargarAvisos();
@@ -457,8 +469,8 @@ const iniciarOTs = (equipos) => {
     guardarConfigVista,
     resetConfigVista,
 
-    onDragEnd, // 🆕 Agregar onDragEnd al return
-    transformarAviso, // 🆕 Exportar por si se necesita
+    onDragEnd, // 
+    transformarAviso, // 
 
     
     equiposSeleccionadosOT,
@@ -468,6 +480,11 @@ const iniciarOTs = (equipos) => {
     indiceEquipoActual,
     setIndiceEquipoActual,  
     abrirOrdenTrabajo,
+
+    // Loading y Error states
+    loading,
+    error,
+    cargarAvisos,
 
   };
 } 

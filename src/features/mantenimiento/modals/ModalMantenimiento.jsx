@@ -427,21 +427,21 @@ const getUbicacionData = (ubicacionId) => {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4">
       <div className="bg-white rounded-2xl w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl">
         
         {/* HEADER */}
-        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div className="p-4 md:p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-600 rounded-xl">
-                <Wrench className="w-6 h-6 text-white" />
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="p-2 md:p-3 bg-blue-600 rounded-lg md:rounded-xl">
+                <Wrench className="w-5 h-5 md:w-6 md:h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">
                   Nuevo Aviso
                 </h2>
-                <p className="text-sm text-gray-600">Completa la información del aviso</p>
+                <p className="text-xs md:text-sm text-gray-600">Completa la información del aviso</p>
               </div>
             </div>
             <button
@@ -453,16 +453,16 @@ const getUbicacionData = (ubicacionId) => {
           </div>
 
           {/* Tipo de Aviso Selector */}
-          <div className="flex gap-3 mb-6">
+          <div className="flex gap-2 md:gap-3 mb-4 md:mb-6">
             <button
               onClick={() => setTipoAviso("mantenimiento")}
-              className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
+              className={`flex-1 px-3 py-2 md:px-4 md:py-3 rounded-xl font-semibold text-sm md:text-base transition-all ${
                 tipoAviso === "mantenimiento"
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
                   : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300"
               }`}
             >
-              <Wrench className="w-5 h-5 inline mr-2" />
+              <Wrench className="w-4 h-4 md:w-5 md:h-5 inline mr-1 md:mr-2" />
               Mantenimiento
             </button>
             <button
@@ -473,13 +473,13 @@ const getUbicacionData = (ubicacionId) => {
                   tipoMantenimiento: null,
                 }));
               }}
-              className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
+              className={`flex-1 px-3 py-2 md:px-4 md:py-3 rounded-xl font-semibold text-sm md:text-base transition-all ${
                 tipoAviso === "instalacion"
                   ? "bg-green-600 text-white shadow-lg shadow-green-500/30"
                   : "bg-white text-gray-600 border border-gray-200 hover:border-green-300"
               }`}
             >
-              <Package className="w-5 h-5 inline mr-2" />
+              <Package className="w-4 h-4 md:w-5 md:h-5 inline mr-1 md:mr-2" />
               Instalación
             </button>
           </div>
@@ -1048,24 +1048,24 @@ const getUbicacionData = (ubicacionId) => {
         </div>
 
         {/* FOOTER */}
-        <div className="p-6 border-t border-gray-100 bg-gray-50">
+        <div className="p-4 md:p-6 border-t border-gray-100 bg-gray-50">
           <div className="flex items-center justify-between">
             <button
               onClick={() => wizardStep === 1 ? onClose() : setWizardStep(wizardStep - 1)}
-              className="px-6 py-3 border border-gray-200 rounded-xl hover:bg-white transition-colors flex items-center gap-2 font-medium"
+              className="px-4 py-2 md:px-6 md:py-3 border border-gray-200 rounded-xl hover:bg-white transition-colors flex items-center gap-2 font-medium text-sm md:text-base"
             >
               <ChevronLeft className="w-4 h-4" />
               {wizardStep === 1 ? "Cancelar" : "Anterior"}
             </button>
 
-            <div className="text-sm text-gray-500">
+            <div className="text-xs md:text-sm text-gray-500">
               Paso {wizardStep} de {steps.length}
             </div>
 
             <button
               disabled={saving}
               onClick={() => wizardStep < 3 ? setWizardStep(wizardStep + 1) : handleGuardarAviso()}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 font-medium disabled:opacity-50"
+              className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 font-medium text-sm md:text-base disabled:opacity-50"
             >
               {saving ? (
                 <>Guardando...</>

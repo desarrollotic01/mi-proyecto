@@ -72,7 +72,7 @@ export default function CalendarioView({ ordenes, onViewOrden }) {
   const estados = ["TODOS", "CREADO", "LIBERADO", "CIERRE_TECNICO", "CERRADO", "CANCELADO"];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
       {/* CONTROLS */}
       <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-4 rounded-xl border border-slate-200">
         <div className="flex flex-wrap gap-3 items-center">
@@ -149,8 +149,8 @@ export default function CalendarioView({ ordenes, onViewOrden }) {
         </div>
       </div>
 
-      {/* CALENDAR */}
-      <div className="bg-white rounded-xl border-2 border-slate-200 shadow-lg overflow-hidden">
+      {/* CALENDAR CONTAINER */}
+      <div className="bg-white rounded-xl border-2 border-slate-200 shadow-lg overflow-hidden relative">
         <FullCalendar
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -190,18 +190,18 @@ export default function CalendarioView({ ordenes, onViewOrden }) {
             meridiem: false
           }}
         />
-      </div>
 
-      {/* EMPTY STATE */}
-      {calendarEvents.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center text-slate-400">
-            <div className="text-6xl mb-4">📅</div>
-            <p className="text-lg font-medium">No hay órdenes en este calendario</p>
-            <p className="text-sm">Ajusta los filtros para ver más eventos</p>
+        {/* EMPTY STATE - DENTRO DEL CONTENEDOR DEL CALENDARIO */}
+        {calendarEvents.length === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-white/60 pointer-events-none">
+            <div className="text-center text-slate-400">
+              <div className="text-6xl mb-4">📅</div>
+              <p className="text-lg font-medium">No hay órdenes en este calendario</p>
+              <p className="text-sm">Ajusta los filtros para ver más eventos</p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

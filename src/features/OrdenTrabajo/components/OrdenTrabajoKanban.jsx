@@ -112,13 +112,13 @@ export default function KanbanView({
   return (
     <>
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[calc(100vh-12rem)]">
+        <div className="flex flex-nowrap overflow-x-auto gap-4 h-[calc(100vh-12rem)]">
           {Object.entries(data).map(([colId, col]) => (
             <Droppable droppableId={colId} key={colId}>
               {(provided, snapshot) => (
                 <div
                   className={`
-                    rounded-2xl border-2 transition-all duration-300 flex flex-col
+                    rounded-2xl border-2 transition-all duration-300 flex flex-col min-w-[320px]
                     ${
                       snapshot.isDraggingOver
                         ? "border-dashed border-slate-400 bg-slate-100 scale-[1.02]"

@@ -66,7 +66,7 @@ export default function ClientesPage() {
       setError("Error al cargar los clientes. Verifica que el backend esté corriendo.");
       console.error(err);
     } finally {
-      loading(false);
+      setLoading(false);
     }
   };
 

@@ -198,7 +198,7 @@ const reorganizarColumnasPorOTs = (columns) => {
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 h-[calc(100vh-200px)] items-start gap-4 h-[calc(100vh-200px)]">
+      <div className="flex flex-nowrap gap-3 md:gap-4 h-[calc(100vh-200px)] items-start overflow-x-auto snap-x snap-mandatory pb-2 px-1">
         {Object.entries(columnasReorganizadas).map(([colId, col]) => {
           const Icon = getColumnIcon(colId);
           const gradient = getColumnColor(colId);
@@ -209,31 +209,31 @@ const reorganizarColumnasPorOTs = (columns) => {
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`flex flex-col rounded-2xl transition-all shadow-lg h-full ${
+                  className={`flex flex-col rounded-2xl transition-all shadow-lg h-full w-[85vw] md:w-[320px] md:min-w-[320px] flex-shrink-0 snap-center ${
                     snapshot.isDraggingOver
                       ? "bg-blue-50 ring-2 ring-blue-400"
                       : "bg-white border-2 border-slate-200"
                   }`}
                 >
                   {/* HEADER DE COLUMNA */}
-                  <div className={`p-5 rounded-t-2xl bg-gradient-to-br ${gradient} text-white shadow-md flex-shrink-0`}>
+                  <div className={`p-3 md:p-5 rounded-t-2xl bg-gradient-to-br ${gradient} text-white shadow-md flex-shrink-0`}>
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-white/25 rounded-xl backdrop-blur-sm border border-white/30">
-                          <Icon className="w-5 h-5" strokeWidth={2.5} />
+                      <div className="flex items-center gap-2 md:gap-3">
+                        <div className="p-2 md:p-2.5 bg-white/25 rounded-xl backdrop-blur-sm border border-white/30">
+                          <Icon className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
                         </div>
-                        <h3 className="font-bold text-base">
+                        <h3 className="font-bold text-sm md:text-base">
                           {ESTADOS_AV[colId]?.label}
                         </h3>
                       </div>
-                      <span className="px-3 py-1.5 bg-white/25 rounded-full text-sm font-bold backdrop-blur-sm border border-white/30">
+                      <span className="px-2 md:px-3 py-1 md:py-1.5 bg-white/25 rounded-full text-xs md:text-sm font-bold backdrop-blur-sm border border-white/30">
                         {col.items.length}
                       </span>
                     </div>
                   </div>
 
                   {/* TARJETAS */}
-                  <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50 to-white">
+                  <div className="flex-1 p-3 md:p-4 space-y-2 md:space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50 to-white">
                     {col.items.map((item, i) => {
                       const tieneDesglose = item._desglose && item._desglose.total > 1;
                       const esParcial = item._esParcial;
@@ -267,14 +267,14 @@ const reorganizarColumnasPorOTs = (columns) => {
                             >
                               {/* Indicador de OT múltiple */}
                               {tieneDesglose && (
-                                <div className="absolute -top-2 -right-2 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-full px-2.5 py-1 text-xs font-bold shadow-lg border-2 border-white flex items-center gap-1">
-                                  <Layers className="w-3 h-3" />
+                                <div className="absolute -top-2 -right-2 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-full px-2 md:px-2.5 py-0.5 md:py-1 text-[10px] md:text-xs font-bold shadow-lg border-2 border-white flex items-center gap-1">
+                                  <Layers className="w-2.5 h-2.5 md:w-3 md:h-3" />
                                   {item._desglose.total} OTs
                                 </div>
                               )}
 
                               {/* CARD CONTENT */}
-                              <div className="flex-1 p-4 space-y-3">
+                              <div className="flex-1 p-3 md:p-4 space-y-2 md:space-y-3">
                                 {/* CONTENIDO DINÁMICO */}
                                 {columnOrder.map((key) => {
                                   if (!cardFields[key]) return null;
@@ -283,8 +283,8 @@ const reorganizarColumnasPorOTs = (columns) => {
                                     case "numeroAviso":
                                       return (
                                         <div key={key} className="flex items-center gap-2">
-                                          <FileText className="w-4 h-4 text-blue-600" />
-                                          <span className="font-bold text-slate-900 text-lg">
+                                          <FileText className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-600" />
+                                          <span className="font-bold text-slate-900 text-xs md:text-sm">
                                             #{item.numeroAviso}
                                           </span>
                                         </div>
@@ -293,8 +293,8 @@ const reorganizarColumnasPorOTs = (columns) => {
                                     case "cliente":
                                       return (
                                         <div key={key} className="flex items-start gap-2">
-                                          <User className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                                          <span className="text-sm text-slate-700 font-medium line-clamp-2">
+                                          <User className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                                          <span className="text-xs md:text-sm text-slate-700 font-medium line-clamp-2">
                                             {item.cliente || "Sin cliente"}
                                           </span>
                                         </div>
@@ -522,24 +522,24 @@ const reorganizarColumnasPorOTs = (columns) => {
 
                               {/* BOTONES DE ACCIÓN */}
                               <div
-                                className="px-4 pb-4 flex gap-2 flex-shrink-0"
+                                className="px-3 pb-3 md:px-4 md:pb-4 flex gap-1.5 md:gap-2 flex-shrink-0"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {estadoReal === "CREADO" && (
                                   <>
                                     <button
                                       onClick={() => abrirTratamiento(item)}
-                                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs font-bold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
+                                      className="flex-1 px-2 py-1.5 md:px-4 md:py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-[10px] md:text-xs font-bold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-1.5"
                                     >
-                                      <Wrench className="w-4 h-4" />
+                                      <Wrench className="w-3 h-3 md:w-4 md:h-4" />
                                       Tratar
                                     </button>
 
                                     <button
                                       onClick={() => cambiarEstado(item, "RECHAZADO")}
-                                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
+                                      className="flex-1 px-2 py-1.5 md:px-4 md:py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-[10px] md:text-xs font-bold rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-1.5"
                                     >
-                                      <XCircle className="w-4 h-4" />
+                                      <XCircle className="w-3 h-3 md:w-4 md:h-4" />
                                       Rechazar
                                     </button>
                                   </>
@@ -548,9 +548,9 @@ const reorganizarColumnasPorOTs = (columns) => {
                                 {estadoReal === "TRATADO" && (
                                   <button
                                     onClick={() => cambiarEstado(item, "CON_OT")}
-                                    className="w-full px-4 py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-bold rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
+                                    className="w-full px-2 py-1.5 md:px-4 md:py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-[10px] md:text-xs font-bold rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-1.5"
                                   >
-                                    <FileText className="w-4 h-4" />
+                                    <FileText className="w-3 h-3 md:w-4 md:h-4" />
                                     Generar OT
                                   </button>
                                 )}
@@ -559,17 +559,17 @@ const reorganizarColumnasPorOTs = (columns) => {
                                   <>
                                     <button
                                       onClick={() => cambiarEstado(item, "FINALIZADO")}
-                                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs font-bold rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
+                                      className="flex-1 px-2 py-1.5 md:px-4 md:py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-[10px] md:text-xs font-bold rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-1.5"
                                     >
-                                      <CheckCircle className="w-4 h-4" />
+                                      <CheckCircle className="w-3 h-3 md:w-4 md:h-4" />
                                       Finalizar
                                     </button>
 
                                     <button
                                       onClick={() => cambiarEstado(item, "FINALIZADO_SIN_FACTURACION")}
-                                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-slate-500 to-slate-600 text-white text-xs font-bold rounded-lg hover:from-slate-600 hover:to-slate-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5"
+                                      className="flex-1 px-2 py-1.5 md:px-4 md:py-2.5 bg-gradient-to-r from-slate-500 to-slate-600 text-white text-[10px] md:text-xs font-bold rounded-lg hover:from-slate-600 hover:to-slate-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-1.5"
                                     >
-                                      <FileCheck className="w-4 h-4" />
+                                      <FileCheck className="w-3 h-3 md:w-4 md:h-4" />
                                       Sin Fact.
                                     </button>
                                   </>

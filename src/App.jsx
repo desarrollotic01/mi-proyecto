@@ -15,6 +15,7 @@ import MaintenanceGuides from "./features/GuiaMantenimiento/GuiaMantenimiento";
 import GuiasKanban from "./pages/GuiaMantenimientoKanban";
 import ListaLink from "./features/Equipo/ListaLink";
 import ItemsPage from "./pages/itemPage";
+import ErrorPage from "./pages/ErrorPage";
 
 function AppLayout() {
   return (
@@ -51,7 +52,8 @@ export default function App() {
         <Route path="items" element={<ItemsPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/login" />} />
+      {/* RUTA 404 - Captura cualquier ruta no definida */}
+      <Route path="*" element={<ErrorPage code={404} message="Página no encontrada" />} />
     </Routes>
   );
 }

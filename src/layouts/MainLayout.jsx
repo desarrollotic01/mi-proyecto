@@ -117,7 +117,7 @@ export default function MainLayout({ children }) {
       <main className="flex-1 flex flex-col min-w-0">
         
         {/* TOP BAR */}
-        <header className="bg-white p-4 shadow-md border-b flex justify-between items-center flex-shrink-0 z-10">
+        <header className="bg-white p-4 shadow-md border-b flex justify-between items-center flex-shrink-0 relative z-40">
           <div className="flex items-center">
             {/* BOTÓN HAMBURGUESA (Solo visible en móvil) */}
             <button 
@@ -143,8 +143,8 @@ export default function MainLayout({ children }) {
             </button>
 
             {userMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border rounded shadow-lg z-50">
-                <div className="px-4 py-2 border-b">
+              <div className="absolute right-0 top-full mt-2 w-48 overflow-visible bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] origin-top-right">
+                <div className="px-4 py-3 border-b border-slate-100">
                   <p className="text-sm font-semibold text-gray-800">
                     {user?.alias}
                   </p>
@@ -155,7 +155,7 @@ export default function MainLayout({ children }) {
 
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 text-red-600 font-medium transition-colors"
+                  className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 text-red-600 font-medium transition-colors rounded-b-xl"
                 >
                   Cerrar sesión
                 </button>
@@ -165,7 +165,7 @@ export default function MainLayout({ children }) {
         </header>
 
         {/* PAGE CONTENT - CON SCROLL */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 bg-gray-50">
           {children}
         </div>
       </main>

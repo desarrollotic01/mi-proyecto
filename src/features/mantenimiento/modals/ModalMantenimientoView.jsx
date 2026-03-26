@@ -244,12 +244,8 @@ export default function ModalMantenimientoView({
     return null;
   };
 
-  const solicitudesCompra = tratamiento?.solicitudesCompra || [];
-  const solicitudesAlmacen = tratamiento?.solicitudesAlmacen || [];
-  const equiposTratamiento = tratamiento?.equipos || [];
-
   return (
-    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[60] p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-[98vw] max-w-[120rem] h-[96vh] flex flex-col overflow-hidden border border-slate-200">
         <div className="px-5 py-3 border-b bg-slate-900">
           <div className="flex justify-between items-start gap-4 flex-wrap">

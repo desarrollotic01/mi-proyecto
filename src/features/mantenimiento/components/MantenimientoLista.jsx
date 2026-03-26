@@ -127,7 +127,7 @@ export default function MantenimientoLista({
                 return (
                   <th
                     key={key}
-                    className={`px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap ${getColumnWidth(key)}`}
+                    className={`px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm lg:text-base font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap ${getColumnWidth(key)}`}
                   >
                     <div className="flex items-center gap-2">
                       {Icon && <Icon className="w-4 h-4 text-gray-500 flex-shrink-0" />}
@@ -136,7 +136,7 @@ export default function MantenimientoLista({
                   </th>
                 );
               })}
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider sticky right-0 bg-gradient-to-r from-gray-50 to-gray-100 min-w-[160px] border-l-2 border-gray-200">
+              <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm lg:text-base font-bold text-gray-700 uppercase tracking-wider sticky right-0 z-30 bg-white min-w-[140px] md:min-w-[160px] border-l-2 border-gray-200 shadow-l">
                 Acciones
               </th>
             </tr>
@@ -150,12 +150,12 @@ export default function MantenimientoLista({
                   colSpan={columnOrder.filter(key => cardFields[key]).length + 1}
                   className="px-6 py-12"
                 >
-                  <div className="flex flex-col items-center justify-center text-gray-400">
-                    <Inbox className="w-16 h-16 mb-4 opacity-30" />
-                    <p className="text-lg font-semibold text-gray-500">
+                  <div className="flex flex-col items-center justify-center text-gray-400 p-4 md:p-6">
+                    <Inbox className="w-12 h-12 md:w-16 md:h-16 mb-4 opacity-30" />
+                    <p className="text-base md:text-lg font-semibold text-gray-500 text-center">
                       No hay avisos para mostrar
                     </p>
-                    <p className="text-sm text-gray-400 mt-1">
+                    <p className="text-xs md:text-sm text-gray-400 mt-1 text-center">
                       Los avisos aparecerán aquí cuando se creen
                     </p>
                   </div>
@@ -181,7 +181,7 @@ export default function MantenimientoLista({
                     return (
                       <td
                         key={key}
-                        className={`px-4 py-3 text-sm ${getColumnWidth(key)}`}
+                        className={`px-3 py-2 md:px-4 md:py-3 text-sm md:text-base lg:text-lg ${getColumnWidth(key)}`}
                       >
                         {/* Número de Aviso */}
                         {key === "numeroAviso" && (
@@ -455,19 +455,19 @@ export default function MantenimientoLista({
 
                   {/* ACCIONES - Sticky en el lado derecho */}
                   <td
-                    className={`px-4 py-3 sticky right-0 border-l border-gray-200 ${
-                      idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    className={`px-3 py-2 md:px-4 md:py-3 sticky right-0 z-30 bg-white border-l border-gray-200 ${
+                      idx % 2 === 0 ? "bg-white" : "bg-gray-50"
                     }`}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center gap-2 justify-end">
+                    <div className="flex items-center gap-1.5 md:gap-2 justify-end">
                       {item.estado === "CREADO" && (
                         <>
                           <button
                             onClick={() => abrirTratamiento(item)}
-                            className="px-3 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs font-semibold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all shadow-sm flex items-center gap-1.5 whitespace-nowrap"
+                            className="px-2 py-1.5 md:px-3 md:py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-[10px] md:text-xs font-semibold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all shadow-sm flex items-center gap-1 whitespace-nowrap"
                           >
-                            <Wrench className="w-3.5 h-3.5" />
+                            <Wrench className="w-3 h-3 md:w-3.5 md:h-3.5" />
                             Tratar
                           </button>
 
@@ -475,10 +475,10 @@ export default function MantenimientoLista({
                             onClick={() =>
                               cambiarEstado(item, "RECHAZADO")
                             }
-                            className="p-2 bg-red-50 border border-red-200 text-red-600 rounded-lg hover:bg-red-100 transition-all"
+                            className="p-1.5 md:p-2 bg-red-50 border border-red-200 text-red-600 rounded-lg hover:bg-red-100 transition-all"
                             title="Rechazar"
                           >
-                            <XCircle className="w-4 h-4" />
+                            <XCircle className="w-3.5 h-3.5 md:w-4 md:h-4" />
                           </button>
                         </>
                       )}
@@ -488,9 +488,9 @@ export default function MantenimientoLista({
                           onClick={() =>
                             cambiarEstado(item, "CON_OT")
                           }
-                          className="px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-semibold rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-sm flex items-center gap-1.5 whitespace-nowrap"
+                          className="px-2 py-1.5 md:px-3 md:py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-[10px] md:text-xs font-semibold rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-sm flex items-center gap-1 whitespace-nowrap"
                         >
-                          <FileText className="w-3.5 h-3.5" />
+                          <FileText className="w-3 h-3 md:w-3.5 md:h-3.5" />
                           Generar OT
                         </button>
                       )}
@@ -501,9 +501,9 @@ export default function MantenimientoLista({
                             onClick={() =>
                               cambiarEstado(item, "FINALIZADO")
                             }
-                            className="px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-sm flex items-center gap-1.5 whitespace-nowrap"
+                            className="px-2 py-1.5 md:px-3 md:py-2 bg-gradient-to-r from-green-500 to-green-600 text-white text-[10px] md:text-xs font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-sm flex items-center gap-1 whitespace-nowrap"
                           >
-                            <CheckCircle className="w-3.5 h-3.5" />
+                            <CheckCircle className="w-3 h-3 md:w-3.5 md:h-3.5" />
                             Finalizar
                           </button>
 
@@ -514,10 +514,10 @@ export default function MantenimientoLista({
                                 "FINALIZADO_SIN_FACTURACION"
                               )
                             }
-                            className="p-2 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                            className="p-1.5 md:p-2 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
                             title="Finalizar sin facturación"
                           >
-                            <FileCheck className="w-4 h-4" />
+                            <FileCheck className="w-3.5 h-3.5 md:w-4 md:h-4" />
                           </button>
                         </>
                       )}

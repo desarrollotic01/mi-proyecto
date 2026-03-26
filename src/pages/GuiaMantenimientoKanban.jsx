@@ -758,14 +758,14 @@ export default function GuiasMantenimientoKanban() {
 
       {/* KANBAN */}
       <div className="flex-1 overflow-hidden p-4">
-        <div className="h-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="h-full flex flex-nowrap overflow-x-auto gap-4">
           {ESTADOS_GUIA.map((estadoKey) => {
             const cfg = ESTADOS_COLUMNA[estadoKey] || ESTADOS_COLUMNA.creado;
             const Icon = cfg.icon || Eye;
             const items = columns[estadoKey]?.items || [];
 
             return (
-              <div key={estadoKey} className={`flex flex-col rounded-2xl border ${cfg.border} overflow-hidden bg-white shadow`}>
+              <div key={estadoKey} className={`flex flex-col rounded-2xl border ${cfg.border} overflow-hidden bg-white shadow min-w-[320px]`}>
                 {/* column header */}
                 <div className={`bg-gradient-to-r ${cfg.gradient} px-4 py-3.5 shrink-0`}>
                   <div className="flex items-center justify-between gap-2">
