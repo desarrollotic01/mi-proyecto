@@ -43,12 +43,12 @@ export default function KanbanCard({
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex-1 min-w-0">
           {title && (
-            <h4 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 mb-1">
+            <h4 className="font-semibold text-slate-900 text-sm leading-tight line-clamp-2 mb-1">
               {title}
             </h4>
           )}
           {subtitle && (
-            <p className="text-xs text-gray-500 font-mono truncate">
+            <p className="text-xs text-slate-500 font-mono truncate">
               {subtitle}
             </p>
           )}
@@ -61,18 +61,18 @@ export default function KanbanCard({
                 e.stopPropagation();
                 setShowActions(!showActions);
               }}
-              className="p-1 hover:bg-gray-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+              className="p-1 hover:bg-slate-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
             >
-              <MoreHorizontal size={14} className="text-gray-500" />
+              <MoreHorizontal size={14} className="text-slate-500" />
             </button>
           )}
-          <ChevronRight size={16} className="text-gray-400 group-hover:text-gray-600 transition" />
+          <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 transition" />
         </div>
       </div>
 
       {/* Description */}
       {description && (
-        <p className="text-xs text-gray-600 line-clamp-2 mb-3">
+        <p className="text-xs text-slate-600 line-clamp-2 mb-3">
           {description}
         </p>
       )}
@@ -96,7 +96,7 @@ export default function KanbanCard({
       {metadata.length > 0 && (
         <div className="space-y-1.5">
           {metadata.map((meta, index) => (
-            <div key={index} className="flex items-center gap-2 text-xs text-gray-500">
+            <div key={index} className="flex items-center gap-2 text-xs text-slate-500">
               {meta.icon && <meta.icon size={12} className="shrink-0" />}
               <span className="truncate">{meta.label}</span>
             </div>
@@ -107,7 +107,7 @@ export default function KanbanCard({
       {/* Actions Dropdown */}
       {showActions && actions.length > 0 && (
         <div 
-          className="absolute right-4 top-12 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[140px]"
+          className="absolute right-4 top-12 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50 min-w-[140px]"
           onClick={(e) => e.stopPropagation()}
         >
           {actions.map((action, index) => (
@@ -117,7 +117,7 @@ export default function KanbanCard({
                 action.onClick(item);
                 setShowActions(false);
               }}
-              className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2"
             >
               {action.icon && <action.icon size={12} />}
               {action.label}

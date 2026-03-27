@@ -11,24 +11,24 @@ export default function ErrorPage({ code = 404, message = "Página no encontrada
           title: "404",
           subtitle: "Página no encontrada",
           description: "Lo sentimos, la página que estás buscando no existe o ha sido movida.",
-          color: "text-blue-600",
-          bgColor: "bg-blue-100",
+          color: "text-slate-700",
+          bgColor: "bg-slate-100",
         };
       case 500:
         return {
           title: "500",
           subtitle: "Error del servidor",
           description: "Ha ocurrido un error interno. Por favor, intenta nuevamente más tarde.",
-          color: "text-red-600",
-          bgColor: "bg-red-100",
+          color: "text-slate-700",
+          bgColor: "bg-slate-100",
         };
       case 403:
         return {
           title: "403",
           subtitle: "Acceso denegado",
           description: "No tienes permisos para acceder a esta página.",
-          color: "text-orange-600",
-          bgColor: "bg-orange-100",
+          color: "text-slate-700",
+          bgColor: "bg-slate-100",
         };
       default:
         return {
@@ -80,7 +80,7 @@ export default function ErrorPage({ code = 404, message = "Página no encontrada
 
           <button
             onClick={() => navigate("/")}
-            className="px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-md shadow-blue-200"
+            className="px-6 py-3 bg-slate-900 text-white font-medium rounded-xl hover:bg-slate-800 transition-all duration-200 flex items-center justify-center gap-2 shadow-md shadow-slate-200"
           >
             <Home className="w-5 h-5" />
             Ir al Inicio

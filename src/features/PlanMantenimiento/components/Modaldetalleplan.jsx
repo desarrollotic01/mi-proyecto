@@ -25,29 +25,29 @@ import {
 
 const TIPO_STYLES = {
   PREVENTIVO: {
-    badge: "bg-blue-100 text-blue-700 border-blue-200",
-    accent: "from-blue-500 to-blue-600",
+    badge: "bg-blue-50 text-blue-700 border-blue-200",
+    accent: "bg-slate-900",
     light: "bg-blue-50",
     text: "text-blue-700",
     dot: "bg-blue-500",
   },
   CORRECTIVO: {
-    badge: "bg-red-100 text-red-700 border-red-200",
-    accent: "from-red-500 to-red-600",
-    light: "bg-red-50",
-    text: "text-red-700",
-    dot: "bg-red-500",
+    badge: "bg-rose-50 text-rose-700 border-rose-200",
+    accent: "bg-slate-900",
+    light: "bg-rose-50",
+    text: "text-rose-700",
+    dot: "bg-rose-500",
   },
   MEJORA: {
-    badge: "bg-purple-100 text-purple-700 border-purple-200",
-    accent: "from-purple-500 to-purple-600",
+    badge: "bg-purple-50 text-purple-700 border-purple-200",
+    accent: "bg-slate-900",
     light: "bg-purple-50",
     text: "text-purple-700",
     dot: "bg-purple-500",
   },
   INSPECCION: {
-    badge: "bg-amber-100 text-amber-700 border-amber-200",
-    accent: "from-amber-500 to-amber-600",
+    badge: "bg-amber-50 text-amber-700 border-amber-200",
+    accent: "bg-slate-900",
     light: "bg-amber-50",
     text: "text-amber-700",
     dot: "bg-amber-500",
@@ -130,7 +130,7 @@ export default function ModalDetallePlan({ plan, onClose }) {
         style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}
       >
         {/* ── HEADER ── */}
-        <div className={`bg-gradient-to-r ${style.accent} p-6 sm:p-8 text-white shrink-0`}>
+        <div className="bg-slate-900 p-6 sm:p-8 text-white shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4">
               <div className="bg-white/20 backdrop-blur rounded-2xl p-3 shrink-0">
@@ -176,7 +176,7 @@ export default function ModalDetallePlan({ plan, onClose }) {
           </div>
 
           {/* STATS ROW */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
             {[
               { label: "Actividades", value: actividades.length, icon: Activity },
               { label: "Equipos", value: equipos.length, icon: Layers },
@@ -236,7 +236,7 @@ export default function ModalDetallePlan({ plan, onClose }) {
 
             {/* Tags */}
             {(summary.roles.length > 0 || summary.freqs.length > 0 || summary.tipos.length > 0) && (
-              <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-4 flex flex-wrap gap-3">
                 {summary.roles.map((r) => (
                   <Chip key={r} label={`👤 ${r}`} className="bg-blue-50 text-blue-700 border-blue-200" />
                 ))}
@@ -258,10 +258,10 @@ export default function ModalDetallePlan({ plan, onClose }) {
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {equipos.map((eq) => (
-                  <div
-                    key={eq.id || eq.codigo}
-                    className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center gap-3"
-                  >
+                    <div
+                      key={eq.id || eq.codigo}
+                      className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center gap-3"
+                    >
                     <div className="bg-white border border-slate-200 rounded-xl p-2.5 shrink-0">
                       <Settings size={18} className="text-slate-500" />
                     </div>
@@ -382,7 +382,7 @@ export default function ModalDetallePlan({ plan, onClose }) {
                               <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
                                 <table className="min-w-[700px] w-full text-sm">
                                   <thead>
-                                    <tr className="border-b border-slate-100 bg-slate-50">
+                                      <tr className="border-b border-slate-100 bg-slate-50">
                                       <th className="p-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Recurso</th>
                                       <th className="p-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Item</th>
                                       <th className="p-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Código</th>
@@ -393,7 +393,7 @@ export default function ModalDetallePlan({ plan, onClose }) {
                                   </thead>
                                   <tbody>
                                     {items.map((it, iIdx) => (
-                                      <tr key={it.id || iIdx} className="border-b border-slate-50 hover:bg-blue-50/30 transition">
+                                      <tr key={it.id || iIdx} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                                         <td className="p-3 text-slate-600">{it.recurso || "—"}</td>
                                         <td className="p-3 font-semibold text-slate-800">{it.item || "—"}</td>
                                         <td className="p-3 font-mono text-xs text-slate-600">{it.itemCode || "—"}</td>

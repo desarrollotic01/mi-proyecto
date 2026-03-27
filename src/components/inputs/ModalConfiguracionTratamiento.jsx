@@ -78,7 +78,7 @@ export default function ModalConfiguracionCampos({
         <div className="mt-4 flex justify-end border-t pt-3">
           <button
             onClick={onClose}
-            className="bg-blue-600 text-white px-4 py-2 rounded text-sm"
+            className="bg-slate-900 text-white px-4 py-2 rounded text-sm hover:bg-slate-800 transition-colors"
           >
             Listo
           </button>

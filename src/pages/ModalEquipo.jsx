@@ -49,7 +49,7 @@ export default function ModalEquipo({ isOpen, onClose, formData, setFormData, on
 
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onClose} className="btn border">Cancelar</button>
-          <button onClick={onSave} className="btn bg-blue-600 text-white">Guardar</button>
+          <button onClick={onSave} className="btn bg-slate-900 text-white hover:bg-slate-800 transition-colors">Guardar</button>
         </div>
       </div>
     </div>

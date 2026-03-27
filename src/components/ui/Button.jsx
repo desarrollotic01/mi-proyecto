@@ -16,16 +16,16 @@ const Button = forwardRef(function Button(
   }, 
   ref
 ) {
-  const baseClasses = "inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
-  
+  const baseClasses = "inline-flex items-center justify-center font-semibold rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200";
+
   const variantClasses = {
-    primary: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 shadow-sm hover:shadow-md",
-    secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500",
-    danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-sm hover:shadow-md",
-    outline: "border-2 border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500 hover:border-gray-400",
-    success: "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 shadow-sm hover:shadow-md",
-    warning: "bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-500 shadow-sm hover:shadow-md",
-    ghost: "text-gray-600 hover:bg-gray-100 focus:ring-gray-500"
+    primary: "bg-slate-900 text-white hover:bg-slate-800 focus:ring-slate-700 shadow-sm transition-colors",
+    secondary: "bg-slate-50 text-slate-900 hover:bg-slate-100 focus:ring-slate-500 transition-colors",
+    danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-sm transition-colors",
+    outline: "bg-transparent border-2 border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 focus:ring-slate-500 transition-colors",
+    success: "bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500 shadow-sm transition-colors",
+    warning: "bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500 shadow-sm transition-colors",
+    ghost: "bg-transparent border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors"
   };
 
   const sizeClasses = {

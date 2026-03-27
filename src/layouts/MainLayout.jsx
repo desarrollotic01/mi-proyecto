@@ -38,7 +38,7 @@ export default function MainLayout({ children }) {
   };
 
   return (
-    <div className="flex h-[100dvh] bg-gray-100 overflow-hidden relative">
+    <div className="flex h-[100dvh] bg-slate-50 overflow-hidden relative">
       
       {/* OVERLAY PARA MÓVIL */}
       {/* Este div oscuro aparece en pantallas pequeñas cuando el sidebar está abierto. Al tocarlo, se cierra. */}
@@ -56,14 +56,14 @@ export default function MainLayout({ children }) {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <h2 className="text-xl font-bold p-4 border-b flex-shrink-0 text-blue-900">
+        <h2 className="text-xl font-bold p-4 border-b border-slate-200 flex-shrink-0 text-slate-900">
           Administración
         </h2>
 
         <nav className="flex flex-col p-4 space-y-4 flex-1 overflow-y-auto">
           {/* PROCESOS */}
           <div>
-            <p className="text-xs text-gray-400 uppercase mb-2 font-semibold">
+            <p className="text-xs text-slate-500 uppercase mb-2 font-semibold">
               Procesos
             </p>
 
@@ -73,10 +73,10 @@ export default function MainLayout({ children }) {
                   key={page.path}
                   to={page.path}
                   onClick={() => setSidebarOpen(false)} // Cierra el menú en móvil al navegar
-                  className={`p-2 rounded-md font-medium transition-colors hover:bg-blue-100 ${
+                  className={`p-2 rounded-md font-medium transition-colors hover:bg-slate-50 ${
                     location.pathname === page.path
-                      ? "bg-blue-200 text-blue-900"
-                      : "text-gray-700"
+                      ? "bg-slate-100 text-slate-900"
+                      : "text-slate-700"
                   }`}
                 >
                   {page.name}
@@ -87,7 +87,7 @@ export default function MainLayout({ children }) {
 
           {/* CATÁLOGOS */}
           <div>
-            <p className="text-xs text-gray-400 uppercase mb-2 font-semibold">
+            <p className="text-xs text-slate-500 uppercase mb-2 font-semibold">
               Catálogos
             </p>
 
@@ -97,10 +97,10 @@ export default function MainLayout({ children }) {
                   key={item.path}
                   to={item.path}
                   onClick={() => setSidebarOpen(false)} // Cierra el menú en móvil al navegar
-                  className={`p-2 rounded-md font-medium transition-colors hover:bg-blue-100 ${
+                  className={`p-2 rounded-md font-medium transition-colors hover:bg-slate-50 ${
                     location.pathname === item.path
-                      ? "bg-blue-200 text-blue-900"
-                      : "text-gray-700"
+                      ? "bg-slate-100 text-slate-900"
+                      : "text-slate-700"
                   }`}
                 >
                   {item.name}
@@ -117,18 +117,18 @@ export default function MainLayout({ children }) {
       <main className="flex-1 flex flex-col min-w-0">
         
         {/* TOP BAR */}
-        <header className="bg-white p-4 shadow-md border-b flex justify-between items-center flex-shrink-0 relative z-40">
+        <header className="bg-white p-4 shadow-sm border-b border-slate-200 flex justify-between items-center flex-shrink-0 relative z-40">
           <div className="flex items-center">
             {/* BOTÓN HAMBURGUESA (Solo visible en móvil) */}
             <button 
               onClick={() => setSidebarOpen(true)}
-              className="mr-3 p-2 text-gray-600 rounded-md hover:bg-gray-100 focus:outline-none md:hidden"
+              className="mr-3 p-2 text-slate-600 rounded-md hover:bg-slate-50 focus:outline-none md:hidden"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <span className="font-semibold text-gray-800 truncate">
+            <span className="font-semibold text-slate-900 truncate">
               {currentPage}
             </span>
           </div>
@@ -137,7 +137,7 @@ export default function MainLayout({ children }) {
           <div className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm hover:bg-blue-700 transition-colors"
+              className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shadow-sm hover:bg-slate-800 transition-colors"
             >
               {user?.alias?.charAt(0).toUpperCase() || "U"}
             </button>
@@ -145,10 +145,10 @@ export default function MainLayout({ children }) {
             {userMenuOpen && (
               <div className="absolute right-0 top-full mt-2 w-48 overflow-visible bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] origin-top-right">
                 <div className="px-4 py-3 border-b border-slate-100">
-                  <p className="text-sm font-semibold text-gray-800">
+                  <p className="text-sm font-semibold text-slate-900">
                     {user?.alias}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     Sesión activa
                   </p>
                 </div>
@@ -165,7 +165,7 @@ export default function MainLayout({ children }) {
         </header>
 
         {/* PAGE CONTENT - CON SCROLL */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 bg-gray-50">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 bg-slate-50">
           {children}
         </div>
       </main>

@@ -193,14 +193,14 @@ export default function ModalMantenimientoView({
         <div className="flex gap-2 flex-wrap justify-end">
           <button
             onClick={handleAbrirTratamiento}
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            className="px-4 py-2 bg-transparent border border-amber-300 text-amber-700 hover:bg-amber-50 active:bg-amber-100 rounded-lg text-sm font-semibold transition-colors"
           >
             Tratar
           </button>
 
           <button
             onClick={() => handleCambiarEstado("RECHAZADO")}
-            className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-semibold transition-colors"
+            className="px-4 py-2 bg-transparent border border-rose-300 text-rose-700 hover:bg-rose-50 active:bg-rose-100 rounded-lg text-sm font-semibold transition-colors"
           >
             Rechazar
           </button>
@@ -213,7 +213,7 @@ export default function ModalMantenimientoView({
         <div className="flex gap-2 flex-wrap justify-end">
           <button
             onClick={() => handleCambiarEstado("CON_OT")}
-            className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold transition-colors"
+            className="px-4 py-2 bg-transparent border border-violet-300 text-violet-700 hover:bg-violet-50 active:bg-violet-100 rounded-lg text-sm font-semibold transition-colors"
           >
             Generar OT
           </button>
@@ -226,14 +226,14 @@ export default function ModalMantenimientoView({
         <div className="flex gap-2 flex-wrap justify-end">
           <button
             onClick={() => handleCambiarEstado("FINALIZADO")}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors"
+            className="px-4 py-2 bg-transparent border border-emerald-300 text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100 rounded-lg text-sm font-semibold transition-colors"
           >
             Finalizar
           </button>
 
           <button
             onClick={() => handleCambiarEstado("FINALIZADO_SIN_FACTURACION")}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold transition-colors"
+            className="px-4 py-2 bg-transparent border border-slate-300 text-slate-700 hover:bg-slate-50 active:bg-slate-100 rounded-lg text-sm font-semibold transition-colors"
           >
             Sin Facturación
           </button>

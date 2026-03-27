@@ -1,10 +1,8 @@
-
-
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { 
   FileText, User, Calendar, AlertCircle, Wrench, Package, 
   CheckCircle, XCircle, Clock, FileCheck, MapPin, Phone, Mail,
-  Briefcase, DollarSign, Layers, Link2, AlertTriangle
+  Briefcase, DollarSign, Layers, AlertTriangle
 } from "lucide-react";
 import { ESTADOS_AV } from "../config/camposMantenimiento";
 import React, { useMemo } from "react";
@@ -34,25 +32,40 @@ export default function MantenimientoKanban({
     return icons[colId] || FileText;
   };
 
-  const getColumnColor = (colId) => {
-    const colors = {
-      CREADO: "from-blue-500 to-blue-600",
-      TRATADO: "from-yellow-500 to-yellow-600",
-      CON_OT: "from-purple-500 to-purple-600",
-      FINALIZADO: "from-green-500 to-green-600",
-      FINALIZADO_SIN_FACTURACION: "from-gray-500 to-gray-600",
-      RECHAZADO: "from-red-500 to-red-600",
+  // 🎨 CABECERAS: Fondo pastel sutil, texto del color principal
+  const getColumnHeaderStyle = (colId) => {
+    const styles = {
+      CREADO: "bg-blue-50 text-blue-700 border-b border-blue-100",
+      TRATADO: "bg-amber-50 text-amber-700 border-b border-amber-100",
+      CON_OT: "bg-violet-50 text-violet-700 border-b border-violet-100",
+      FINALIZADO: "bg-emerald-50 text-emerald-700 border-b border-emerald-100",
+      FINALIZADO_SIN_FACTURACION: "bg-slate-50 text-slate-700 border-b border-slate-200",
+      RECHAZADO: "bg-rose-50 text-rose-700 border-b border-rose-100",
     };
-    return colors[colId] || "from-gray-500 to-gray-600";
+    return styles[colId] || "bg-slate-50 text-slate-700 border-b border-slate-200";
   };
 
-  const getPriorityColor = (priority) => {
-    const colors = {
-      Alta: "bg-red-100 text-red-700 border-red-300",
-      Media: "bg-yellow-100 text-yellow-700 border-yellow-300",
-      Baja: "bg-green-100 text-green-700 border-green-300",
+  // 🎨 TARJETAS CORPORATIVAS: Fondo blanco, borde superior grueso (border-t-4)
+  const getCardOutlineStyle = (estadoReal) => {
+    const styles = {
+      CREADO: "bg-white border border-blue-200 border-t-4 border-t-blue-500 hover:border-blue-300",
+      TRATADO: "bg-white border border-amber-200 border-t-4 border-t-amber-500 hover:border-amber-300",
+      CON_OT: "bg-white border border-violet-200 border-t-4 border-t-violet-500 hover:border-violet-300",
+      FINALIZADO: "bg-white border border-emerald-200 border-t-4 border-t-emerald-500 hover:border-emerald-300",
+      FINALIZADO_SIN_FACTURACION: "bg-white border border-slate-200 border-t-4 border-t-slate-400 hover:border-slate-300",
+      RECHAZADO: "bg-white border border-rose-200 border-t-4 border-t-rose-500 hover:border-rose-300",
     };
-    return colors[priority] || "bg-gray-100 text-gray-700 border-gray-300";
+    return styles[estadoReal] || "bg-white border border-slate-200 border-t-4 border-t-slate-400";
+  };
+
+  // 🎨 BADGES ESTILO GHOST (Transparentes con borde de color)
+  const getPriorityGhostColor = (priority) => {
+    const colors = {
+      Alta: "bg-transparent border border-rose-300 text-rose-600",
+      Media: "bg-transparent border border-amber-300 text-amber-600",
+      Baja: "bg-transparent border border-emerald-300 text-emerald-600",
+    };
+    return colors[priority] || "bg-transparent border border-slate-300 text-slate-600";
   };
 
   const getEquipoData = (equipoId) => {
@@ -63,22 +76,20 @@ export default function MantenimientoKanban({
     if (!desglose || !desglose.esMultiple) return null;
 
     return (
-      <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+      <div className="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
           <Layers className="w-3 h-3" />
-          <span>Desglose de OTs ({desglose.total})</span>
+          <span>Desglose ({desglose.total} OTs)</span>
         </div>
         
         <div className="grid grid-cols-2 gap-1">
           {Object.entries(desglose.porEstado).map(([estado, cantidad]) => (
             <div 
               key={estado}
-              className={`flex items-center justify-between px-2 py-1 rounded text-xs ${
-                ESTADOS_AV[estado]?.badge || 'bg-gray-100 text-gray-700'
-              }`}
+              className={`flex items-center justify-between px-1.5 py-0.5 rounded text-[10px] bg-slate-50 border border-slate-100`}
             >
-              <span className="font-semibold">{ESTADOS_AV[estado]?.label}</span>
-              <span className="font-bold">{cantidad}</span>
+              <span className="font-semibold text-slate-600 truncate">{ESTADOS_AV[estado]?.label}</span>
+              <span className="font-bold text-slate-800 ml-1">{cantidad}</span>
             </div>
           ))}
         </div>
@@ -87,121 +98,117 @@ export default function MantenimientoKanban({
   };
 
   const getTargetKey = (obj) => {
-  if (obj?.equipoId) return `E:${String(obj.equipoId)}`;
-  if (obj?.ubicacionTecnicaId) return `U:${String(obj.ubicacionTecnicaId)}`;
-  if (obj?.ubicacionId) return `U:${String(obj.ubicacionId)}`;
-  return null;
-};
+    if (obj?.equipoId) return `E:${String(obj.equipoId)}`;
+    if (obj?.ubicacionTecnicaId) return `U:${String(obj.ubicacionTecnicaId)}`;
+    if (obj?.ubicacionId) return `U:${String(obj.ubicacionId)}`;
+    return null;
+  };
 
-const reorganizarColumnasPorOTs = (columns) => {
-  const nuevasColumnas = {};
+  const reorganizarColumnasPorOTs = (columns) => {
+    const nuevasColumnas = {};
 
-  Object.keys(columns).forEach((colId) => {
-    nuevasColumnas[colId] = { items: [] };
-  });
+    Object.keys(columns).forEach((colId) => {
+      nuevasColumnas[colId] = { items: [] };
+    });
 
-  Object.values(columns).forEach((col) => {
-    col.items.forEach((item) => {
-      const otsDelAviso = ordenesTrabajoData.filter(
-        (ot) => String(ot.avisoId) === String(item.id)
-      );
+    Object.values(columns).forEach((col) => {
+      col.items.forEach((item) => {
+        const otsDelAviso = ordenesTrabajoData.filter(
+          (ot) => String(ot.avisoId) === String(item.id)
+        );
 
-      // Targets reales del aviso
-      const targetsAviso = new Set();
+        const targetsAviso = new Set();
 
-      (item.equiposRelacion || []).forEach((rel) => {
-        const key = getTargetKey(rel);
-        if (key) targetsAviso.add(key);
-      });
+        (item.equiposRelacion || []).forEach((rel) => {
+          const key = getTargetKey(rel);
+          if (key) targetsAviso.add(key);
+        });
 
-      (item.ubicacionesRelacion || []).forEach((rel) => {
-        const key = getTargetKey(rel);
-        if (key) targetsAviso.add(key);
-      });
+        (item.ubicacionesRelacion || []).forEach((rel) => {
+          const key = getTargetKey(rel);
+          if (key) targetsAviso.add(key);
+        });
 
-      // Si no tiene OTs, se queda en su estado real
-      if (!otsDelAviso.length) {
-        nuevasColumnas[item.estado]?.items.push({
+        if (!otsDelAviso.length) {
+          nuevasColumnas[item.estado]?.items.push({
+            ...item,
+            _estadoReal: item.estado,
+            _estadoOriginal: item.estado,
+            _tieneOTs: false,
+            _esParcial: false,
+            _equiposPendientes: 0,
+            _cantidadOTs: 0,
+            _desglose: null,
+          });
+          return;
+        }
+
+        const targetsConOT = new Set();
+
+        otsDelAviso.forEach((ot) => {
+          (ot.equipos || []).forEach((targetOT) => {
+            const key = getTargetKey(targetOT);
+            if (key) targetsConOT.add(key);
+          });
+        });
+
+        const totalTargetsAviso = targetsAviso.size;
+        const cantidadTargetsConOT = targetsConOT.size;
+        const equiposPendientes = Math.max(0, totalTargetsAviso - cantidadTargetsConOT);
+
+        const estaCompleto =
+          totalTargetsAviso > 0 && cantidadTargetsConOT >= totalTargetsAviso;
+
+        const esParcial =
+          cantidadTargetsConOT > 0 && cantidadTargetsConOT < totalTargetsAviso;
+
+        const porEstado = {};
+        otsDelAviso.forEach((ot) => {
+          const estadoOT = ot.estado || "CREADO";
+          porEstado[estadoOT] = (porEstado[estadoOT] || 0) + 1;
+        });
+
+        let columnaDestino = "TRATADO";
+
+        if (totalTargetsAviso === 0) {
+          columnaDestino = "CON_OT";
+        } else if (estaCompleto) {
+          columnaDestino = "CON_OT";
+        } else if (esParcial) {
+          columnaDestino = "TRATADO";
+        }
+
+        nuevasColumnas[columnaDestino]?.items.push({
           ...item,
-          _estadoReal: item.estado,
           _estadoOriginal: item.estado,
-          _tieneOTs: false,
-          _esParcial: false,
-          _equiposPendientes: 0,
-          _cantidadOTs: 0,
-          _desglose: null,
+          _estadoReal: columnaDestino,
+          _tieneOTs: true,
+          _esParcial: esParcial,
+          _equiposPendientes: equiposPendientes,
+          _cantidadOTs: otsDelAviso.length,
+          _desglose: {
+            total: otsDelAviso.length,
+            porEstado,
+            equiposConOT: cantidadTargetsConOT,
+            equiposTotales: totalTargetsAviso,
+            esMultiple: otsDelAviso.length > 1,
+          },
         });
-        return;
-      }
-
-      // Targets cubiertos por las OTs
-      const targetsConOT = new Set();
-
-      otsDelAviso.forEach((ot) => {
-        (ot.equipos || []).forEach((targetOT) => {
-          const key = getTargetKey(targetOT);
-          if (key) targetsConOT.add(key);
-        });
-      });
-
-      const totalTargetsAviso = targetsAviso.size;
-      const cantidadTargetsConOT = targetsConOT.size;
-      const equiposPendientes = Math.max(0, totalTargetsAviso - cantidadTargetsConOT);
-
-      const estaCompleto =
-        totalTargetsAviso > 0 && cantidadTargetsConOT >= totalTargetsAviso;
-
-      const esParcial =
-        cantidadTargetsConOT > 0 && cantidadTargetsConOT < totalTargetsAviso;
-
-      const porEstado = {};
-      otsDelAviso.forEach((ot) => {
-        const estadoOT = ot.estado || "CREADO";
-        porEstado[estadoOT] = (porEstado[estadoOT] || 0) + 1;
-      });
-
-      // Si hay al menos una OT y cubre todos los targets => CON_OT
-      // Si hay OT parcial => TRATADO
-      // Si por alguna razón no se pudo calcular targets del aviso, al menos mostrar CON_OT
-      let columnaDestino = "TRATADO";
-
-      if (totalTargetsAviso === 0) {
-        columnaDestino = "CON_OT";
-      } else if (estaCompleto) {
-        columnaDestino = "CON_OT";
-      } else if (esParcial) {
-        columnaDestino = "TRATADO";
-      }
-
-      nuevasColumnas[columnaDestino]?.items.push({
-        ...item,
-        _estadoOriginal: item.estado,
-        _estadoReal: columnaDestino,
-        _tieneOTs: true,
-        _esParcial: esParcial,
-        _equiposPendientes: equiposPendientes,
-        _cantidadOTs: otsDelAviso.length,
-        _desglose: {
-          total: otsDelAviso.length,
-          porEstado,
-          equiposConOT: cantidadTargetsConOT,
-          equiposTotales: totalTargetsAviso,
-          esMultiple: otsDelAviso.length > 1,
-        },
       });
     });
-  });
 
-  return nuevasColumnas;
-};
+    return nuevasColumnas;
+  };
+
   const columnasReorganizadas = reorganizarColumnasPorOTs(filteredColumns);
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="flex flex-nowrap gap-3 md:gap-4 h-[calc(100vh-200px)] items-start overflow-x-auto snap-x snap-mandatory pb-2 px-1">
+      {/* Contenedor principal sin scroll en PC */}
+      <div className="w-full flex flex-nowrap gap-2 md:gap-3 h-[calc(100vh-200px)] items-start overflow-x-auto lg:overflow-hidden snap-x snap-mandatory pb-2 px-1">
         {Object.entries(columnasReorganizadas).map(([colId, col]) => {
           const Icon = getColumnIcon(colId);
-          const gradient = getColumnColor(colId);
+          const headerClasses = getColumnHeaderStyle(colId);
           
           return (
             <Droppable droppableId={colId} key={colId}>
@@ -209,35 +216,35 @@ const reorganizarColumnasPorOTs = (columns) => {
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`flex flex-col rounded-2xl transition-all shadow-lg h-full w-[85vw] md:w-[320px] md:min-w-[320px] flex-shrink-0 snap-center ${
+                  // Columnas se comprimen equitativamente en PC
+                  className={`flex flex-col rounded-xl transition-colors h-full w-[85vw] flex-shrink-0 snap-center lg:flex-1 lg:min-w-0 lg:w-auto ${
                     snapshot.isDraggingOver
-                      ? "bg-blue-50 ring-2 ring-blue-400"
-                      : "bg-white border-2 border-slate-200"
+                      ? "bg-slate-50 ring-2 ring-slate-200"
+                      : "bg-white border border-slate-100 shadow-sm"
                   }`}
                 >
-                  {/* HEADER DE COLUMNA */}
-                  <div className={`p-3 md:p-5 rounded-t-2xl bg-gradient-to-br ${gradient} text-white shadow-md flex-shrink-0`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2 md:gap-3">
-                        <div className="p-2 md:p-2.5 bg-white/25 rounded-xl backdrop-blur-sm border border-white/30">
-                          <Icon className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
-                        </div>
-                        <h3 className="font-bold text-sm md:text-base">
+                  {/* CABECERA DE COLUMNA: Outline/Pastel */}
+                  <div className={`px-3 py-2.5 md:px-3.5 md:py-3 rounded-t-xl ${headerClasses} flex-shrink-0`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <Icon className="w-4 h-4 flex-shrink-0 opacity-70" strokeWidth={2.5} />
+                        <h3 className="font-bold text-xs md:text-sm truncate uppercase tracking-tight">
                           {ESTADOS_AV[colId]?.label}
                         </h3>
                       </div>
-                      <span className="px-2 md:px-3 py-1 md:py-1.5 bg-white/25 rounded-full text-xs md:text-sm font-bold backdrop-blur-sm border border-white/30">
+                      <span className="px-2 py-0.5 bg-white rounded-full text-[10px] md:text-xs font-bold shadow-sm border border-black/5 ml-2">
                         {col.items.length}
                       </span>
                     </div>
                   </div>
 
                   {/* TARJETAS */}
-                  <div className="flex-1 p-3 md:p-4 space-y-2 md:space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50 to-white">
+                  <div className="flex-1 p-2 md:p-2.5 space-y-2 md:space-y-3 overflow-y-auto bg-slate-50/50">
                     {col.items.map((item, i) => {
                       const tieneDesglose = item._desglose && item._desglose.total > 1;
                       const esParcial = item._esParcial;
                       const estadoReal = item._estadoReal || item.estado;
+                      const cardStyle = getCardOutlineStyle(estadoReal);
 
                       return (
                         <Draggable
@@ -255,292 +262,173 @@ const reorganizarColumnasPorOTs = (columns) => {
                                 setViewStep(1);
                                 setViewOpen(true);
                               }}
-                              className={`bg-white rounded-xl border-2 shadow-md transition-all duration-200 cursor-pointer group relative flex flex-col ${
-                                snapshot.isDragging
-                                  ? "border-blue-500 shadow-2xl scale-105 rotate-1 ring-4 ring-blue-200"
-                                  : tieneDesglose
-                                  ? "border-purple-300 hover:border-purple-400 hover:shadow-xl"
-                                  : esParcial
-                                  ? "border-orange-300 hover:border-orange-400 hover:shadow-xl"
-                                  : "border-slate-200 hover:border-blue-300 hover:shadow-lg"
+                              // TARJETA CORPORATIVA: Borde superior grueso
+                              className={`${cardStyle} rounded-xl shadow-sm transition-all duration-200 cursor-pointer group relative flex flex-col ${
+                                snapshot.isDragging ? "shadow-xl scale-[1.02] rotate-1 ring-4 ring-black/5 z-50" : "hover:shadow-md"
                               }`}
                             >
                               {/* Indicador de OT múltiple */}
                               {tieneDesglose && (
-                                <div className="absolute -top-2 -right-2 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-full px-2 md:px-2.5 py-0.5 md:py-1 text-[10px] md:text-xs font-bold shadow-lg border-2 border-white flex items-center gap-1">
-                                  <Layers className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                                <div className="absolute -top-3 -right-2 bg-white text-violet-700 border border-violet-200 rounded-full px-2 py-0.5 text-[9px] md:text-[10px] font-bold shadow-sm flex items-center gap-1 z-10">
+                                  <Layers className="w-2.5 h-2.5" />
                                   {item._desglose.total} OTs
                                 </div>
                               )}
 
-                              {/* CARD CONTENT */}
-                              <div className="flex-1 p-3 md:p-4 space-y-2 md:space-y-3">
-                                {/* CONTENIDO DINÁMICO */}
-                                {columnOrder.map((key) => {
-                                  if (!cardFields[key]) return null;
+                              {/* CONTENIDO DE LA TARJETA */}
+                              <div className="flex-1 p-2.5 md:p-3 space-y-2">
+                                {/* Encabezado de la Tarjeta (ID y Cliente) */}
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-slate-800 text-[11px] md:text-xs truncate">
+                                      #{item.numeroAviso}
+                                    </span>
+                                    {/* Prioridad Ghost */}
+                                    {item.prioridad && (
+                                      <span className={`text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded ${getPriorityGhostColor(item.prioridad)}`}>
+                                        {item.prioridad}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-start gap-1.5">
+                                    <User className="w-3 h-3 text-slate-400 flex-shrink-0 mt-0.5" />
+                                    <span className="text-[10px] md:text-[11px] text-slate-500 font-medium line-clamp-2">
+                                      {item.cliente || "Sin cliente"}
+                                    </span>
+                                  </div>
+                                </div>
 
-                                  switch (key) {
-                                    case "numeroAviso":
-                                      return (
-                                        <div key={key} className="flex items-center gap-2">
-                                          <FileText className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-600" />
-                                          <span className="font-bold text-slate-900 text-xs md:text-sm">
-                                            #{item.numeroAviso}
-                                          </span>
-                                        </div>
-                                      );
+                                {/* Caja interna gris (Caja de Datos Internos) */}
+                                <div className="bg-slate-50 border border-slate-100 rounded-lg p-2 space-y-1.5">
+                                  {columnOrder.map((key) => {
+                                    if (!cardFields[key] || ["numeroAviso", "cliente", "prioridad"].includes(key)) return null;
 
-                                    case "cliente":
-                                      return (
-                                        <div key={key} className="flex items-start gap-2">
-                                          <User className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                                          <span className="text-xs md:text-sm text-slate-700 font-medium line-clamp-2">
-                                            {item.cliente || "Sin cliente"}
-                                          </span>
-                                        </div>
-                                      );
-
-                                    case "estado":
-                                      return (
-                                        <span
-                                          key={key}
-                                          className={`inline-flex items-center px-3 py-1.5 text-xs font-bold border-2 rounded-lg shadow-sm ${
-                                            ESTADOS_AV[estadoReal]?.badge
-                                          }`}
-                                        >
-                                          {ESTADOS_AV[estadoReal]?.label}
-                                        </span>
-                                      );
-
-                                    case "fecha":
-                                      return (
-                                        <div key={key} className="flex items-center gap-2 text-sm text-slate-600">
-                                          <Calendar className="w-4 h-4" />
-                                          <span>
-                                            {item.fechaAtencion
-                                              ? new Date(item.fechaAtencion).toLocaleDateString("es-PE", {
-                                                  day: "2-digit",
-                                                  month: "short",
-                                                })
-                                              : "Sin fecha"}
-                                          </span>
-                                        </div>
-                                      );
-
-                                    case "prioridad":
-                                      return item.prioridad ? (
-                                        <div key={key} className="flex items-center gap-2">
-                                          <AlertCircle className="w-4 h-4 text-slate-400" />
-                                          <span
-                                            className={`text-xs font-bold px-2.5 py-1 rounded-lg border-2 ${getPriorityColor(
-                                              item.prioridad
-                                            )}`}
-                                          >
-                                            {item.prioridad}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "solicitante":
-                                      return item.solicitante ? (
-                                        <div key={key} className="text-xs text-slate-600 flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
-                                          <User className="w-3 h-3" />
-                                          {item.solicitante}
-                                        </div>
-                                      ) : null;
-
-                                    case "tipoMantenimiento":
-                                      return item.tipoMantenimiento ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <Wrench className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-700 font-medium">
-                                            {item.tipoMantenimiento}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "tipoAviso":
-                                      return (
-                                        <div key={key} className="flex items-center gap-1">
-                                          <span
-                                            className={`text-xs font-bold px-2.5 py-1 rounded-lg border-2 ${
-                                              item.tipoAviso === "mantenimiento"
-                                                ? "bg-blue-50 text-blue-700 border-blue-300"
-                                                : "bg-green-50 text-green-700 border-green-300"
-                                            }`}
-                                          >
-                                            {item.tipoAviso === "mantenimiento" ? "🔧 Mantenimiento" : "📦 Instalación"}
-                                          </span>
-                                        </div>
-                                      );
-
-                                    case "equipo":
-                                      if (!item.equiposRelacion || item.equiposRelacion.length === 0) return null;
-                                      
-                                      const primerEquipoRel = item.equiposRelacion[0];
-                                      const primerEquipo = primerEquipoRel?.equipo;
-                                      
-                                      return primerEquipo ? (
-                                        <div key={key} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1.5 rounded-lg">
-                                          <Package className="w-3.5 h-3.5 text-slate-500" />
-                                          <span className="text-xs text-slate-700 font-medium line-clamp-1">
-                                            {primerEquipo.nombre}
-                                          </span>
-                                          {item.equiposRelacion.length > 1 && (
-                                            <span className="text-xs text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded-full ml-auto font-bold">
-                                              +{item.equiposRelacion.length - 1}
+                                    switch (key) {
+                                      case "fecha":
+                                        return (
+                                          <div key={key} className="flex items-center justify-between text-[10px] md:text-[11px]">
+                                            <span className="text-slate-400 flex items-center gap-1">
+                                              <Calendar className="w-3 h-3" /> Fecha
                                             </span>
-                                          )}
-                                        </div>
-                                      ) : null;
+                                            <span className="text-slate-700 font-medium">
+                                              {item.fechaAtencion ? new Date(item.fechaAtencion).toLocaleDateString("es-PE", { day: "2-digit", month: "short" }) : "-"}
+                                            </span>
+                                          </div>
+                                        );
 
-                                    case "ordenVenta":
-                                      return item.ordenVenta ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-600">
-                                            <span className="font-bold">OV:</span> {item.ordenVenta}
-                                          </span>
-                                        </div>
-                                      ) : null;
+                                      case "solicitante":
+                                        return item.solicitante ? (
+                                          <div key={key} className="flex items-center justify-between text-[10px] md:text-[11px]">
+                                            <span className="text-slate-400 flex items-center gap-1">
+                                              <User className="w-3 h-3" /> Solic.
+                                            </span>
+                                            <span className="text-slate-700 font-medium truncate max-w-[100px]">{item.solicitante}</span>
+                                          </div>
+                                        ) : null;
 
-                                    case "centroCosto":
-                                      return item.centroCosto ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <DollarSign className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-600">
-                                            <span className="font-bold">CC:</span> {item.centroCosto}
-                                          </span>
-                                        </div>
-                                      ) : null;
+                                      case "tipoMantenimiento":
+                                        return item.tipoMantenimiento ? (
+                                          <div key={key} className="flex items-center justify-between text-[10px] md:text-[11px]">
+                                            <span className="text-slate-400 flex items-center gap-1">
+                                              <Wrench className="w-3 h-3" /> Tipo
+                                            </span>
+                                            <span className="text-slate-700 font-medium truncate">{item.tipoMantenimiento}</span>
+                                          </div>
+                                        ) : null;
 
-                                    case "producto":
-                                      return item.producto ? (
-                                        <div key={key} className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
-                                          <Package className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-700 line-clamp-1">
-                                            {item.producto}
-                                          </span>
-                                        </div>
-                                      ) : null;
+                                      case "tipoAviso":
+                                        return (
+                                          <div key={key} className="flex items-center gap-1 mt-1">
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border bg-transparent ${item.tipoAviso === "mantenimiento" ? "text-slate-600 border-slate-300" : "text-emerald-600 border-emerald-300"}`}>
+                                              {item.tipoAviso === "mantenimiento" ? "🔧 Mant." : "📦 Inst."}
+                                            </span>
+                                          </div>
+                                        );
 
-                                    case "descripcionResumida":
-                                      return item.descripcionResumida ? (
-                                        <div key={key} className="text-sm text-slate-700 line-clamp-2 italic border-l-4 border-blue-400 pl-3 py-1 bg-blue-50 rounded-r">
-                                          {item.descripcionResumida}
-                                        </div>
-                                      ) : null;
+                                      case "equipo":
+                                        if (!item.equiposRelacion || item.equiposRelacion.length === 0) return null;
+                                        const primerEquipoRel = item.equiposRelacion[0];
+                                        const primerEquipo = primerEquipoRel?.equipo;
+                                        return primerEquipo ? (
+                                          <div key={key} className="flex items-center justify-between text-[10px] md:text-[11px] pt-1 border-t border-slate-200/60 mt-1">
+                                            <span className="text-slate-400 flex items-center gap-1">
+                                              <Package className="w-3 h-3" /> Equipo
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-slate-700 font-medium truncate max-w-[80px]">{primerEquipo.nombre}</span>
+                                              {item.equiposRelacion.length > 1 && (
+                                                <span className="text-[9px] text-slate-500 bg-slate-200 px-1 rounded-full font-bold">
+                                                  +{item.equiposRelacion.length - 1}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ) : null;
 
-                                    case "ubicacionTecnica":
-                                      return item.ubicacionTecnica ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-600 line-clamp-1">
-                                            {item.ubicacionTecnica}
-                                          </span>
-                                        </div>
-                                      ) : null;
+                                      case "descripcionResumida":
+                                        return item.descripcionResumida ? (
+                                          <div key={key} className="text-[10px] text-slate-500 line-clamp-2 italic pt-1">
+                                            "{item.descripcionResumida}"
+                                          </div>
+                                        ) : null;
 
-                                    case "nombreContacto":
-                                      return item.nombreContacto ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <User className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-600">
-                                            {item.nombreContacto}
-                                          </span>
-                                        </div>
-                                      ) : null;
+                                      default: {
+                                        if (!item[key]) return null;
+                                        const contenido = typeof item[key] === 'object' ? JSON.stringify(item[key]) : item[key];
+                                        return (
+                                          <div key={key} className="text-[10px] md:text-[11px] text-slate-500 truncate">
+                                            {contenido}
+                                          </div>
+                                        );
+                                      }
+                                    }
+                                  })}
+                                </div>
 
-                                    case "correoContacto":
-                                      return item.correoContacto ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <Mail className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-600 truncate">
-                                            {item.correoContacto}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                    case "numeroContacto":
-                                      return item.numeroContacto ? (
-                                        <div key={key} className="flex items-center gap-1.5">
-                                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                                          <span className="text-xs text-slate-600">
-                                            {item.numeroContacto}
-                                          </span>
-                                        </div>
-                                      ) : null;
-
-                                  default: {
-  if (!item[key]) return null;
-  
-  // Si el valor es un objeto/arreglo, lo convierte a texto para que no rompa React
-  const contenido = typeof item[key] === 'object' 
-    ? JSON.stringify(item[key]) 
-    : item[key];
-
-  return (
-    <div key={key} className="text-xs text-slate-600 truncate">
-      {contenido}
-    </div>
-  );
-}
-                                  }
-                                })}
-
-                                {/* DESGLOSE DE ESTADOS */}
                                 <DesgloseEstados desglose={item._desglose} />
 
-                                {/* BADGE DE ORDEN PARCIAL con barra de progreso */}
+                                {/* OT PARCIAL */}
                                 {esParcial && (
-                                  <div className="pt-3 border-t border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 -mx-4 -mb-4 px-4 pb-3 rounded-b-xl mt-auto">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div className="flex items-center gap-2">
-                                        <AlertTriangle className="w-4 h-4 text-orange-600" />
-                                        <span className="text-xs font-bold text-orange-800">
-                                          Orden de Trabajo Parcial
+                                  <div className="pt-2 border-t border-slate-100 mt-2">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <div className="flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3 text-amber-500" />
+                                        <span className="text-[9px] md:text-[10px] font-bold text-amber-600">
+                                          OT Parcial
                                         </span>
                                       </div>
-                                      <span className="px-2 py-1 bg-orange-200 text-orange-800 rounded-full text-xs font-bold">
-                                        {item._equiposPendientes} pendiente{item._equiposPendientes !== 1 ? 's' : ''}
+                                      <span className="px-1 py-0.5 bg-transparent border border-amber-200 text-amber-600 rounded text-[9px] font-bold">
+                                        {item._equiposPendientes} pend.
                                       </span>
                                     </div>
-                                    <div className="w-full bg-orange-200 rounded-full h-2 overflow-hidden">
+                                    <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
                                       <div 
-                                        className="bg-orange-600 h-full rounded-full transition-all duration-300"
-                                        style={{ 
-                                          width: `${((item._desglose?.equiposConOT || 0) / (item._desglose?.equiposTotales || 1)) * 100}%` 
-                                        }}
+                                        className="bg-amber-400 h-full rounded-full transition-all duration-300"
+                                        style={{ width: `${((item._desglose?.equiposConOT || 0) / (item._desglose?.equiposTotales || 1)) * 100}%` }}
                                       />
-                                    </div>
-                                    <div className="text-xs text-orange-700 mt-1 text-center font-medium">
-                                      {item._desglose?.equiposConOT || 0} de {item._desglose?.equiposTotales || 0} equipos con OT
                                     </div>
                                   </div>
                                 )}
                               </div>
 
-                              {/* BOTONES DE ACCIÓN */}
+                              {/* BOTONES DE ACCIÓN: Estilo Outline/Ghost adaptado al borde */}
                               <div
-                                className="px-3 pb-3 md:px-4 md:pb-4 flex gap-1.5 md:gap-2 flex-shrink-0"
+                                className="px-2.5 pb-2.5 md:px-3 md:pb-3 flex flex-col xl:flex-row flex-wrap gap-1.5 flex-shrink-0"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {estadoReal === "CREADO" && (
                                   <>
                                     <button
                                       onClick={() => abrirTratamiento(item)}
-                                      className="flex-1 px-2 py-1.5 md:px-4 md:py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-[10px] md:text-xs font-bold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-1.5"
+                                      className="flex-1 px-2 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-blue-600 hover:border-blue-300 text-[10px] md:text-[11px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 truncate shadow-sm"
                                     >
-                                      <Wrench className="w-3 h-3 md:w-4 md:h-4" />
-                                      Tratar
+                                      <Wrench className="w-3 h-3 flex-shrink-0" /> Tratar
                                     </button>
-
                                     <button
                                       onClick={() => cambiarEstado(item, "RECHAZADO")}
-                                      className="flex-1 px-2 py-1.5 md:px-4 md:py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-[10px] md:text-xs font-bold rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-1.5"
+                                      className="flex-1 px-2 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-[10px] md:text-[11px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 truncate shadow-sm"
                                     >
-                                      <XCircle className="w-3 h-3 md:w-4 md:h-4" />
-                                      Rechazar
+                                      <XCircle className="w-3 h-3 flex-shrink-0" /> Rechazar
                                     </button>
                                   </>
                                 )}
@@ -548,29 +436,26 @@ const reorganizarColumnasPorOTs = (columns) => {
                                 {estadoReal === "TRATADO" && (
                                   <button
                                     onClick={() => cambiarEstado(item, "CON_OT")}
-                                    className="w-full px-2 py-1.5 md:px-4 md:py-2.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-[10px] md:text-xs font-bold rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-1.5"
+                                    className="w-full px-2 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-violet-50 hover:text-violet-600 hover:border-violet-300 text-[10px] md:text-[11px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 truncate shadow-sm"
                                   >
-                                    <FileText className="w-3 h-3 md:w-4 md:h-4" />
-                                    Generar OT
+                                    <FileText className="w-3 h-3 flex-shrink-0" /> Generar OT
                                   </button>
                                 )}
-
-                                {estadoReal === "CON_OT" && (
+{estadoReal === "CON_OT" && (
                                   <>
                                     <button
                                       onClick={() => cambiarEstado(item, "FINALIZADO")}
-                                      className="flex-1 px-2 py-1.5 md:px-4 md:py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-[10px] md:text-xs font-bold rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-1.5"
+                                      className="flex-1 px-2 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-300 text-[10px] md:text-[11px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 truncate shadow-sm"
                                     >
-                                      <CheckCircle className="w-3 h-3 md:w-4 md:h-4" />
-                                      Finalizar
+                                      <CheckCircle className="w-3 h-3 flex-shrink-0" /> Finalizar
                                     </button>
 
+                                    {/* Aquí está de vuelta el botón Sin Facturación */}
                                     <button
                                       onClick={() => cambiarEstado(item, "FINALIZADO_SIN_FACTURACION")}
-                                      className="flex-1 px-2 py-1.5 md:px-4 md:py-2.5 bg-gradient-to-r from-slate-500 to-slate-600 text-white text-[10px] md:text-xs font-bold rounded-lg hover:from-slate-600 hover:to-slate-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1 md:gap-1.5"
+                                      className="flex-1 px-2 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 hover:border-slate-400 text-[10px] md:text-[11px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 truncate shadow-sm"
                                     >
-                                      <FileCheck className="w-3 h-3 md:w-4 md:h-4" />
-                                      Sin Fact.
+                                      <FileCheck className="w-3 h-3 flex-shrink-0" /> Sin Fact.
                                     </button>
                                   </>
                                 )}
@@ -585,12 +470,9 @@ const reorganizarColumnasPorOTs = (columns) => {
 
                     {/* EMPTY STATE */}
                     {col.items.length === 0 && !snapshot.isDraggingOver && (
-                      <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                        <div className="bg-slate-100 rounded-2xl p-6 mb-4">
-                          <Package className="w-16 h-16 opacity-30" />
-                        </div>
-                        <p className="text-sm font-bold">Sin avisos</p>
-                        <p className="text-xs text-slate-400 mt-1">Esta columna está vacía</p>
+                      <div className="flex flex-col items-center justify-center py-12 text-slate-300">
+                        <Package className="w-8 h-8 mb-2 opacity-50" />
+                        <p className="text-xs font-bold uppercase tracking-wider">Vacío</p>
                       </div>
                     )}
                   </div>

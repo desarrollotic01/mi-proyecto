@@ -105,7 +105,7 @@ export default function UbicacionesTecnicasPage() {
     setPdfOpen(true);
   };
 
-  if (loading && items.length === 0) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
+  if (loading && items.length === 0) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-slate-900" size={32} /></div>;
 
   return (
     <div className="min-h-screen bg-[#f8fafc] p-3 sm:p-6 font-sans text-slate-800 w-full overflow-x-hidden">
@@ -114,13 +114,13 @@ export default function UbicacionesTecnicasPage() {
         {/* Header Responsivo */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white px-4 sm:px-6 py-4 rounded-2xl border border-slate-200 shadow-sm gap-4">
           <h1 className="text-[16px] sm:text-[17px] font-black text-slate-800 flex items-center gap-2.5 tracking-tight w-full sm:w-auto">
-            <MapPin size={20} className="text-blue-600 stroke-[2.5] shrink-0"/> Gestión de Activos
+            <MapPin size={20} className="text-slate-700 stroke-[2.5] shrink-0"/> Gestión de Activos
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
-             <button onClick={loadAllData} className="p-2 sm:p-2.5 text-slate-400 hover:text-blue-600 transition-colors border border-transparent hover:border-slate-200 rounded-lg bg-slate-50 hover:bg-white shrink-0">
+             <button onClick={loadAllData} className="p-2 sm:p-2.5 text-slate-400 hover:text-slate-700 transition-colors border border-transparent hover:border-slate-200 rounded-lg bg-slate-50 hover:bg-white shrink-0">
                <RefreshCw size={18} className={loading ? "animate-spin" : ""}/>
              </button>
-             <button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-blue-600 text-white px-4 sm:px-5 py-2.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 hover:bg-blue-700 transition-all uppercase tracking-wider flex-1 sm:flex-none">
+             <button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-slate-900 text-white px-4 sm:px-5 py-2.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-2 shadow-md shadow-slate-900/20 hover:bg-slate-800 transition-all uppercase tracking-wider flex-1 sm:flex-none">
                <Plus size={16} strokeWidth={3} className="shrink-0"/> 
                <span className="hidden sm:inline">NUEVO REGISTRO</span>
                <span className="sm:hidden">NUEVO</span>
@@ -141,7 +141,7 @@ export default function UbicacionesTecnicasPage() {
           <input 
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} 
             placeholder="Buscar identificación, nombre, placa..." 
-            className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-[12px] font-medium outline-none focus:border-blue-500 bg-white shadow-sm transition-all text-slate-700 placeholder:text-slate-400"
+            className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-[12px] font-medium outline-none focus:border-slate-500 bg-white shadow-sm transition-all text-slate-700 placeholder:text-slate-400"
           />
         </div>
 
