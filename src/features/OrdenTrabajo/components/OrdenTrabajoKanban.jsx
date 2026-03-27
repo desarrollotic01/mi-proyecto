@@ -1,46 +1,34 @@
 import { useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { FileText } from "lucide-react";
+import { FileText, Calendar, User, Clock } from "lucide-react";
 import ModalInformesNotificacion from "../modals/ModalInformesNotificacion";
 
-/* ================= HELPERS ================= */
+/* ================= HELPERS (LÓGICA INTACTA) ================= */
 
 const getCardColor = (estado) => {
   const colors = {
-    creado:
-      "bg-gradient-to-br from-blue-50 to-blue-100 border-blue-300 hover:shadow-blue-200",
-    liberado:
-      "bg-gradient-to-br from-purple-50 to-purple-100 border-purple-300 hover:shadow-purple-200",
-    cierre_tecnico:
-      "bg-gradient-to-br from-amber-50 to-amber-100 border-amber-300 hover:shadow-amber-200",
-    cerrado:
-      "bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300 hover:shadow-emerald-200",
-    cancelado:
-      "bg-gradient-to-br from-red-50 to-red-100 border-red-300 hover:shadow-red-200",
+    creado: "bg-white border-blue-200 border-t-4 border-t-blue-500",
+    liberado: "bg-white border-purple-200 border-t-4 border-t-purple-500",
+    cierre_tecnico: "bg-white border-amber-200 border-t-4 border-t-amber-500",
+    cerrado: "bg-white border-emerald-200 border-t-4 border-t-emerald-500",
+    cancelado: "bg-white border-slate-200 border-t-4 border-t-slate-500",
   };
-  return colors[estado] || colors.creado;
+  return colors[estado] || "bg-white border-slate-200 border-t-4 border-t-slate-400";
 };
 
 const getColumnColor = (estado) => {
   const colors = {
-    creado: "from-blue-500 to-blue-600",
-    liberado: "from-purple-500 to-purple-600",
-    cierre_tecnico: "from-amber-500 to-amber-600",
-    cerrado: "from-emerald-500 to-emerald-600",
-    cancelado: "from-red-500 to-red-600",
+    creado: "bg-blue-50 border-b border-blue-200 text-blue-700",
+    liberado: "bg-purple-50 border-b border-purple-200 text-purple-700",
+    cierre_tecnico: "bg-amber-50 border-b border-amber-200 text-amber-700",
+    cerrado: "bg-emerald-50 border-b border-emerald-200 text-emerald-700",
+    cancelado: "bg-rose-50 border-b border-rose-200 text-rose-700",
   };
-  return colors[estado] || colors.creado;
+  return colors[estado] || "bg-slate-50 border-b border-slate-200 text-slate-700";
 };
 
 const getColumnBg = (estado) => {
-  const colors = {
-    creado: "bg-blue-50/50",
-    liberado: "bg-purple-50/50",
-    cierre_tecnico: "bg-amber-50/50",
-    cerrado: "bg-emerald-50/50",
-    cancelado: "bg-red-50/50",
-  };
-  return colors[estado] || colors.creado;
+  return "bg-slate-50/40"; 
 };
 
 const formatDate = (isoDate) => {
@@ -65,23 +53,11 @@ const mapKanbanToEstado = (kanbanState) => {
 
 const getRegistroLabel = (registro, idx) => {
   if (registro?.equipoId) {
-    return (
-      registro?.descripcionEquipo ||
-      registro?.equipo?.nombre ||
-      registro?.equipo?.codigo ||
-      `Equipo ${idx + 1}`
-    );
+    return registro?.descripcionEquipo || registro?.equipo?.nombre || registro?.equipo?.codigo || `Equipo ${idx + 1}`;
   }
-
   if (registro?.ubicacionTecnicaId) {
-    return (
-      registro?.descripcionUbicacion ||
-      registro?.ubicacionTecnica?.nombre ||
-      registro?.ubicacionTecnica?.codigo ||
-      `Ubicación técnica ${idx + 1}`
-    );
+    return registro?.descripcionUbicacion || registro?.ubicacionTecnica?.nombre || registro?.ubicacionTecnica?.codigo || `Ubicación técnica ${idx + 1}`;
   }
-
   return `Registro ${idx + 1}`;
 };
 
@@ -98,9 +74,7 @@ export default function KanbanView({
 
   const onDragEnd = ({ source, destination }) => {
     if (!destination) return;
-
     const sourceColumn = data[source.droppableId];
-
     if (source.droppableId === destination.droppableId) return;
 
     const movedOrden = sourceColumn.items[source.index];
@@ -112,43 +86,34 @@ export default function KanbanView({
   return (
     <>
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex flex-nowrap overflow-x-auto gap-4 h-[calc(100vh-12rem)]">
+        {/* 🚀 CONTENEDOR PRINCIPAL: lg:overflow-hidden quita el scroll en PC */}
+        <div className="flex flex-nowrap overflow-x-auto lg:overflow-hidden gap-2 h-[calc(100vh-14rem)] pb-2 px-1">
           {Object.entries(data).map(([colId, col]) => (
             <Droppable droppableId={colId} key={colId}>
               {(provided, snapshot) => (
                 <div
+                  // 🚀 COLUMNAS RESPONSIVE: lg:flex-1 hace que se junten y quepan todas en PC
                   className={`
-                    rounded-2xl border-2 transition-all duration-300 flex flex-col min-w-[320px]
-                    ${
-                      snapshot.isDraggingOver
-                        ? "border-dashed border-slate-400 bg-slate-100 scale-[1.02]"
-                        : "border-transparent"
-                    }
-                    ${getColumnBg(colId)}
+                    flex flex-col rounded-xl border transition-all duration-300 h-full
+                    w-[85vw] flex-shrink-0 lg:flex-1 lg:min-w-0 lg:w-auto
+                    ${snapshot.isDraggingOver ? "bg-slate-100 border-slate-300" : getColumnBg(colId)}
                   `}
                 >
-                  {/* COLUMN HEADER */}
-                  <div
-                    className={`
-                      bg-gradient-to-r ${getColumnColor(colId)}
-                      text-white p-4 rounded-t-2xl
-                      shadow-lg flex-shrink-0
-                    `}
-                  >
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-lg tracking-wide">{col.name}</h3>
-                      <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-semibold">
-                        {col.items?.length || 0}
-                      </span>
-                    </div>
+                  {/* HEADER (MÁS COMPACTO) */}
+                  <div className={`p-3 rounded-t-xl flex items-center justify-between shadow-sm flex-shrink-0 ${getColumnColor(colId)}`}>
+                    <h3 className="font-black text-[10px] md:text-xs uppercase tracking-wider truncate mr-1">
+                      {col.name}
+                    </h3>
+                    <span className="bg-white/60 px-2 py-0.5 rounded-full text-[9px] font-black border border-current/10 shrink-0">
+                      {col.items?.length || 0}
+                    </span>
                   </div>
 
-                  {/* CARDS */}
+                  {/* CONTENEDOR DE TARJETAS */}
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="p-3 space-y-3 overflow-y-auto flex-1"
-                    style={{ minHeight: "200px" }}
+                    className="p-1.5 space-y-2 overflow-y-auto flex-1 custom-scrollbar"
                   >
                     {col.items?.map((item, index) => (
                       <Draggable key={item.id} draggableId={item.id} index={index}>
@@ -157,190 +122,60 @@ export default function KanbanView({
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
+                            onClick={() => onViewOrden(item)}
                             className={`
-                              relative p-4 rounded-xl border-2 
-                              shadow-md hover:shadow-xl
-                              transition-all duration-300 cursor-move
+                              relative p-2.5 rounded-lg border shadow-sm transition-all duration-200 cursor-move
                               ${getCardColor(colId)}
-                              ${
-                                snapshot.isDragging
-                                  ? "rotate-2 scale-105 shadow-2xl"
-                                  : "hover:-translate-y-1"
-                              }
+                              ${snapshot.isDragging ? "rotate-1 scale-[1.02] shadow-xl z-50 ring-2 ring-black/5" : "hover:shadow-md hover:-translate-y-0.5"}
                             `}
                           >
-                            {/* VIEW BUTTON */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onViewOrden(item);
-                              }}
-                              className="
-                                absolute top-3 right-3 
-                                w-8 h-8 rounded-lg
-                                bg-white/80 backdrop-blur-sm
-                                text-slate-600 hover:text-slate-900
-                                hover:bg-white
-                                shadow-sm hover:shadow-md
-                                transition-all duration-200
-                                flex items-center justify-center
-                                font-bold text-lg
-                              "
-                            >
-                              ⋮
-                            </button>
-
-                            {/* CARD CONTENT */}
-                            <div className="space-y-3 pr-8">
-                              {/* N° OT */}
+                            {/* CONTENIDO REDUCIDO PARA CABER MEJOR */}
+                            <div className="space-y-2 pr-4">
                               <div>
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                                  N° Orden
-                                </p>
-                                <p className="text-sm font-black text-slate-900 bg-white/60 px-2 py-1 rounded-lg inline-block">
-                                  {item.numeroOT || "—"}
-                                </p>
+                                <p className="text-[8px] font-black text-slate-400 uppercase leading-none mb-1">N° Orden</p>
+                                <p className="text-[10px] font-black text-slate-900 truncate">#{item.numeroOT || "S/N"}</p>
                               </div>
 
-                              {/* DESCRIPCIÓN */}
-                              <div>
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                                  Descripción
-                                </p>
-                                <p className="text-sm text-slate-800 line-clamp-2">
-                                  {item.descripcionGeneral || "Sin descripción"}
-                                </p>
-                              </div>
+                              <p className="text-[10px] text-slate-600 line-clamp-1 italic font-medium">
+                                {item.descripcionGeneral || "Sin descripción"}
+                              </p>
 
-                              {/* SUPERVISOR */}
-                              {item.supervisorId && (
-                                <div>
-                                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                                    👤 Supervisor
-                                  </p>
-                                  <p className="text-sm text-slate-800">
-                                    {item.supervisorId}
-                                  </p>
+                              {/* CAJA DE DATOS MÁS COMPACTA */}
+                              <div className="bg-slate-50/80 border border-slate-100 rounded p-1.5 space-y-1">
+                                <div className="flex items-center justify-between text-[9px]">
+                                  <span className="text-slate-400 font-bold uppercase truncate mr-1">👤 Sup.</span>
+                                  <span className="text-slate-800 font-black truncate">{item.supervisorId || "—"}</span>
                                 </div>
-                              )}
-
-                              {/* FECHAS */}
-                              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
-                                <div>
-                                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                                    📅 Inicio
-                                  </p>
-                                  <p className="text-xs text-slate-800 font-semibold">
-                                    {formatDate(item.fechaProgramadaInicio)}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                                    🏁 Fin
-                                  </p>
-                                  <p className="text-xs text-slate-800 font-semibold">
-                                    {formatDate(item.fechaProgramadaFin)}
-                                  </p>
+                                <div className="flex items-center justify-between text-[9px] pt-1 border-t border-slate-200/50">
+                                  <span className="text-slate-400 font-bold uppercase mr-1">📅 Inicio</span>
+                                  <span className="text-slate-800 font-black shrink-0">{formatDate(item.fechaProgramadaInicio)}</span>
                                 </div>
                               </div>
 
-                              {/* REGISTROS */}
-                              {item.equipos && item.equipos.length > 0 && (
-                                <div className="pt-2 border-t border-slate-200">
-                                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                                    🔧 Registros ({item.equipos.length})
-                                  </p>
-
-                                  <div className="space-y-1">
-                                    {item.equipos.slice(0, 2).map((registro, idx) => (
-                                      <div
-                                        key={registro.id || idx}
-                                        className="flex items-center gap-2 text-xs"
-                                      >
-                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                        <span className="text-slate-700 truncate">
-                                          {getRegistroLabel(registro, idx)}
-                                        </span>
-                                      </div>
-                                    ))}
-
-                                    {item.equipos.length > 2 && (
-                                      <p className="text-[10px] text-slate-500 italic ml-3.5">
-                                        +{item.equipos.length - 2} más...
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* BOTONES DE ACCIÓN */}
-                              <div className="pt-3 border-t border-slate-200 space-y-2">
-                                {/* BOTÓN LIBERAR */}
+                              {/* BOTONES DE ACCIÓN (ESTILO CORPORATIVO) */}
+                              <div className="pt-1">
                                 {colId === "creado" && (
                                   <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onLiberar(item.id);
-                                    }}
-                                    className="
-                                      w-full py-2 px-4 rounded-lg
-                                      bg-gradient-to-r from-purple-500 to-purple-600
-                                      hover:from-purple-600 hover:to-purple-700
-                                      text-white font-bold text-sm
-                                      shadow-md hover:shadow-lg
-                                      transition-all duration-200
-                                      transform hover:scale-[1.02]
-                                      flex items-center justify-center gap-2
-                                    "
+                                    onClick={(e) => { e.stopPropagation(); onLiberar(item.id); }}
+                                    className="w-full py-1 bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 text-[9px] font-black rounded transition-all shadow-sm"
                                   >
-                                    <span>🚀</span>
-                                    <span>Liberar</span>
+                                    🚀 LIBERAR
                                   </button>
                                 )}
-
-                                {/* BOTÓN CIERRE TÉCNICO */}
                                 {colId === "liberado" && (
                                   <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onAbrirCierreTecnico(item);
-                                    }}
-                                    className="
-                                      w-full py-2 px-4 rounded-lg
-                                      bg-gradient-to-r from-amber-500 to-amber-600
-                                      hover:from-amber-600 hover:to-amber-700
-                                      text-white font-bold text-sm
-                                      shadow-md hover:shadow-lg
-                                      transition-all duration-200
-                                      transform hover:scale-[1.02]
-                                      flex items-center justify-center gap-2
-                                    "
+                                    onClick={(e) => { e.stopPropagation(); onAbrirCierreTecnico(item); }}
+                                    className="w-full py-1 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 text-[9px] font-black rounded transition-all shadow-sm"
                                   >
-                                    <span>✅</span>
-                                    <span>Cierre Técnico</span>
+                                    ✅ CIERRE TÉCNICO
                                   </button>
                                 )}
-
-                                {/* BOTÓN INFORMES DE NOTIFICACIÓN */}
                                 {colId === "cierre_tecnico" && (
                                   <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOtSeleccionadaInformes(item);
-                                    }}
-                                    className="
-                                      w-full py-2 px-4 rounded-lg
-                                      bg-gradient-to-r from-slate-800 to-slate-900
-                                      hover:from-slate-900 hover:to-black
-                                      text-white font-bold text-sm
-                                      shadow-md hover:shadow-lg
-                                      transition-all duration-200
-                                      transform hover:scale-[1.02]
-                                      flex items-center justify-center gap-2
-                                    "
+                                    onClick={(e) => { e.stopPropagation(); setOtSeleccionadaInformes(item); }}
+                                    className="w-full py-1 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-[9px] font-black rounded transition-all shadow-sm flex items-center justify-center gap-1"
                                   >
-                                    <FileText className="w-4 h-4" />
-                                    <span>Informes de la notificación</span>
+                                    <FileText size={10} /> INFORMES
                                   </button>
                                 )}
                               </div>
@@ -349,14 +184,12 @@ export default function KanbanView({
                         )}
                       </Draggable>
                     ))}
-
                     {provided.placeholder}
-
-                    {/* EMPTY STATE */}
+                    
                     {(!col.items || col.items.length === 0) && (
-                      <div className="text-center py-12 text-slate-400">
-                        <div className="text-4xl mb-2">📭</div>
-                        <p className="text-sm font-medium">No hay órdenes</p>
+                      <div className="flex flex-col items-center justify-center py-8 opacity-10 grayscale">
+                        <FileText size={24} />
+                        <p className="text-[8px] font-black uppercase mt-1">Vacío</p>
                       </div>
                     )}
                   </div>

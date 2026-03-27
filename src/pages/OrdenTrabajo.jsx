@@ -83,7 +83,7 @@ export default function OrdenTrabajo() {
 
   /* ================= KANBAN DATA ================= */
   const columns = {
-    creado: { name: "Creado", color: "#3b82f6" },
+    creado: { name: "Creado", color: "#f11414" },
     liberado: { name: "Liberado", color: "#8b5cf6" },
     cierre_tecnico: { name: "Cierre Técnico", color: "#f59e0b" },
     cerrado: { name: "Cerrado", color: "#10b981" },
@@ -175,9 +175,6 @@ export default function OrdenTrabajo() {
   // ===== NUEVA FUNCIÓN: ABRIR MODAL DE CIERRE TÉCNICO =====
   const handleAbrirCierreTecnico = async (ordenTrabajo) => {
     try {
-      // Mostrar indicador de carga (opcional)
-      // setLoadingModal(true);
-
       // Cargar técnicos y planes en paralelo
       const [tecnicosData, planesData] = await Promise.all([
         fetch('/api/tecnicos').then(r => r.json()).catch(() => []),
@@ -212,59 +209,62 @@ export default function OrdenTrabajo() {
   /* ================= RENDER ================= */
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="flex items-center justify-center min-h-[100dvh] bg-slate-50">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-slate-600 font-medium">Cargando órdenes de trabajo...</p>
+          <div className="w-12 h-12 md:w-16 md:h-16 border-4 border-slate-300 border-t-slate-800 rounded-full animate-spin mx-auto"></div>
+          <p className="text-slate-600 font-medium text-sm md:text-base">Cargando órdenes de trabajo...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
-      <div className="container mx-auto px-4 py-6">
+    <div className="min-h-[100dvh] bg-slate-50 overflow-x-hidden">
+      <div className="container mx-auto px-4 py-6 md:py-8 w-full max-w-full">
         {/* HEADER */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 bg-clip-text text-transparent mb-2">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-slate-900 mb-2 tracking-tight">
             Órdenes de Trabajo
           </h1>
-          <p className="text-slate-600">
+          <p className="text-slate-500 text-sm md:text-base">
             Gestiona y visualiza todas tus órdenes de trabajo
           </p>
         </div>
 
-        {/* NAVIGATION */}
-        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-2 mb-6 border border-slate-200/50">
-          <div className="flex items-center gap-2">
-            {["kanban", "lista", "calendario"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`
-                  flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-300 capitalize
-                  ${activeTab === tab
-                    ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30 transform scale-[1.02]"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }
-                `}
-              >
-                {tab === "kanban" ? "📊 Estados" : tab === "lista" ? "📋 Lista" : "📅 Calendario"}
-              </button>
-            ))}
+        {/* NAVIGATION & ACTIONS - 🚀 FLEX-WRAP y FLEX-COL para MÓVILES */}
+        <div className="bg-white rounded-xl shadow-sm p-2 md:p-3 mb-6 border border-slate-200">
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 md:gap-3 w-full">
             
+            {/* Contenedor de Pestañas */}
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 flex-1">
+              {["kanban", "lista", "calendario"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`
+                    w-full sm:w-auto sm:flex-1 px-4 py-2.5 md:px-6 md:py-2.5 rounded-lg font-semibold transition-colors duration-200 capitalize text-sm md:text-base border
+                    ${activeTab === tab
+                      ? "bg-slate-800 text-white border-slate-800 shadow-sm"
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
+                    }
+                  `}
+                >
+                  {tab === "kanban" ? "📊 Estados" : tab === "lista" ? "📋 Lista" : "📅 Calendario"}
+                </button>
+              ))}
+            </div>
+            
+            {/* Botón Nueva OT - 🚀 Ocupa el 100% en móvil y su propio espacio en PC */}
             <button
               onClick={() => {
                 setWizardStep(1);
                 setModalOpen(true);
               }}
               className="
-                px-6 py-3 rounded-xl font-semibold
-                bg-gradient-to-r from-emerald-600 to-emerald-500 
-                text-white shadow-lg shadow-emerald-500/30
-                hover:shadow-xl hover:shadow-emerald-500/40
-                transform hover:scale-105 transition-all duration-300
-                whitespace-nowrap
+                w-full sm:w-auto px-4 py-2.5 md:px-6 md:py-2.5 rounded-lg font-bold
+                bg-emerald-600 text-white shadow-sm border border-emerald-700
+                hover:bg-emerald-700 transition-colors duration-200
+                whitespace-nowrap text-sm md:text-base flex items-center justify-center gap-2
               "
             >
               ✨ Nueva OT
@@ -273,7 +273,7 @@ export default function OrdenTrabajo() {
         </div>
 
         {/* VIEWS */}
-        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-6 border border-slate-200/50">
+        <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-slate-200 w-full min-w-0 overflow-hidden">
           {activeTab === "kanban" && (
             <KanbanView
               data={getKanbanData()}
@@ -314,16 +314,16 @@ export default function OrdenTrabajo() {
       />
 
       <ModalOrdenTrabajoView
-  isOpen={viewOpen}
-  orden={viewData}
-  onClose={() => {
-    setViewOpen(false);
-    setViewData(null);
-  }}
-  onUpdateEstado={handleUpdateEstado}
-  onLiberar={handleLiberar}
-  onAbrirCierreTecnico={handleAbrirCierreTecnico}
-/>
+        isOpen={viewOpen}
+        orden={viewData}
+        onClose={() => {
+          setViewOpen(false);
+          setViewData(null);
+        }}
+        onUpdateEstado={handleUpdateEstado}
+        onLiberar={handleLiberar}
+        onAbrirCierreTecnico={handleAbrirCierreTecnico}
+      />
 
       {/* MODAL DE NOTIFICACIÓN (CIERRE TÉCNICO) */}
       <CrearNotificacionModal
