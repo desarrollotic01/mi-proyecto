@@ -4,6 +4,7 @@ export const guiaMantenimientoService = {
   getGuias,
   getGuiaById,
   createGuia,
+  patchGuia, // Nombre estándar para actualizaciones parciales
   ejecutarProgramacion,
   cancelarProgramacion,
 };
@@ -30,7 +31,19 @@ function getGuiaById(id) {
 function createGuia(payload) {
   return api.post("/guia-mantenimiento", payload).then((res) => res.data);
 }
-
+// =======================
+// PATCH / UPDATE ESTADO
+// =======================
+// Esta es la función que usará el Kanban para mover las piezas
+async function patchGuia(id, data) {
+  try {
+    const res = await api.patch(`/guia-mantenimiento/${id}`, data);
+    return res.data;
+  } catch (error) {
+    console.error(`Error al actualizar guía ${id}:`, error);
+    throw error;
+  }
+}
 // =======================
 // EJECUTAR PROGRAMACIÓN
 // =======================

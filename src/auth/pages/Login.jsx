@@ -29,48 +29,48 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden">
       {/* Animated background circles */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-slate-200 rounded-full opacity-10 blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-slate-300 rounded-full opacity-10 blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-slate-200 rounded-full opacity-5 blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-20 left-10 w-72 h-72 bg-lime-400 rounded-full opacity-10 blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-lime-500 rounded-full opacity-10 blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-lime-300 rounded-full opacity-5 blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
 
       {/* Login Card */}
       <div className="relative z-10 w-full max-w-md mx-4">
-        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 animate-fadeIn">
+        <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/20 animate-fadeIn">
           {/* Header with Logo */}
-          <div className="bg-slate-50 p-8 text-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-black/5"></div>
+          <div className="bg-gradient-to-r from-lime-400 to-lime-500 p-8 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-black/10"></div>
             <div className="relative z-10 flex flex-col items-center justify-center animate-slideDown">
               {/* Logo Circle */}
-              <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center shadow mb-4 animate-bounce" style={{ animationDuration: '2s' }}>
+              <div className="w-20 h-20 bg-lime-400 rounded-full flex items-center justify-center shadow-lg mb-4 animate-bounce" style={{ animationDuration: '2s' }}>
                 <div className="w-12 h-12 flex flex-col justify-center items-center gap-1">
-                  <div className="w-8 h-1 bg-slate-900 rounded"></div>
-                  <div className="w-8 h-1 bg-slate-900 rounded"></div>
-                  <div className="w-8 h-1 bg-slate-900 rounded"></div>
+                  <div className="w-8 h-1 bg-gray-900 rounded"></div>
+                  <div className="w-8 h-1 bg-gray-900 rounded"></div>
+                  <div className="w-8 h-1 bg-gray-900 rounded"></div>
                 </div>
               </div>
-              <h1 className="text-4xl font-bold text-slate-900 tracking-wider">Alsud</h1>
-              <p className="text-xs text-slate-500 mt-5 uppercase tracking-widest">Sistemas de Mantenimiento</p>
+              <h1 className="text-4xl font-bold text-gray-900 tracking-wider">Alsud</h1>
+              <p className="text-xs text-gray-800 mt-5 uppercase tracking-widest">Sistemas de Mantenimiento</p>
             </div>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-8 space-y-6">
             <div className="text-center mb-6 animate-slideUp">
-              <h2 className="text-2xl font-semibold text-slate-900 mb-2">
+              <h2 className="text-2xl font-semibold text-white mb-2">
                 Bienvenido
               </h2>
-              <p className="text-slate-500 text-sm">
+              <p className="text-gray-400 text-sm">
                 Ingresa tus credenciales para continuar
               </p>
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm animate-shake">
+              <div className="bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg text-sm animate-shake">
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -82,7 +82,7 @@ export default function Login() {
 
             {/* Alias Input */}
             <div className="space-y-2 animate-slideUp" style={{ animationDelay: '0.1s' }}>
-              <label className="block text-sm font-medium text-slate-700">
+              <label className="block text-sm font-medium text-gray-300">
                 Usuario
               </label>
               <div className="relative">
@@ -96,7 +96,7 @@ export default function Login() {
                   placeholder="Ingresa tu alias"
                   value={alias}
                   onChange={(e) => setAlias(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all duration-300"
+                  className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent transition-all duration-300"
                   disabled={isLoading}
                 />
               </div>
@@ -104,7 +104,7 @@ export default function Login() {
 
             {/* Password Input */}
             <div className="space-y-2 animate-slideUp" style={{ animationDelay: '0.2s' }}>
-              <label className="block text-sm font-medium text-slate-700">
+              <label className="block text-sm font-medium text-gray-300">
                 Contraseña
               </label>
               <div className="relative">
@@ -118,13 +118,13 @@ export default function Login() {
                   placeholder="Ingresa tu contraseña"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all duration-300"
+                  className="w-full pl-10 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent transition-all duration-300"
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-700 transition-colors duration-200"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-lime-400 transition-colors duration-200"
                   disabled={isLoading}
                 >
                   {showPassword ? (
@@ -145,7 +145,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-slate-900 text-white font-semibold py-3 px-4 rounded-xl hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:ring-offset-2 focus:ring-offset-slate-50 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg animate-slideUp"
+              className="w-full bg-gradient-to-r from-lime-400 to-lime-500 text-gray-900 font-semibold py-3 px-4 rounded-xl hover:from-lime-500 hover:to-lime-600 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-lime-400/50 animate-slideUp"
               style={{ animationDelay: '0.3s' }}
             >
               {isLoading ? (
@@ -162,7 +162,7 @@ export default function Login() {
             </button>
 
             {/* Footer */}
-            <div className="text-center text-xs text-slate-500 mt-6 animate-slideUp" style={{ animationDelay: '0.4s' }}>
+            <div className="text-center text-xs text-gray-500 mt-6 animate-slideUp" style={{ animationDelay: '0.4s' }}>
               <p>© 2024 Alsud. Todos los derechos reservados.</p>
             </div>
           </form>

@@ -492,7 +492,7 @@ export default function MantenimientoLista({
                         >
                           <FileText className="w-3 h-3 md:w-3.5 md:h-3.5" />
                           Generar OT
-                        </button>
+                        </button> 
                       )}
 
                       {item.estado === "CON_OT" && (

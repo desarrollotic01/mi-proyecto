@@ -1,51 +1,41 @@
 /**
  * GuiasMantenimientoKanban.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * ✅ Kanban BLANCO (Light UI) para Guías de Mantenimiento por estadoGuia
- * Estados (según tu modelo):
- *  - "creado" | "tratado" | "con OT" | "rechazado" | "finalizado" | "finalizado sin facturacion"
- *
- * 📍 Coloca en:  src/pages/GuiasMantenimientoKanban.jsx
- * ✅ Solo importa: guiaMantenimientoService y lucide-react
- *
- * ⚠️ IMPORTANTE:
- * Este archivo asume que tu service tiene alguno de estos métodos:
- *  - guiaMantenimientoService.updateEstadoGuia(guiaId, estadoGuia)
- *  - guiaMantenimientoService.updateGuia(guiaId, { estadoGuia })
- *  - guiaMantenimientoService.patchGuia(guiaId, { estadoGuia })
- * Si no existe, te va a salir el alert "No existe método..."
+ * ✅ Kanban BLANCO (Light UI)
+ * ✅ Filtro Custom Premium (Sin <select> nativo)
+ * 🚩 Consume EXCLUSIVAMENTE de avisosService.js -> obtenerAvisos() (/Avisos/)
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { guiaMantenimientoService } from "../features/GuiaMantenimiento/services/guiaMantenimientoService";
-import { obtenerAvisosOrigenManual } from "../features/mantenimiento/services/avisoServices";
+// ✅ IMPORTACIÓN ESTRICTA DEL SERVICE
+import { obtenerAvisos, actualizarEstadoAviso } from "../features/mantenimiento/services/avisoServices";
 import {
-  LayoutGrid,
-  Search,
-  RefreshCw,
-  Filter,
-  ChevronDown,
-  X,
-  Package,
-  Wrench,
-  ClipboardCheck,
-  FileText,
-  Ban,
-  CheckCircle2,
-  Wallet,
-  ArrowLeft,
-  ArrowRight,
-  Eye,
-  Calendar,
-  Hash,
-  User,
-  MapPin,
-  Layers,
+  LayoutGrid, Search, RefreshCw, Filter, ChevronDown, X, Package, Wrench,
+  ClipboardCheck, FileText, Ban, CheckCircle2, Wallet, ArrowLeft, ArrowRight,
+  Eye, Calendar, Hash, User, MapPin, Layers,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ESTADOS (según tu ENUM)
+// MAPEOS DE ESTADO (FRONTEND <-> BACKEND)
 // ─────────────────────────────────────────────────────────────────────────────
+const MAP_API_A_UI = {
+  "CREADO": "creado",
+  "TRATADO": "tratado",
+  "CON_OT": "con OT",
+  "FINALIZADO": "finalizado",
+  "FINALIZADO_SIN_FACTURACION": "finalizado sin facturacion",
+  "RECHAZADO": "rechazado"
+};
+
+const MAP_UI_A_API = {
+  "creado": "CREADO",
+  "tratado": "TRATADO",
+  "con OT": "CON_OT",
+  "finalizado": "FINALIZADO",
+  "finalizado sin facturacion": "FINALIZADO_SIN_FACTURACION",
+  "rechazado": "RECHAZADO"
+};
+
 const ESTADOS_GUIA = [
   "creado",
   "tratado",
@@ -57,48 +47,12 @@ const ESTADOS_GUIA = [
 
 // Config visual por columna (light)
 const ESTADOS_COLUMNA = {
-  creado: {
-    label: "Creado",
-    gradient: "from-slate-600 to-slate-700",
-    border: "border-slate-200",
-    icon: FileText,
-    chip: "bg-slate-100 text-slate-700 border-slate-200",
-  },
-  tratado: {
-    label: "Tratado",
-    gradient: "from-blue-600 to-blue-700",
-    border: "border-slate-200",
-    icon: ClipboardCheck,
-    chip: "bg-blue-50 text-blue-700 border-blue-200",
-  },
-  "con OT": {
-    label: "Con OT",
-    gradient: "from-indigo-600 to-indigo-700",
-    border: "border-slate-200",
-    icon: Wrench,
-    chip: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  },
-  finalizado: {
-    label: "Finalizado",
-    gradient: "from-emerald-600 to-emerald-700",
-    border: "border-slate-200",
-    icon: CheckCircle2,
-    chip: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
-  "finalizado sin facturacion": {
-    label: "Finalizado s/ fact.",
-    gradient: "from-amber-600 to-amber-700",
-    border: "border-slate-200",
-    icon: Wallet,
-    chip: "bg-amber-50 text-amber-800 border-amber-200",
-  },
-  rechazado: {
-    label: "Rechazado",
-    gradient: "from-red-700 to-red-800",
-    border: "border-slate-200",
-    icon: Ban,
-    chip: "bg-red-50 text-red-700 border-red-200",
-  },
+  creado: { label: "Creado", gradient: "from-slate-600 to-slate-700", border: "border-slate-200", icon: FileText, chip: "bg-slate-100 text-slate-700 border-slate-200" },
+  tratado: { label: "Tratado", gradient: "from-blue-600 to-blue-700", border: "border-slate-200", icon: ClipboardCheck, chip: "bg-blue-50 text-blue-700 border-blue-200" },
+  "con OT": { label: "Con OT", gradient: "from-indigo-600 to-indigo-700", border: "border-slate-200", icon: Wrench, chip: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  finalizado: { label: "Finalizado", gradient: "from-emerald-600 to-emerald-700", border: "border-slate-200", icon: CheckCircle2, chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  "finalizado sin facturacion": { label: "Finalizado s/ fact.", gradient: "from-amber-600 to-amber-700", border: "border-slate-200", icon: Wallet, chip: "bg-amber-50 text-amber-800 border-amber-200" },
+  rechazado: { label: "Rechazado", gradient: "from-red-700 to-red-800", border: "border-slate-200", icon: Ban, chip: "bg-red-50 text-red-700 border-red-200" },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,9 +69,7 @@ function fmtFecha(iso) {
 function fmtDatetime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return isNaN(d)
-    ? "—"
-    : d.toLocaleString("es-PE", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return isNaN(d) ? "—" : d.toLocaleString("es-PE", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function normalizarEstado(estadoGuia) {
@@ -144,41 +96,31 @@ function GuiaCard({ guia, onOpen, onMoverPrev, onMoverNext }) {
 
   return (
     <div
-      className="
-        rounded-2xl border border-slate-200 bg-white overflow-hidden
-        hover:shadow-lg hover:shadow-slate-200/60 transition cursor-pointer group
-      "
+      className="rounded-2xl border border-slate-200 bg-white overflow-hidden hover:shadow-lg hover:shadow-slate-200/60 transition cursor-pointer group"
       onClick={() => onOpen(guia)}
     >
-      {/* top color bar */}
       <div className={`h-1 w-full bg-gradient-to-r ${cfg.gradient}`} />
-
       <div className="p-4 space-y-3">
-        {/* meta row */}
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-mono text-slate-500 truncate">
             {show(guia.numeroAlerta)}
           </span>
-
           <div className="flex items-center gap-1.5 shrink-0">
             {guia.creticidad && (
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${badgecreticidad(guia.creticidad)}`}>
                 CRIT.{guia.creticidad}
               </span>
             )}
-
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.chip}`}>
               {cfg.label}
             </span>
           </div>
         </div>
 
-        {/* title */}
         <p className="font-extrabold text-slate-900 text-sm leading-snug line-clamp-2">
           {guia.producto || guia.descripcion || "Sin título"}
         </p>
 
-        {/* equipo */}
         {(guia.equipo || guia.equipoId) && (
           <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-200">
             <Package size={12} className="text-slate-500 shrink-0" />
@@ -193,7 +135,6 @@ function GuiaCard({ guia, onOpen, onMoverPrev, onMoverNext }) {
           </div>
         )}
 
-        {/* plan */}
         {(guia.planMantenimiento || guia.planMantenimientoId) && (
           <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-200">
             <Layers size={12} className="text-slate-500 shrink-0" />
@@ -208,15 +149,13 @@ function GuiaCard({ guia, onOpen, onMoverPrev, onMoverNext }) {
           </div>
         )}
 
-        {/* fechas + OV */}
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200">
             <p className="text-[9px] text-slate-500 uppercase tracking-wide font-black mb-1 flex items-center gap-1">
-              <Calendar size={10} /> Inicio alerta
+              <Calendar size={10} /> Inicio
             </p>
             <p className="text-xs text-slate-800 font-semibold">{fmtFecha(guia.fechaInicioAlerta)}</p>
           </div>
-
           <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200">
             <p className="text-[9px] text-slate-500 uppercase tracking-wide font-black mb-1 flex items-center gap-1">
               <Hash size={10} /> OV
@@ -226,34 +165,20 @@ function GuiaCard({ guia, onOpen, onMoverPrev, onMoverNext }) {
         </div>
       </div>
 
-      {/* actions (hover) */}
       <div className="px-4 pb-4 flex gap-2 opacity-0 group-hover:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => canPrev && onMoverPrev(guia)}
           disabled={!canPrev}
-          className="
-            flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl
-            bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold
-            border border-slate-200 transition disabled:opacity-40 disabled:hover:bg-slate-100
-          "
-          title="Mover a estado anterior"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 transition disabled:opacity-40 disabled:hover:bg-slate-100"
         >
-          <ArrowLeft size={12} />
-          Anterior
+          <ArrowLeft size={12} /> Anterior
         </button>
-
         <button
           onClick={() => canNext && onMoverNext(guia)}
           disabled={!canNext}
-          className="
-            flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl
-            bg-blue-600/10 hover:bg-blue-600/15 text-blue-700 text-xs font-bold
-            border border-blue-200 transition disabled:opacity-40 disabled:hover:bg-blue-600/10
-          "
-          title="Mover a siguiente estado"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600/10 hover:bg-blue-600/15 text-blue-700 text-xs font-bold border border-blue-200 transition disabled:opacity-40 disabled:hover:bg-blue-600/10"
         >
-          Siguiente
-          <ArrowRight size={12} />
+          Siguiente <ArrowRight size={12} />
         </button>
       </div>
     </div>
@@ -261,13 +186,16 @@ function GuiaCard({ guia, onOpen, onMoverPrev, onMoverNext }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPONENTE: MODAL DETALLE (light)
+// COMPONENTE: MODAL DETALLE
 // ─────────────────────────────────────────────────────────────────────────────
 function ModalDetalle({ guia, onClose, onSetEstado }) {
   if (!guia) return null;
 
   const estado = normalizarEstado(guia.estadoGuia);
   const cfg = ESTADOS_COLUMNA[estado] || ESTADOS_COLUMNA.creado;
+  
+  // Estado local para el dropdown custom dentro del modal
+  const [isOpenModalFiltro, setIsOpenModalFiltro] = useState(false);
 
   return (
     <div
@@ -276,7 +204,6 @@ function ModalDetalle({ guia, onClose, onSetEstado }) {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="w-full max-w-3xl max-h-[88vh] flex flex-col rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-white">
-        {/* header */}
         <div className="relative px-6 py-5 border-b border-slate-200 bg-white">
           <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${cfg.gradient}`} />
 
@@ -285,22 +212,13 @@ function ModalDetalle({ guia, onClose, onSetEstado }) {
               <p className="text-slate-500 text-xs font-mono truncate">
                 {show(guia.numeroAlerta)} · OV {show(guia.ordenVenta)}
               </p>
-
               <h2 className="text-slate-900 font-black text-xl leading-tight mt-1">
                 {guia.producto || guia.descripcion || "Sin título"}
               </h2>
-
               <div className="mt-3 flex flex-wrap gap-2 items-center">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.chip}`}>
                   {cfg.label}
                 </span>
-
-                {guia.periodo && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                    {String(guia.periodo).replace(/_/g, " ")}
-                  </span>
-                )}
-
                 {guia.creticidad && (
                   <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${badgecreticidad(guia.creticidad)}`}>
                     CRIT.{guia.creticidad}
@@ -308,7 +226,6 @@ function ModalDetalle({ guia, onClose, onSetEstado }) {
                 )}
               </div>
             </div>
-
             <button
               onClick={onClose}
               className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 transition shrink-0"
@@ -319,12 +236,9 @@ function ModalDetalle({ guia, onClose, onSetEstado }) {
           </div>
         </div>
 
-        {/* body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {/* info grid */}
           <section>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Información</p>
-
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {[
                 { icon: Calendar, label: "Inicio alerta", value: fmtFecha(guia.fechaInicioAlerta) },
@@ -347,7 +261,6 @@ function ModalDetalle({ guia, onClose, onSetEstado }) {
             </div>
           </section>
 
-          {/* desc det */}
           {guia.descripcionDetallada && (
             <section className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Descripción detallada</p>
@@ -355,7 +268,6 @@ function ModalDetalle({ guia, onClose, onSetEstado }) {
             </section>
           )}
 
-          {/* adjuntos */}
           <section className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Adjuntos</p>
             {Array.isArray(guia.adjuntos) && guia.adjuntos.length > 0 ? (
@@ -374,8 +286,7 @@ function ModalDetalle({ guia, onClose, onSetEstado }) {
                         className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 transition"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <Eye size={14} />
-                        Ver
+                        <Eye size={14} /> Ver
                       </a>
                     ) : (
                       <span className="text-xs text-slate-400">—</span>
@@ -388,45 +299,61 @@ function ModalDetalle({ guia, onClose, onSetEstado }) {
             )}
           </section>
 
-          {/* cambiar estado */}
           <section className="bg-white rounded-2xl p-4 border border-slate-200">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Cambiar estado</p>
-
             <div className="flex flex-col sm:flex-row gap-2">
-              <select
-                value={estado}
-                onChange={(e) => onSetEstado(e.target.value)}
-                className="
-                  w-full sm:flex-1 px-3 py-2.5 rounded-xl bg-white
-                  border border-slate-300 text-slate-800 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/30
-                "
-              >
-                {ESTADOS_GUIA.map((s) => (
-                  <option key={s} value={s}>
-                    {ESTADOS_COLUMNA[s]?.label || s}
-                  </option>
-                ))}
-              </select>
+              
+              {/* DROPDOWN CUSTOM EN EL MODAL */}
+              <div className="relative w-full sm:flex-1">
+                <button
+                  onClick={() => setIsOpenModalFiltro(!isOpenModalFiltro)}
+                  className="
+                    flex items-center justify-between w-full px-3 py-2.5 rounded-xl bg-white
+                    border border-slate-300 text-slate-700 text-sm font-medium
+                    hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition
+                  "
+                >
+                  <span className="truncate flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${ESTADOS_COLUMNA[estado]?.gradient}`} />
+                    {ESTADOS_COLUMNA[estado]?.label || estado}
+                  </span>
+                  <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpenModalFiltro ? "rotate-180" : ""}`} />
+                </button>
+
+                {isOpenModalFiltro && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsOpenModalFiltro(false)} />
+                    <div className="absolute left-0 bottom-full mb-2 w-full bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-200/50 z-50 py-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                      {ESTADOS_GUIA.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => { onSetEstado(s); setIsOpenModalFiltro(false); }}
+                          className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center gap-3
+                            ${estado === s ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50 font-medium"}
+                          `}
+                        >
+                          <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${ESTADOS_COLUMNA[s].gradient}`} />
+                          {ESTADOS_COLUMNA[s]?.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
 
               <button
                 onClick={onClose}
-                className="
-                  px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200
-                  text-slate-700 text-sm font-bold border border-slate-200 transition
-                "
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold border border-slate-200 transition"
               >
                 Cerrar
               </button>
             </div>
-
             <p className="text-[11px] text-slate-500 mt-2">
-              Esto replica el flujo tipo Aviso: solo cambiamos <span className="font-mono">estadoGuia</span>.
+              Esto actualizará el estado directamente en el backend.
             </p>
           </section>
         </div>
 
-        {/* footer */}
         <div className="shrink-0 border-t border-slate-200 px-6 py-3 flex items-center justify-between bg-white">
           <span className="text-[11px] text-slate-500 font-mono truncate">{show(guia.id)}</span>
           <button
@@ -451,74 +378,42 @@ export default function GuiasMantenimientoKanban() {
 
   const [q, setQ] = useState("");
   const [fEstado, setFEstado] = useState("TODOS");
+  const [isOpenFiltro, setIsOpenFiltro] = useState(false); // 👈 ESTADO DEL MENÚ CUSTOM
 
   const [guiaSeleccionada, setGuiaSeleccionada] = useState(null);
 
-  // ✅ adapta aquí si tu service tiene otro método
-  const apiUpdateEstado = useCallback(async (guiaId, estadoGuia) => {
-    if (guiaMantenimientoService.updateEstadoGuia) {
-      return guiaMantenimientoService.updateEstadoGuia(guiaId, estadoGuia);
-    }
-    if (guiaMantenimientoService.updateGuia) {
-      return guiaMantenimientoService.updateGuia(guiaId, { estadoGuia });
-    }
-    if (guiaMantenimientoService.patchGuia) {
-      return guiaMantenimientoService.patchGuia(guiaId, { estadoGuia });
-    }
-    throw new Error("No existe método en guiaMantenimientoService para actualizar estadoGuia");
+  // ✅ 1. API: ACTUALIZAR ESTADO
+  const apiUpdateEstado = useCallback(async (guiaId, estadoGuiaUI) => {
+    const estadoAvisoBackend = MAP_UI_A_API[estadoGuiaUI] || "CREADO";
+    return actualizarEstadoAviso(guiaId, estadoAvisoBackend);
   }, []);
 
+  // ✅ 2. API: CARGAR DESDE LA RUTA GENERAL (/Avisos)
   const cargarGuias = useCallback(async (silencioso = false) => {
     try {
       silencioso ? setRefreshing(true) : setLoading(true);
-      const data = await guiaMantenimientoService.getGuias();
-
-      // También traer avisos (origen manual) y normalizarlos como "guías"
-      let avisos = [];
-      try {
-        const respAvisos = await obtenerAvisosOrigenManual();
-        avisos = Array.isArray(respAvisos) ? respAvisos : [];
-      } catch (err) {
-        console.warn("No se pudo cargar avisos para mostrarlos en Alertas:", err);
-        avisos = [];
+      
+      let data = await obtenerAvisos();
+      
+      if (data && data.data && Array.isArray(data.data)) {
+        data = data.data;
       }
 
-      // Mapeo simple de estados del backend de aviso → estado esperado por esta página
-      const ESTADO_AVISO_MAP = {
-        CREADO: "creado",
-        TRATADO: "tratado",
-        CON_OT: "con OT",
-        RECHAZADO: "rechazado",
-        FINALIZADO: "finalizado",
-        FINALIZADO_SIN_FACTURACION: "finalizado sin facturacion",
-      };
-
-      const avisosComoGuias = avisos.map((a) => ({
-        // prefijo id para evitar colisiones con guías reales
-        id: `av-${a.id}`,
-        numeroAlerta: a.numeroAviso || a.numero || `AV-${a.id}`,
+      const guiasNormalizadas = (Array.isArray(data) ? data : []).map((a) => ({
+        ...a,
+        numeroAlerta: a.numeroAviso || a.numero || a.id,
         producto: a.producto || a.descripcion || "",
         descripcion: a.descripcion || a.descripcionResumida || "",
         ordenVenta: a.ordenVenta || a.ordenCliente || "",
-        equipo: a.equiposRelacion?.[0]?.equipo || null,
+        equipo: a.equiposRelacion?.[0]?.equipo || a.equipo || null,
         equipoId: a.equiposRelacion?.[0]?.equipoId || a.equipoId || null,
         fechaInicioAlerta: a.fechaAtencion || a.fechaSugerida || a.createdAt || null,
-        createdAt: a.createdAt || new Date().toISOString(),
-        updatedAt: a.updatedAt || a.createdAt || new Date().toISOString(),
-        // mapear estadoAviso (BACK) a estadoGuia (FRONT)
-        estadoGuia: ESTADO_AVISO_MAP[a.estadoAviso] || ESTADO_AVISO_MAP[a.estado] || "creado",
-        // pasar otros campos útiles
-        creticidad: a.creticidad,
-        planMantenimiento: a.planMantenimiento,
-        ubicacionTecnica: a.ubicacionTecnica,
-        solicitante: a.solicitante,
-        adjuntos: a.adjuntos,
+        estadoGuia: MAP_API_A_UI[a.estadoAviso || a.estado] || "creado",
       }));
 
-      const guiasData = Array.isArray(data) ? data : [];
-      setGuias([...guiasData, ...avisosComoGuias]);
+      setGuias(guiasNormalizadas);
     } catch (e) {
-      console.error("Error cargando guías:", e);
+      console.error("Error cargando guías (/Avisos/):", e);
       setGuias([]);
     } finally {
       setLoading(false);
@@ -552,10 +447,7 @@ export default function GuiasMantenimientoKanban() {
         g.equipo?.modelo,
         g.planMantenimiento?.nombre,
         g.planMantenimiento?.codigoPlan,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+      ].filter(Boolean).join(" ").toLowerCase();
 
       return blob.includes(txt);
     });
@@ -570,7 +462,6 @@ export default function GuiasMantenimientoKanban() {
       (cols[estado] || cols.creado).items.push(g);
     });
 
-    // orden: más nuevo primero
     Object.values(cols).forEach((c) => {
       c.items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     });
@@ -579,16 +470,7 @@ export default function GuiasMantenimientoKanban() {
   }, [guiasFiltradas]);
 
   const stats = useMemo(() => {
-    const base = {
-      total: guias.length,
-      creado: 0,
-      tratado: 0,
-      conOT: 0,
-      finalizado: 0,
-      finalizadoSinFact: 0,
-      rechazado: 0,
-    };
-
+    const base = { total: guias.length, creado: 0, tratado: 0, conOT: 0, finalizado: 0, finalizadoSinFact: 0, rechazado: 0 };
     guias.forEach((g) => {
       const e = normalizarEstado(g.estadoGuia);
       if (e === "creado") base.creado++;
@@ -598,55 +480,63 @@ export default function GuiasMantenimientoKanban() {
       else if (e === "finalizado sin facturacion") base.finalizadoSinFact++;
       else if (e === "rechazado") base.rechazado++;
     });
-
     return base;
   }, [guias]);
 
-  const mover = useCallback(
-    async (guia, dir) => {
-      const actual = normalizarEstado(guia.estadoGuia);
-      const idx = ESTADOS_GUIA.indexOf(actual);
-      if (idx === -1) return;
+  const mover = useCallback(async (guia, dir) => {
+    const actual = normalizarEstado(guia.estadoGuia);
+    const idx = ESTADOS_GUIA.indexOf(actual);
+    if (idx === -1) return;
 
-      const nextIdx = dir === "next" ? idx + 1 : idx - 1;
-      if (nextIdx < 0 || nextIdx >= ESTADOS_GUIA.length) return;
+    const nextIdx = dir === "next" ? idx + 1 : idx - 1;
+    if (nextIdx < 0 || nextIdx >= ESTADOS_GUIA.length) return;
 
-      const nuevo = ESTADOS_GUIA[nextIdx];
+    const nuevoUI = ESTADOS_GUIA[nextIdx];
 
-      try {
-        await apiUpdateEstado(guia.id, nuevo);
-        await cargarGuias(true);
+    try {
+      await apiUpdateEstado(guia.id, nuevoUI);
+      await cargarGuias(true);
 
-        // refrescar modal si corresponde
-        if (guiaSeleccionada?.id === guia.id) {
-          const fresh = (await guiaMantenimientoService.getGuias()).find((x) => x.id === guia.id);
-          if (fresh) setGuiaSeleccionada(fresh);
+      if (guiaSeleccionada?.id === guia.id) {
+        let freshData = await obtenerAvisos();
+        if (freshData && freshData.data && Array.isArray(freshData.data)) freshData = freshData.data;
+
+        const freshAviso = (Array.isArray(freshData) ? freshData : []).find((x) => x.id === guia.id);
+        if (freshAviso) {
+          setGuiaSeleccionada({
+            ...freshAviso,
+            estadoGuia: MAP_API_A_UI[freshAviso.estadoAviso || freshAviso.estado] || "creado"
+          });
         }
-      } catch (e) {
-        console.error("Error moviendo guía:", e);
-        alert(e?.message || "Error al mover la guía de estado");
       }
-    },
-    [apiUpdateEstado, cargarGuias, guiaSeleccionada]
-  );
+    } catch (e) {
+      console.error("Error moviendo guía:", e);
+      alert(e?.message || "Error al mover la guía de estado");
+    }
+  }, [apiUpdateEstado, cargarGuias, guiaSeleccionada]);
 
-  const setEstadoDesdeModal = useCallback(
-    async (nuevoEstado) => {
-      if (!guiaSeleccionada) return;
-      try {
-        await apiUpdateEstado(guiaSeleccionada.id, nuevoEstado);
-        await cargarGuias(true);
-        const fresh = (await guiaMantenimientoService.getGuias()).find((x) => x.id === guiaSeleccionada.id);
-        if (fresh) setGuiaSeleccionada(fresh);
-      } catch (e) {
-        console.error(e);
-        alert(e?.message || "No se pudo actualizar el estado");
+  const setEstadoDesdeModal = useCallback(async (nuevoEstadoUI) => {
+    if (!guiaSeleccionada) return;
+    try {
+      await apiUpdateEstado(guiaSeleccionada.id, nuevoEstadoUI);
+      await cargarGuias(true);
+      
+      let freshData = await obtenerAvisos();
+      if (freshData && freshData.data && Array.isArray(freshData.data)) freshData = freshData.data;
+
+      const freshAviso = (Array.isArray(freshData) ? freshData : []).find((x) => x.id === guiaSeleccionada.id);
+      if (freshAviso) {
+        setGuiaSeleccionada({
+          ...freshAviso,
+          estadoGuia: MAP_API_A_UI[freshAviso.estadoAviso || freshAviso.estado] || "creado"
+        });
       }
-    },
-    [apiUpdateEstado, cargarGuias, guiaSeleccionada]
-  );
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || "No se pudo actualizar el estado");
+    }
+  }, [apiUpdateEstado, cargarGuias, guiaSeleccionada]);
 
-  // loading screen (light)
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -663,9 +553,7 @@ export default function GuiasMantenimientoKanban() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-50 overflow-hidden" style={{ fontFamily: "'DM Sans','Segoe UI',system-ui,sans-serif" }}>
-      {/* HEADER */}
       <div className="shrink-0 bg-white border-b border-slate-200 px-6 py-4 space-y-4">
-        {/* row 1 */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-200">
@@ -677,20 +565,11 @@ export default function GuiasMantenimientoKanban() {
             </div>
           </div>
 
-          <button
-            onClick={() => cargarGuias(true)}
-            className="
-              flex items-center gap-2 px-4 py-2 rounded-xl
-              bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold
-              border border-slate-200 transition
-            "
-          >
-            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-            Actualizar
+          <button onClick={() => cargarGuias(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold border border-slate-200 transition">
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Actualizar
           </button>
         </div>
 
-        {/* stats */}
         <div className="flex flex-wrap gap-2">
           {[
             { label: "Total", value: stats.total, tone: "text-slate-900" },
@@ -708,7 +587,6 @@ export default function GuiasMantenimientoKanban() {
           ))}
         </div>
 
-        {/* search + filter */}
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
@@ -716,11 +594,7 @@ export default function GuiasMantenimientoKanban() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar por alerta, equipo, producto, plan…"
-              className="
-                w-full pl-9 pr-9 py-2.5 rounded-xl bg-white
-                border border-slate-300 text-slate-800 placeholder-slate-400 text-sm
-                focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-400 transition
-              "
+              className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-400 transition"
             />
             {q && (
               <button onClick={() => setQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition">
@@ -729,25 +603,60 @@ export default function GuiasMantenimientoKanban() {
             )}
           </div>
 
+          {/* ✅ CUSTOM DROPDOWN FILTRO */}
           <div className="relative shrink-0">
-            <Filter size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <select
-              value={fEstado}
-              onChange={(e) => setFEstado(e.target.value)}
+            <button
+              onClick={() => setIsOpenFiltro(!isOpenFiltro)}
               className="
-                pl-8 pr-8 py-2.5 rounded-xl bg-white
-                border border-slate-300 text-slate-700 text-sm
-                focus:outline-none focus:ring-2 focus:ring-blue-500/25 appearance-none cursor-pointer
+                flex items-center justify-between w-48 pl-9 pr-4 py-2.5 rounded-xl bg-white
+                border border-slate-300 text-slate-700 text-sm font-medium
+                hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/25 transition
               "
             >
-              <option value="TODOS">Todos los estados</option>
-              {ESTADOS_GUIA.map((s) => (
-                <option key={s} value={s}>
-                  {ESTADOS_COLUMNA[s]?.label || s}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Filter size={14} className="absolute left-3.5 text-slate-400" />
+              <span className="truncate">
+                {fEstado === "TODOS" ? "Todos los estados" : ESTADOS_COLUMNA[fEstado]?.label}
+              </span>
+              <ChevronDown 
+                size={14} 
+                className={`text-slate-400 transition-transform duration-200 ${isOpenFiltro ? "rotate-180" : ""}`} 
+              />
+            </button>
+
+            {isOpenFiltro && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsOpenFiltro(false)} />
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-200/50 z-50 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <button
+                    onClick={() => { setFEstado("TODOS"); setIsOpenFiltro(false); }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-3
+                      ${fEstado === "TODOS" ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50 font-medium"}
+                    `}
+                  >
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                    Todos los estados
+                  </button>
+
+                  <div className="h-px bg-slate-100 my-1 mx-4" />
+
+                  {ESTADOS_GUIA.map((s) => {
+                    const cfg = ESTADOS_COLUMNA[s];
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => { setFEstado(s); setIsOpenFiltro(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center gap-3
+                          ${fEstado === s ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-600 hover:bg-slate-50 font-medium"}
+                        `}
+                      >
+                        <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${cfg.gradient}`} />
+                        {cfg.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           <span className="shrink-0 text-slate-500 text-xs">
@@ -756,7 +665,6 @@ export default function GuiasMantenimientoKanban() {
         </div>
       </div>
 
-      {/* KANBAN */}
       <div className="flex-1 overflow-hidden p-4">
         <div className="h-full flex flex-nowrap overflow-x-auto gap-4">
           {ESTADOS_GUIA.map((estadoKey) => {
@@ -766,7 +674,6 @@ export default function GuiasMantenimientoKanban() {
 
             return (
               <div key={estadoKey} className={`flex flex-col rounded-2xl border ${cfg.border} overflow-hidden bg-white shadow min-w-[320px]`}>
-                {/* column header */}
                 <div className={`bg-gradient-to-r ${cfg.gradient} px-4 py-3.5 shrink-0`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-3 min-w-0">
@@ -780,14 +687,12 @@ export default function GuiasMantenimientoKanban() {
                         </p>
                       </div>
                     </div>
-
                     <span className="bg-white/20 text-white text-xs font-black px-2.5 py-0.5 rounded-full shrink-0">
                       {items.length}
                     </span>
                   </div>
                 </div>
 
-                {/* cards list */}
                 <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-slate-50">
                   {items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-14 text-slate-400">
@@ -814,7 +719,6 @@ export default function GuiasMantenimientoKanban() {
         </div>
       </div>
 
-      {/* MODAL */}
       {guiaSeleccionada && (
         <ModalDetalle
           guia={guiaSeleccionada}
