@@ -156,27 +156,27 @@ function GuiaCard({ guia, onOpen, onMoverPrev, onMoverNext }) {
 
   return (
     <div
-      className={`rounded-lg border border-slate-200 bg-white overflow-hidden hover:shadow-md transition cursor-pointer group ${cfg.borderLeft}`}
+      className={`rounded-xl border border-slate-200 bg-white overflow-hidden hover:shadow-lg transition cursor-pointer group ${cfg.borderLeft}`}
       onClick={() => onOpen(guia)}
     >
-      <div className="p-3 space-y-2">
+      <div className="p-4 space-y-3">
         {/* Header: Icono + Estado + Contador */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className={`w-8 h-8 rounded-lg ${cfg.iconBg} flex items-center justify-center shrink-0`}>
-              <cfg.icon size={16} className={cfg.iconColor} />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className={`w-10 h-10 rounded-lg ${cfg.iconBg} flex items-center justify-center shrink-0`}>
+              <cfg.icon size={20} className={cfg.iconColor} />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-mono text-slate-400 block">
+              <span className="text-xs font-mono text-slate-400 block">
                 {show(guia.numeroAlerta)}
               </span>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${cfg.chip}`}>
+              <span className={`text-xs font-bold px-2 py-1 rounded-md border ${cfg.chip}`}>
                 {cfg.label}
               </span>
             </div>
           </div>
           {guia.creticidad && (
-            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border shrink-0 ${
+            <span className={`text-xs font-black px-2 py-1 rounded-md border shrink-0 ${
               guia.creticidad === 'A' 
                 ? 'bg-[#FEF2F2] text-[#DC2626] border-[#FCA5A5]' 
                 : 'bg-[#FFF7ED] text-[#EA580C] border-[#FDBA74]'
@@ -187,24 +187,24 @@ function GuiaCard({ guia, onOpen, onMoverPrev, onMoverNext }) {
         </div>
 
         {/* Descripción principal */}
-        <p className="font-semibold text-slate-800 text-xs leading-snug break-words">
+        <p className="font-semibold text-slate-800 text-sm leading-snug break-words">
           {guia.producto || guia.descripcion || "Sin título"}
         </p>
 
         {/* Equipo y Plan en grid flexible */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {(guia.equipo || guia.equipoId) && (
-            <div className="flex items-center gap-1.5 bg-slate-50 rounded-md px-2 py-1 border border-slate-100 min-w-0">
-              <Package size={10} className="text-slate-400 shrink-0" />
-              <span className="text-[10px] text-slate-600 truncate">
+            <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-1.5 border border-slate-100 min-w-0">
+              <Package size={12} className="text-slate-400 shrink-0" />
+              <span className="text-xs text-slate-600 truncate">
                 {show(guia.equipo?.nombre || guia.equipoId)}
               </span>
             </div>
           )}
           {(guia.planMantenimiento || guia.planMantenimientoId) && (
-            <div className="flex items-center gap-1.5 bg-slate-50 rounded-md px-2 py-1 border border-slate-100 min-w-0">
-              <Layers size={10} className="text-slate-400 shrink-0" />
-              <span className="text-[10px] text-slate-600 truncate">
+            <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-1.5 border border-slate-100 min-w-0">
+              <Layers size={12} className="text-slate-400 shrink-0" />
+              <span className="text-xs text-slate-600 truncate">
                 {show(guia.planMantenimiento?.nombre || guia.planMantenimientoId)}
               </span>
             </div>
@@ -212,33 +212,33 @@ function GuiaCard({ guia, onOpen, onMoverPrev, onMoverNext }) {
         </div>
 
         {/* Fecha y OV en fila */}
-        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-          <div className="flex items-center gap-1 text-[10px] text-slate-500">
-            <Calendar size={10} />
+        <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Calendar size={12} />
             <span>{fmtFecha(guia.fechaInicioAlerta)}</span>
           </div>
-          <div className="flex items-center gap-1 text-[10px] text-slate-500">
-            <Hash size={10} />
-            <span className="truncate max-w-[80px]">{show(guia.ordenVenta)}</span>
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Hash size={12} />
+            <span className="truncate max-w-[100px]">{show(guia.ordenVenta)}</span>
           </div>
         </div>
       </div>
 
       {/* Botones de acción */}
-      <div className="px-3 pb-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
+      <div className="px-4 pb-4 flex gap-2 opacity-0 group-hover:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => canPrev && onMoverPrev(guia)}
           disabled={!canPrev}
-          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-semibold border border-slate-200 transition disabled:opacity-40"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold border border-slate-200 transition disabled:opacity-40"
         >
-          <ArrowLeft size={10} />
+          <ArrowLeft size={14} /> Ant
         </button>
         <button
           onClick={() => canNext && onMoverNext(guia)}
           disabled={!canNext}
-          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#2563EB] text-[10px] font-semibold border border-[#BFDBFE] transition disabled:opacity-40"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#2563EB] text-xs font-semibold border border-[#BFDBFE] transition disabled:opacity-40"
         >
-          <ArrowRight size={10} />
+          Sig <ArrowRight size={14} />
         </button>
       </div>
     </div>
@@ -726,33 +726,33 @@ export default function GuiasMantenimientoKanban() {
       </div>
 
       <div className="flex-1 overflow-hidden p-3">
-        {/* GRID RESPONSIVO - Sin scroll horizontal */}
-        <div className="h-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        {/* GRID FLEXIBLE - Ocupa todo el ancho disponible */}
+        <div className="h-full flex flex-col lg:flex-row gap-3">
           {ESTADOS_GUIA.map((estadoKey) => {
             const cfg = ESTADOS_COLUMNA[estadoKey] || ESTADOS_COLUMNA.creado;
             const Icon = cfg.icon || Eye;
             const items = columns[estadoKey]?.items || [];
 
             return (
-              <div key={estadoKey} className={`flex flex-col rounded-2xl border ${cfg.border} overflow-hidden bg-white shadow-sm min-h-0`}>
-                {/* Cabecera estilo pastel pill del screenshot */}
+              <div key={estadoKey} className={`flex-1 flex flex-col min-w-0 rounded-2xl border ${cfg.border} overflow-hidden bg-white shadow-sm min-h-0`}>
+                {/* Cabecera estilo pastel pill */}
                 <div className={`${cfg.bgHeader} px-3 py-3 shrink-0`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className={`w-7 h-7 rounded-full ${cfg.iconBg} flex items-center justify-center shrink-0`}>
-                        <Icon size={16} className={cfg.iconColor} />
+                      <div className={`w-8 h-8 rounded-full ${cfg.iconBg} flex items-center justify-center shrink-0`}>
+                        <Icon size={18} className={cfg.iconColor} />
                       </div>
-                      <h3 className={`font-bold text-[11px] sm:text-xs uppercase tracking-wide ${cfg.textColor} whitespace-normal break-words leading-tight`}>
+                      <h3 className={`font-bold text-xs lg:text-sm uppercase tracking-wide ${cfg.textColor} whitespace-nowrap`}>
                         {cfg.label}
                       </h3>
                     </div>
-                    <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[10px] font-bold shadow-sm border border-slate-100 shrink-0">
+                    <span className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-xs font-bold shadow-sm border border-slate-100 shrink-0">
                       {items.length}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 bg-slate-50/50 min-h-0">
+                <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-50/50 min-h-0">
                   {items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-slate-300">
                       <Package className="w-8 h-8 mb-2 opacity-50" />
