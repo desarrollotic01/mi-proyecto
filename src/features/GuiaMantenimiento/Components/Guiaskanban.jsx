@@ -187,7 +187,7 @@ export default function GuiasKanban({
   calcularUrgencia,
 }) {
   return (
-    <div className="h-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="h-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 p-3">
       {columnOrder.map((colId) => {
         const col = columns[colId] || { items: [] };
         const cfg = estadosConfig[colId] || {};
@@ -200,27 +200,26 @@ export default function GuiasKanban({
         }).length;
 
         return (
-          <div key={colId} className="flex flex-col rounded-2xl bg-slate-800/50 border border-slate-700/50 overflow-hidden backdrop-blur-sm">
-            {/* Cabecera de columna */}
-            <div className={`bg-gradient-to-r ${cfg.gradient || "from-slate-600 to-slate-700"} px-4 py-4 shrink-0`}>
+          <div key={colId} className="flex flex-col rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+            {/* Cabecera tipo pill pastel del screenshot */}
+            <div className={`px-3 py-3 shrink-0 ${cfg.bgHeader || "bg-slate-50"}`}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                    <Icon size={18} className="text-white" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-white text-sm">{cfg.label || colId}</p>
-                    <p className="text-white/60 text-xs">{col.items.length} guía{col.items.length !== 1 ? "s" : ""}</p>
-                  </div>
-                </div>
                 <div className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${cfg.iconBg || "bg-white"}`}>
+                    <Icon size={16} className={cfg.iconColor || "text-slate-600"} />
+                  </div>
+                  <h3 className={`font-bold text-xs uppercase tracking-wide ${cfg.textColor || "text-slate-700"}`}>
+                    {cfg.label || colId}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-1.5">
                   {alertCount > 0 && (
-                    <span className="flex items-center gap-1 bg-red-500/30 text-red-200 border border-red-400/40 text-xs font-bold px-2.5 py-1 rounded-full animate-pulse">
+                    <span className="flex items-center gap-1 bg-red-100 text-red-700 border border-red-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
                       <AlertTriangle size={10} />
                       {alertCount}
                     </span>
                   )}
-                  <span className="bg-white/20 text-white text-sm font-bold px-3 py-1 rounded-full">
+                  <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[10px] font-bold shadow-sm border border-slate-100">
                     {col.items.length}
                   </span>
                 </div>
@@ -228,14 +227,11 @@ export default function GuiasKanban({
             </div>
 
             {/* Cards */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+            <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 bg-slate-50/50">
               {col.items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-600">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mb-3">
-                    <Package size={28} className="opacity-30" />
-                  </div>
-                  <p className="text-sm font-semibold">Sin guías</p>
-                  <p className="text-xs mt-1 opacity-70">Esta columna está vacía</p>
+                <div className="flex flex-col items-center justify-center py-12 text-slate-300">
+                  <Package className="w-8 h-8 mb-2 opacity-50" />
+                  <p className="text-xs font-bold uppercase tracking-wider">Vacío</p>
                 </div>
               ) : (
                 col.items.map((guia) => (

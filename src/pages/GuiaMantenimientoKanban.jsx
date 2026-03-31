@@ -45,14 +45,74 @@ const ESTADOS_GUIA = [
   "rechazado",
 ];
 
-// Config visual por columna (light)
+// Config visual por columna (Paleta Semántica Soft UI)
 const ESTADOS_COLUMNA = {
-  creado: { label: "Creado", gradient: "from-slate-600 to-slate-700", border: "border-slate-200", icon: FileText, chip: "bg-slate-100 text-slate-700 border-slate-200" },
-  tratado: { label: "Tratado", gradient: "from-blue-600 to-blue-700", border: "border-slate-200", icon: ClipboardCheck, chip: "bg-blue-50 text-blue-700 border-blue-200" },
-  "con OT": { label: "Con OT", gradient: "from-indigo-600 to-indigo-700", border: "border-slate-200", icon: Wrench, chip: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  finalizado: { label: "Finalizado", gradient: "from-emerald-600 to-emerald-700", border: "border-slate-200", icon: CheckCircle2, chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  "finalizado sin facturacion": { label: "Finalizado s/ fact.", gradient: "from-amber-600 to-amber-700", border: "border-slate-200", icon: Wallet, chip: "bg-amber-50 text-amber-800 border-amber-200" },
-  rechazado: { label: "Rechazado", gradient: "from-red-700 to-red-800", border: "border-slate-200", icon: Ban, chip: "bg-red-50 text-red-700 border-red-200" },
+  creado: { 
+    label: "Creado", 
+    bgHeader: "bg-[#EFF6FF]", 
+    textColor: "text-[#2563EB]",
+    iconBg: "bg-[#DBEAFE]",
+    iconColor: "text-[#2563EB]",
+    borderLeft: "border-l-4 border-l-[#2563EB]",
+    border: "border-slate-100", 
+    icon: FileText, 
+    chip: "bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE]"
+  },
+  tratado: { 
+    label: "Tratado", 
+    bgHeader: "bg-[#FFF7ED]", 
+    textColor: "text-[#EA580C]",
+    iconBg: "bg-[#FED7AA]",
+    iconColor: "text-[#EA580C]",
+    borderLeft: "border-l-4 border-l-[#EA580C]",
+    border: "border-slate-100", 
+    icon: ClipboardCheck, 
+    chip: "bg-[#FFF7ED] text-[#EA580C] border-[#FDBA74]"
+  },
+  "con OT": { 
+    label: "Con OT", 
+    bgHeader: "bg-[#FAF5FF]", 
+    textColor: "text-[#9333EA]",
+    iconBg: "bg-[#E9D5FF]",
+    iconColor: "text-[#9333EA]",
+    borderLeft: "border-l-4 border-l-[#9333EA]",
+    border: "border-slate-100", 
+    icon: Wrench, 
+    chip: "bg-[#FAF5FF] text-[#9333EA] border-[#D8B4FE]"
+  },
+  finalizado: { 
+    label: "Finalizado", 
+    bgHeader: "bg-[#F0FDF4]", 
+    textColor: "text-[#16A34A]",
+    iconBg: "bg-[#BBF7D0]",
+    iconColor: "text-[#16A34A]",
+    borderLeft: "border-l-4 border-l-[#16A34A]",
+    border: "border-slate-100", 
+    icon: CheckCircle2, 
+    chip: "bg-[#F0FDF4] text-[#16A34A] border-[#86EFAC]"
+  },
+  "finalizado sin facturacion": { 
+    label: "Finalizado s/ fact.", 
+    bgHeader: "bg-[#F8FAFC]", 
+    textColor: "text-[#475569]",
+    iconBg: "bg-[#E2E8F0]",
+    iconColor: "text-[#475569]",
+    borderLeft: "border-l-4 border-l-[#475569]",
+    border: "border-slate-100", 
+    icon: Wallet, 
+    chip: "bg-[#F8FAFC] text-[#475569] border-[#CBD5E1]"
+  },
+  rechazado: { 
+    label: "Rechazado", 
+    bgHeader: "bg-[#FEF2F2]", 
+    textColor: "text-[#DC2626]",
+    iconBg: "bg-[#FECACA]",
+    iconColor: "text-[#DC2626]",
+    borderLeft: "border-l-4 border-l-[#DC2626]",
+    border: "border-slate-100", 
+    icon: Ban, 
+    chip: "bg-[#FEF2F2] text-[#DC2626] border-[#FCA5A5]"
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -96,89 +156,89 @@ function GuiaCard({ guia, onOpen, onMoverPrev, onMoverNext }) {
 
   return (
     <div
-      className="rounded-2xl border border-slate-200 bg-white overflow-hidden hover:shadow-lg hover:shadow-slate-200/60 transition cursor-pointer group"
+      className={`rounded-lg border border-slate-200 bg-white overflow-hidden hover:shadow-md transition cursor-pointer group ${cfg.borderLeft}`}
       onClick={() => onOpen(guia)}
     >
-      <div className={`h-1 w-full bg-gradient-to-r ${cfg.gradient}`} />
-      <div className="p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-mono text-slate-500 truncate">
-            {show(guia.numeroAlerta)}
-          </span>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {guia.creticidad && (
-              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${badgecreticidad(guia.creticidad)}`}>
-                CRIT.{guia.creticidad}
+      <div className="p-3 space-y-2">
+        {/* Header: Icono + Estado + Contador */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className={`w-8 h-8 rounded-lg ${cfg.iconBg} flex items-center justify-center shrink-0`}>
+              <cfg.icon size={16} className={cfg.iconColor} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] font-mono text-slate-400 block">
+                {show(guia.numeroAlerta)}
               </span>
-            )}
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.chip}`}>
-              {cfg.label}
-            </span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${cfg.chip}`}>
+                {cfg.label}
+              </span>
+            </div>
           </div>
+          {guia.creticidad && (
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border shrink-0 ${
+              guia.creticidad === 'A' 
+                ? 'bg-[#FEF2F2] text-[#DC2626] border-[#FCA5A5]' 
+                : 'bg-[#FFF7ED] text-[#EA580C] border-[#FDBA74]'
+            }`}>
+              {guia.creticidad}
+            </span>
+          )}
         </div>
 
-        <p className="font-extrabold text-slate-900 text-sm leading-snug line-clamp-2">
+        {/* Descripción principal */}
+        <p className="font-semibold text-slate-800 text-xs leading-snug break-words">
           {guia.producto || guia.descripcion || "Sin título"}
         </p>
 
-        {(guia.equipo || guia.equipoId) && (
-          <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-200">
-            <Package size={12} className="text-slate-500 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-800 truncate">{show(guia.equipo?.nombre || guia.equipoId)}</p>
-              {guia.equipo && (
-                <p className="text-[10px] font-mono text-slate-500 truncate">
-                  {show(guia.equipo.codigo)} · {show(guia.equipo.modelo)}
-                </p>
-              )}
+        {/* Equipo y Plan en grid flexible */}
+        <div className="flex flex-wrap gap-1.5">
+          {(guia.equipo || guia.equipoId) && (
+            <div className="flex items-center gap-1.5 bg-slate-50 rounded-md px-2 py-1 border border-slate-100 min-w-0">
+              <Package size={10} className="text-slate-400 shrink-0" />
+              <span className="text-[10px] text-slate-600 truncate">
+                {show(guia.equipo?.nombre || guia.equipoId)}
+              </span>
             </div>
-          </div>
-        )}
-
-        {(guia.planMantenimiento || guia.planMantenimientoId) && (
-          <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-200">
-            <Layers size={12} className="text-slate-500 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-800 truncate">
+          )}
+          {(guia.planMantenimiento || guia.planMantenimientoId) && (
+            <div className="flex items-center gap-1.5 bg-slate-50 rounded-md px-2 py-1 border border-slate-100 min-w-0">
+              <Layers size={10} className="text-slate-400 shrink-0" />
+              <span className="text-[10px] text-slate-600 truncate">
                 {show(guia.planMantenimiento?.nombre || guia.planMantenimientoId)}
-              </p>
-              {guia.planMantenimiento?.codigoPlan && (
-                <p className="text-[10px] font-mono text-slate-500 truncate">{show(guia.planMantenimiento.codigoPlan)}</p>
-              )}
+              </span>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200">
-            <p className="text-[9px] text-slate-500 uppercase tracking-wide font-black mb-1 flex items-center gap-1">
-              <Calendar size={10} /> Inicio
-            </p>
-            <p className="text-xs text-slate-800 font-semibold">{fmtFecha(guia.fechaInicioAlerta)}</p>
+        {/* Fecha y OV en fila */}
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+          <div className="flex items-center gap-1 text-[10px] text-slate-500">
+            <Calendar size={10} />
+            <span>{fmtFecha(guia.fechaInicioAlerta)}</span>
           </div>
-          <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200">
-            <p className="text-[9px] text-slate-500 uppercase tracking-wide font-black mb-1 flex items-center gap-1">
-              <Hash size={10} /> OV
-            </p>
-            <p className="text-xs text-slate-800 font-semibold truncate">{show(guia.ordenVenta)}</p>
+          <div className="flex items-center gap-1 text-[10px] text-slate-500">
+            <Hash size={10} />
+            <span className="truncate max-w-[80px]">{show(guia.ordenVenta)}</span>
           </div>
         </div>
       </div>
 
-      <div className="px-4 pb-4 flex gap-2 opacity-0 group-hover:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
+      {/* Botones de acción */}
+      <div className="px-3 pb-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => canPrev && onMoverPrev(guia)}
           disabled={!canPrev}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 transition disabled:opacity-40 disabled:hover:bg-slate-100"
+          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-semibold border border-slate-200 transition disabled:opacity-40"
         >
-          <ArrowLeft size={12} /> Anterior
+          <ArrowLeft size={10} />
         </button>
         <button
           onClick={() => canNext && onMoverNext(guia)}
           disabled={!canNext}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600/10 hover:bg-blue-600/15 text-blue-700 text-xs font-bold border border-blue-200 transition disabled:opacity-40 disabled:hover:bg-blue-600/10"
+          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md bg-[#EFF6FF] hover:bg-[#DBEAFE] text-[#2563EB] text-[10px] font-semibold border border-[#BFDBFE] transition disabled:opacity-40"
         >
-          Siguiente <ArrowRight size={12} />
+          <ArrowRight size={10} />
         </button>
       </div>
     </div>
@@ -203,9 +263,9 @@ function ModalDetalle({ guia, onClose, onSetEstado }) {
       style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(8px)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-3xl max-h-[88vh] flex flex-col rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-white">
-        <div className="relative px-6 py-5 border-b border-slate-200 bg-white">
-          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${cfg.gradient}`} />
+      <div className="w-full max-w-3xl max-h-[88vh] flex flex-col rounded-2xl overflow-hidden border border-slate-200 shadow-2xl bg-white">
+        <div className={`relative px-6 py-5 border-b border-slate-200 bg-white ${cfg.borderLeft}`}>
+          <div className={`absolute top-0 left-0 w-1 h-full ${cfg.bgHeader.replace('bg-', 'bg-')}`} />
 
           <div className="flex items-start justify-between gap-4 mt-1">
             <div className="min-w-0 flex-1">
@@ -665,41 +725,38 @@ export default function GuiasMantenimientoKanban() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden p-4">
-        <div className="h-full flex flex-nowrap overflow-x-auto gap-4">
+      <div className="flex-1 overflow-hidden p-3">
+        {/* GRID RESPONSIVO - Sin scroll horizontal */}
+        <div className="h-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           {ESTADOS_GUIA.map((estadoKey) => {
             const cfg = ESTADOS_COLUMNA[estadoKey] || ESTADOS_COLUMNA.creado;
             const Icon = cfg.icon || Eye;
             const items = columns[estadoKey]?.items || [];
 
             return (
-              <div key={estadoKey} className={`flex flex-col rounded-2xl border ${cfg.border} overflow-hidden bg-white shadow min-w-[320px]`}>
-                <div className={`bg-gradient-to-r ${cfg.gradient} px-4 py-3.5 shrink-0`}>
+              <div key={estadoKey} className={`flex flex-col rounded-2xl border ${cfg.border} overflow-hidden bg-white shadow-sm min-h-0`}>
+                {/* Cabecera estilo pastel pill del screenshot */}
+                <div className={`${cfg.bgHeader} px-3 py-3 shrink-0`}>
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                        <Icon size={16} className="text-white" />
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className={`w-7 h-7 rounded-full ${cfg.iconBg} flex items-center justify-center shrink-0`}>
+                        <Icon size={16} className={cfg.iconColor} />
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-black text-white text-sm leading-none truncate">{cfg.label}</p>
-                        <p className="text-white/70 text-[10px] mt-0.5">
-                          {items.length} guía{items.length !== 1 ? "s" : ""}
-                        </p>
-                      </div>
+                      <h3 className={`font-bold text-[11px] sm:text-xs uppercase tracking-wide ${cfg.textColor} whitespace-normal break-words leading-tight`}>
+                        {cfg.label}
+                      </h3>
                     </div>
-                    <span className="bg-white/20 text-white text-xs font-black px-2.5 py-0.5 rounded-full shrink-0">
+                    <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[10px] font-bold shadow-sm border border-slate-100 shrink-0">
                       {items.length}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-slate-50">
+                <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 bg-slate-50/50 min-h-0">
                   {items.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-14 text-slate-400">
-                      <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-3">
-                        <Package size={24} className="opacity-40" />
-                      </div>
-                      <p className="text-xs font-semibold">Sin guías</p>
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-300">
+                      <Package className="w-8 h-8 mb-2 opacity-50" />
+                      <p className="text-xs font-bold uppercase tracking-wider">Vacío</p>
                     </div>
                   ) : (
                     items.map((g) => (
