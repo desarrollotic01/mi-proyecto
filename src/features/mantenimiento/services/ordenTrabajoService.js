@@ -42,3 +42,23 @@ export const updateOrdenTrabajoCompleta = async (id, data) => {
     throw error;
   }
 };
+
+export const syncSAPOrdenTrabajo = async (ordenId) => {
+  const res = await api.post(`/orden-trabajo/${ordenId}/sync-sap`);
+  return res.data;
+};
+
+export const verificarLiberacionOT = async (id) => {
+  const res = await api.get(`/orden-trabajo/${id}/verificar-liberacion`);
+  return res.data;
+};
+
+export const liberarOrdenTrabajoService = async (id, destinatarioId = null, ccEmails = []) => {
+  const res = await api.patch(`/orden-trabajo/${id}/liberar`, { destinatarioId, ccEmails });
+  return res.data;
+};
+
+export const cerrarOrdenTrabajoService = async (id) => {
+  const res = await api.patch(`/orden-trabajo/${id}/cerrar`);
+  return res.data;
+};

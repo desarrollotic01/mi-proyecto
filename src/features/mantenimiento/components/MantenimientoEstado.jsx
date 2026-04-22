@@ -1,4 +1,4 @@
-import { Settings, Plus, Search, AlertCircle, Wrench, User, X } from "lucide-react";
+import { Settings, Plus, Search, AlertCircle, Wrench, User, X, Filter } from "lucide-react";
 
 export default function MantenimientoEstado({
   activeTab,
@@ -10,7 +10,7 @@ export default function MantenimientoEstado({
   filters,
   setFilters,
 }) {
-  const hasActiveFilters = filters.search || filters.prioridad || filters.tipoMantenimiento || filters.solicitante;
+  const hasActiveFilters = filters.search || filters.prioridad || filters.tipoMantenimiento || filters.solicitante || filters.estado;
 
   return (
     <div className="space-y-3 p-4">
@@ -18,17 +18,22 @@ export default function MantenimientoEstado({
       <div className="flex items-center gap-4">
         {/* NAV TABS - Con ancho mínimo */}
         <div className="flex gap-2 flex-shrink-0">
-          {["kanban", "lista", "calendario"].map((t) => (
+          {[
+            { id: "kanban",     label: "Kanban" },
+            { id: "lista",      label: "Lista" },
+            { id: "calendario", label: "Calendario" },
+            { id: "excel",      label: "📥 Excel" },
+          ].map(({ id, label }) => (
             <button
-              key={t}
-              onClick={() => setActiveTab(t)}
+              key={id}
+              onClick={() => setActiveTab(id)}
               className={`px-3 py-2 font-semibold rounded-lg transition-all whitespace-nowrap text-sm ${
-                activeTab === t
+                activeTab === id
                   ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30"
                   : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300 hover:bg-blue-50"
               }`}
             >
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+              {label}
             </button>
           ))}
         </div>
@@ -60,7 +65,7 @@ export default function MantenimientoEstado({
 
       {/* BARRA DE FILTROS - Grid responsivo */}
       <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-3 rounded-xl shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
           {/* Búsqueda General */}
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -131,6 +136,29 @@ export default function MantenimientoEstado({
               }
             />
           </div>
+
+          {/* Estado */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Filter className="w-4 h-4 text-gray-400" />
+            </div>
+            <select
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white appearance-none cursor-pointer"
+              value={filters.estado}
+              onChange={(e) =>
+                setFilters({ ...filters, estado: e.target.value })
+              }
+            >
+              <option value="">Todos los estados</option>
+              <option value="CREADO">Creado</option>
+              <option value="TRATADO">Tratado</option>
+              <option value="CON_OT">Con OT</option>
+              <option value="RECHAZADO">Rechazado</option>
+              <option value="FINALIZADO">Finalizado</option>
+              <option value="FACTURADO">Facturado</option>
+              <option value="FINALIZADO_SIN_FACTURACION">Fin. sin facturación</option>
+            </select>
+          </div>
         </div>
 
         {/* Indicador de filtros activos - Compacto */}
@@ -186,8 +214,20 @@ export default function MantenimientoEstado({
               </span>
             )}
 
+            {filters.estado && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full text-xs font-medium">
+                {filters.estado.replace(/_/g, " ")}
+                <button
+                  onClick={() => setFilters({ ...filters, estado: "" })}
+                  className="hover:bg-violet-200 rounded-full p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
             <button
-              onClick={() => setFilters({ search: "", prioridad: "", tipoMantenimiento: "", solicitante: "" })}
+              onClick={() => setFilters({ search: "", prioridad: "", tipoMantenimiento: "", solicitante: "", estado: "" })}
               className="text-xs text-red-600 hover:text-red-800 font-medium"
             >
               Limpiar

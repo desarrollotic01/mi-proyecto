@@ -1,367 +1,313 @@
+import { useState, useMemo } from "react";
+import {
+  FileText, User, Calendar, Wrench,
+  CheckCircle, Clock, Hash, ChevronUp, ChevronDown as ChevronDownIcon, ChevronsUpDown,
+} from "lucide-react";
 
-import { useState } from "react";
+const PAGE_SIZE = 20;
 
-/* ================= HELPERS ================= */
-
+/* ── Helpers ── */
 const formatDate = (isoDate) => {
   if (!isoDate) return "—";
-  const date = new Date(isoDate);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+  const d = new Date(isoDate);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+const getTipoAvisoBadge = (tipo) => {
+  const map = {
+    mantenimiento: "bg-blue-100 text-blue-700 border-blue-300",
+    instalacion:   "bg-emerald-100 text-emerald-700 border-emerald-300",
+    venta:         "bg-purple-100 text-purple-700 border-purple-300",
+  };
+  return map[tipo] || "bg-gray-100 text-gray-700 border-gray-300";
 };
 
 const getEstadoBadge = (estado) => {
-  const badges = {
-    "CREADO": "bg-blue-100 text-blue-800 border-blue-200",
-    "LIBERADO": "bg-purple-100 text-purple-800 border-purple-200",
-    "CIERRE_TECNICO": "bg-amber-100 text-amber-800 border-amber-200",
-    "CERRADO": "bg-emerald-100 text-emerald-800 border-emerald-200",
-    "CANCELADO": "bg-red-100 text-red-800 border-red-200"
+  const map = {
+    CREADO:         "bg-blue-100 text-blue-800 border-blue-300",
+    LIBERADO:       "bg-purple-100 text-purple-800 border-purple-300",
+    CIERRE_TECNICO: "bg-amber-100 text-amber-800 border-amber-300",
+    CERRADO:        "bg-emerald-100 text-emerald-800 border-emerald-300",
+    CANCELADO:      "bg-red-100 text-red-800 border-red-300",
   };
-  return badges[estado] || badges.CREADO;
+  return map[estado] || "bg-gray-100 text-gray-800 border-gray-300";
 };
 
-/* ================= COLUMNS CONFIG ================= */
-
-const COLUMNS_CONFIG = {
-  numeroOT: { label: "N° Orden", default: true },
-  descripcionGeneral: { label: "Descripción", default: true },
-  estado: { label: "Estado", default: true },
-  supervisorId: { label: "Supervisor", default: true },
-  fechaProgramadaInicio: { label: "Inicio Programado", default: true },
-  fechaProgramadaFin: { label: "Fin Programado", default: true },
-  fechaInicioReal: { label: "Inicio Real", default: false },
-  fechaFinReal: { label: "Fin Real", default: false },
-  fechaCierre: { label: "Fecha Cierre", default: false },
-  observaciones: { label: "Observaciones", default: false },
-  avisoId: { label: "ID Aviso", default: false },
-  tratamientoId: { label: "ID Tratamiento", default: false },
+const getEstadoLabel = (estado) => {
+  const map = {
+    CREADO: "Creado", LIBERADO: "Liberado",
+    CIERRE_TECNICO: "Cierre Técnico", CERRADO: "Cerrado", CANCELADO: "Cancelado",
+  };
+  return map[estado] || estado;
 };
 
-/* ================= COMPONENT ================= */
+const getRegistroLabel = (r, i) => {
+  if (r?.equipoId) return r.descripcionEquipo || r.equipo?.nombre || r.equipo?.codigo || `Equipo ${i + 1}`;
+  if (r?.ubicacionTecnicaId) return r.descripcionUbicacion || r.ubicacionTecnica?.nombre || r.ubicacionTecnica?.codigo || `Ubicación ${i + 1}`;
+  return `Registro ${i + 1}`;
+};
 
-export default function ListaView({ ordenes, onViewOrden }) {
-  const [search, setSearch] = useState("");
-  const [estadoFilter, setEstadoFilter] = useState("TODOS");
-  const [showColumnSelector, setShowColumnSelector] = useState(false);
-  
-  // Initialize visible columns
-  const [visibleColumns, setVisibleColumns] = useState(() => 
-    Object.keys(COLUMNS_CONFIG).reduce((acc, key) => {
-      acc[key] = COLUMNS_CONFIG[key].default;
-      return acc;
-    }, {})
-  );
+/* ── Column metadata (label + icon for header, sortable flag) ── */
+const COLUMNS_META = {
+  numeroOT:              { label: "N° Orden",      icon: Hash,         sortable: true  },
+  estado:                { label: "Estado",         icon: Clock,        sortable: true  },
+  tipoAviso:             { label: "Tipo Aviso",     icon: FileText,     sortable: true  },
+  descripcionGeneral:    { label: "Descripción",    icon: FileText,     sortable: false },
+  supervisorId:          { label: "Supervisor",     icon: User,         sortable: true  },
+  registros:             { label: "Equipos/Ubs.",   icon: Wrench,       sortable: false },
+  fechaProgramadaInicio: { label: "Inicio Prog.",   icon: Calendar,     sortable: true  },
+  fechaProgramadaFin:    { label: "Fin Prog.",      icon: Calendar,     sortable: true  },
+  fechaInicioReal:       { label: "Inicio Real",    icon: Calendar,     sortable: true  },
+  fechaFinReal:          { label: "Fin Real",       icon: Calendar,     sortable: true  },
+  fechaCierre:           { label: "Fecha Cierre",   icon: CheckCircle,  sortable: true  },
+  avisoNumero:           { label: "N° Aviso",       icon: FileText,     sortable: false },
+  observaciones:         { label: "Observaciones",  icon: FileText,     sortable: false },
+};
 
-  const [tempColumns, setTempColumns] = useState(visibleColumns);
+export const OT_DEFAULT_FIELDS = {
+  numeroOT: true, estado: true, tipoAviso: true, descripcionGeneral: true,
+  supervisorId: true, registros: true, fechaProgramadaInicio: true,
+  fechaProgramadaFin: true, fechaInicioReal: false, fechaFinReal: false,
+  fechaCierre: false, avisoNumero: false, observaciones: false,
+};
 
-  /* ================= FILTERING ================= */
-  const filteredOrdenes = ordenes.filter(orden => {
-    const matchesSearch = 
-      !search ||
-      orden.numeroOT?.toLowerCase().includes(search.toLowerCase()) ||
-      orden.descripcionGeneral?.toLowerCase().includes(search.toLowerCase()) ||
-      orden.supervisorId?.toLowerCase().includes(search.toLowerCase());
+export const OT_DEFAULT_ORDER = Object.keys(OT_DEFAULT_FIELDS);
 
-    const matchesEstado = 
-      estadoFilter === "TODOS" || 
-      orden.estado === estadoFilter;
+/* ── Main component ── */
+export default function OrdenTrabajoLista({
+  ordenes = [],
+  onViewOrden,
+  cardFields,
+  columnOrder,
+}) {
+  const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState("numeroOT");
+  const [sortDir, setSortDir] = useState("desc");
 
-    return matchesSearch && matchesEstado;
-  });
+  // Fall back to defaults if parent hasn't wired up config yet
+  const visibleFields = cardFields || OT_DEFAULT_FIELDS;
+  const colOrder = columnOrder || OT_DEFAULT_ORDER;
 
-  /* ================= COLUMN MANAGEMENT ================= */
-  const handleApplyColumns = () => {
-    setVisibleColumns(tempColumns);
-    setShowColumnSelector(false);
+  const handleSort = (key) => {
+    if (!COLUMNS_META[key]?.sortable) return;
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+    setPage(1);
   };
 
-  const handleResetFilters = () => {
-    setSearch("");
-    setEstadoFilter("TODOS");
-    const defaults = Object.keys(COLUMNS_CONFIG).reduce((acc, key) => {
-      acc[key] = COLUMNS_CONFIG[key].default;
-      return acc;
-    }, {});
-    setVisibleColumns(defaults);
-    setTempColumns(defaults);
-    setShowColumnSelector(false);
-  };
+  const sorted = useMemo(() => {
+    if (!sortKey || !COLUMNS_META[sortKey]?.sortable) return ordenes;
+    return [...ordenes].sort((a, b) => {
+      const av = a[sortKey] ?? "";
+      const bv = b[sortKey] ?? "";
+      const cmp = String(av).localeCompare(String(bv), "es", { sensitivity: "base" });
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [ordenes, sortKey, sortDir]);
 
-  const estados = ["TODOS", "CREADO", "LIBERADO", "CIERRE_TECNICO", "CERRADO", "CANCELADO"];
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Only show columns that exist in COLUMNS_META AND are enabled AND appear in order
+  const visibleKeys = colOrder.filter((k) => COLUMNS_META[k] && visibleFields[k]);
+
+  const SortIcon = ({ k }) => {
+    if (!COLUMNS_META[k]?.sortable) return null;
+    if (sortKey !== k) return <ChevronsUpDown className="w-3.5 h-3.5 text-gray-400 opacity-50" />;
+    return sortDir === "asc"
+      ? <ChevronUp className="w-3.5 h-3.5 text-blue-300" />
+      : <ChevronDownIcon className="w-3.5 h-3.5 text-blue-300" />;
+  };
 
   return (
-    <div className="space-y-4">
-      {/* FILTERS BAR */}
-      <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-4 rounded-xl border border-slate-200">
-        <div className="flex flex-wrap gap-3 items-center">
-          {/* SEARCH */}
-          <div className="flex-1 min-w-[250px]">
-            <div className="relative">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="🔍 Buscar por N° OT, descripción o supervisor..."
-                className="
-                  w-full px-4 py-2.5 pl-10
-                  bg-white border-2 border-slate-200
-                  rounded-xl
-                  focus:border-blue-500 focus:ring-4 focus:ring-blue-100
-                  transition-all duration-200
-                  placeholder:text-slate-400
-                "
-              />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                🔍
-              </span>
-            </div>
-          </div>
-
-          {/* ESTADO FILTER */}
-          <select
-            value={estadoFilter}
-            onChange={(e) => setEstadoFilter(e.target.value)}
-            className="
-              px-4 py-2.5
-              bg-white border-2 border-slate-200
-              rounded-xl
-              focus:border-blue-500 focus:ring-4 focus:ring-blue-100
-              transition-all duration-200
-              font-medium text-slate-700
-              cursor-pointer
-            "
-          >
-            {estados.map(estado => (
-              <option key={estado} value={estado}>
-                {estado === "TODOS" ? "📊 Todos los Estados" : `${estado.replace(/_/g, ' ')}`}
-              </option>
-            ))}
-          </select>
-
-          {/* COLUMN SELECTOR */}
-          <button
-            onClick={() => {
-              setTempColumns(visibleColumns);
-              setShowColumnSelector(!showColumnSelector);
-            }}
-            className="
-              px-4 py-2.5 rounded-xl font-semibold
-              bg-white border-2 border-slate-200
-              text-slate-700
-              hover:border-blue-500 hover:text-blue-600
-              transition-all duration-200
-              whitespace-nowrap
-            "
-          >
-            ⚙️ Columnas
-          </button>
-
-          {/* RESET */}
-          <button
-            onClick={handleResetFilters}
-            className="
-              px-4 py-2.5 rounded-xl font-semibold
-              bg-red-50 border-2 border-red-200
-              text-red-700
-              hover:bg-red-100
-              transition-all duration-200
-              whitespace-nowrap
-            "
-          >
-            🔄 Limpiar
-          </button>
-        </div>
-
-        {/* COLUMN SELECTOR PANEL */}
-        {showColumnSelector && (
-          <div className="mt-4 p-4 bg-white rounded-xl border-2 border-slate-200 shadow-lg">
-            <h3 className="font-bold text-slate-900 mb-3">Seleccionar Columnas</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
-              {Object.entries(COLUMNS_CONFIG).map(([key, config]) => (
-                <label
-                  key={key}
-                  className="
-                    flex items-center gap-2 p-2 rounded-lg
-                    hover:bg-slate-50 cursor-pointer
-                    transition-colors duration-200
-                  "
-                >
-                  <input
-                    type="checkbox"
-                    checked={tempColumns[key]}
-                    onChange={(e) => 
-                      setTempColumns(prev => ({ ...prev, [key]: e.target.checked }))
-                    }
-                    className="
-                      w-4 h-4 rounded border-2 border-slate-300
-                      text-blue-600 focus:ring-2 focus:ring-blue-500
-                      cursor-pointer
-                    "
-                  />
-                  <span className="text-sm text-slate-700 font-medium">
-                    {config.label}
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowColumnSelector(false)}
-                className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 font-medium hover:bg-slate-200"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleApplyColumns}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
-              >
-                Aplicar
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* RESULTS COUNT */}
-      <div className="flex items-center justify-between px-2">
-        <p className="text-sm text-slate-600">
-          Mostrando <span className="font-bold text-slate-900">{filteredOrdenes.length}</span> de{" "}
-          <span className="font-bold text-slate-900">{ordenes.length}</span> órdenes
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+      {/* Top bar */}
+      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm font-semibold text-gray-700">
+          {sorted.length === 0
+            ? "Sin resultados"
+            : `${sorted.length} orden${sorted.length !== 1 ? "es" : ""}${sorted.length > PAGE_SIZE ? ` — página ${safePage} de ${totalPages}` : ""}`}
         </p>
+        <p className="text-xs text-gray-400">Haz clic en un encabezado para ordenar · Usa ⚙️ Configurar del encabezado para cambiar columnas</p>
       </div>
 
-      {/* TABLE */}
-      <div className="overflow-x-auto rounded-xl border-2 border-slate-200 shadow-lg">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gradient-to-r from-slate-800 to-slate-700 text-white">
-              {Object.entries(COLUMNS_CONFIG).map(([key, config]) => 
-                visibleColumns[key] && (
+      {/* Table */}
+      <div className="overflow-x-auto flex-1">
+        <table className="w-full">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
+              {visibleKeys.map((key) => {
+                const cfg = COLUMNS_META[key];
+                const Icon = cfg.icon;
+                return (
                   <th
                     key={key}
-                    className="px-4 py-3 text-left font-bold uppercase tracking-wider text-xs border-r border-slate-600 last:border-r-0"
+                    onClick={() => handleSort(key)}
+                    className={`px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap min-w-[130px] ${cfg.sortable ? "cursor-pointer hover:bg-gray-200 select-none" : ""}`}
                   >
-                    {config.label}
+                    <div className="flex items-center gap-1.5">
+                      {Icon && <Icon className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />}
+                      <span className="truncate">{cfg.label}</span>
+                      <SortIcon k={key} />
+                    </div>
                   </th>
-                )
-              )}
-              <th className="px-4 py-3 text-center font-bold uppercase tracking-wider text-xs">
+                );
+              })}
+              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[80px]">
                 Acciones
               </th>
             </tr>
           </thead>
           <tbody>
-            {filteredOrdenes.length === 0 ? (
+            {pageItems.length === 0 ? (
               <tr>
-                <td
-                  colSpan={Object.values(visibleColumns).filter(Boolean).length + 1}
-                  className="px-4 py-16 text-center"
-                >
-                  <div className="text-slate-400">
-                    <div className="text-6xl mb-4">📭</div>
-                    <p className="text-lg font-medium">No se encontraron órdenes</p>
-                    <p className="text-sm">Intenta ajustar los filtros de búsqueda</p>
+                <td colSpan={visibleKeys.length + 1} className="px-4 py-16 text-center">
+                  <div className="text-gray-400">
+                    <div className="text-5xl mb-3">📭</div>
+                    <p className="text-base font-medium">No se encontraron órdenes</p>
+                    <p className="text-sm mt-1">Ajusta los filtros de búsqueda</p>
                   </div>
                 </td>
               </tr>
             ) : (
-              filteredOrdenes.map((orden, idx) => (
-                <tr
-                  key={orden.id}
-                  className={`
-                    border-b border-slate-100 transition-all duration-200
-                    ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}
-                    hover:bg-blue-50
-                  `}
-                >
-                  {visibleColumns.numeroOT && (
-                    <td className="px-4 py-3 font-bold text-slate-900 border-r border-slate-100">
-                      {orden.numeroOT || "—"}
+              pageItems.map((orden, idx) => {
+                const registros = orden.equipos || [];
+                return (
+                  <tr
+                    key={orden.id}
+                    className={`border-b border-gray-100 transition-colors hover:bg-blue-50 ${idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                  >
+                    {visibleFields.numeroOT && colOrder.includes("numeroOT") && (
+                      <td className="px-4 py-3 font-bold text-gray-900">
+                        <span className="font-mono text-sm">{orden.numeroOT || "—"}</span>
+                      </td>
+                    )}
+                    {visibleFields.estado && colOrder.includes("estado") && (
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${getEstadoBadge(orden.estado)}`}>
+                          {getEstadoLabel(orden.estado)}
+                        </span>
+                      </td>
+                    )}
+                    {visibleFields.tipoAviso && colOrder.includes("tipoAviso") && (
+                      <td className="px-4 py-3">
+                        {orden.aviso?.tipoAviso ? (
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${getTipoAvisoBadge(orden.aviso.tipoAviso)}`}>
+                            {orden.aviso.tipoAviso.charAt(0).toUpperCase() + orden.aviso.tipoAviso.slice(1)}
+                          </span>
+                        ) : "—"}
+                      </td>
+                    )}
+                    {visibleFields.descripcionGeneral && colOrder.includes("descripcionGeneral") && (
+                      <td className="px-4 py-3 text-gray-700 max-w-xs truncate text-sm">
+                        {orden.descripcionGeneral || "—"}
+                      </td>
+                    )}
+                    {visibleFields.supervisorId && colOrder.includes("supervisorId") && (
+                      <td className="px-4 py-3 text-gray-700 text-sm">{orden.supervisorId || "—"}</td>
+                    )}
+                    {visibleFields.registros && colOrder.includes("registros") && (
+                      <td className="px-4 py-3">
+                        {registros.length === 0 ? (
+                          <span className="text-gray-400 text-xs">Sin registros</span>
+                        ) : (
+                          <div className="space-y-0.5">
+                            {registros.slice(0, 2).map((r, i) => (
+                              <div key={i} className="flex items-center gap-1.5 text-xs text-gray-700">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                                <span className="truncate max-w-[130px]">{getRegistroLabel(r, i)}</span>
+                              </div>
+                            ))}
+                            {registros.length > 2 && (
+                              <span className="text-xs text-gray-400 italic">+{registros.length - 2} más</span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    )}
+                    {visibleFields.fechaProgramadaInicio && colOrder.includes("fechaProgramadaInicio") && (
+                      <td className="px-4 py-3 text-gray-700 text-sm">{formatDate(orden.fechaProgramadaInicio)}</td>
+                    )}
+                    {visibleFields.fechaProgramadaFin && colOrder.includes("fechaProgramadaFin") && (
+                      <td className="px-4 py-3 text-gray-700 text-sm">{formatDate(orden.fechaProgramadaFin)}</td>
+                    )}
+                    {visibleFields.fechaInicioReal && colOrder.includes("fechaInicioReal") && (
+                      <td className="px-4 py-3 text-gray-700 text-sm">{formatDate(orden.fechaInicioReal)}</td>
+                    )}
+                    {visibleFields.fechaFinReal && colOrder.includes("fechaFinReal") && (
+                      <td className="px-4 py-3 text-gray-700 text-sm">{formatDate(orden.fechaFinReal)}</td>
+                    )}
+                    {visibleFields.fechaCierre && colOrder.includes("fechaCierre") && (
+                      <td className="px-4 py-3 text-gray-700 text-sm">{formatDate(orden.fechaCierre)}</td>
+                    )}
+                    {visibleFields.avisoNumero && colOrder.includes("avisoNumero") && (
+                      <td className="px-4 py-3 text-gray-700 text-sm font-mono">
+                        {orden.aviso?.numeroAviso || "—"}
+                      </td>
+                    )}
+                    {visibleFields.observaciones && colOrder.includes("observaciones") && (
+                      <td className="px-4 py-3 text-gray-700 text-sm max-w-[200px] truncate">
+                        {orden.observaciones || "—"}
+                      </td>
+                    )}
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => onViewOrden(orden)}
+                        className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm hover:shadow-md"
+                      >
+                        Ver / Editar
+                      </button>
                     </td>
-                  )}
-                  {visibleColumns.descripcionGeneral && (
-                    <td className="px-4 py-3 text-slate-700 border-r border-slate-100 max-w-xs truncate">
-                      {orden.descripcionGeneral || "—"}
-                    </td>
-                  )}
-                  {visibleColumns.estado && (
-                    <td className="px-4 py-3 border-r border-slate-100">
-                      <span className={`
-                        inline-block px-3 py-1 rounded-full text-xs font-bold border-2
-                        ${getEstadoBadge(orden.estado)}
-                      `}>
-                        {orden.estado?.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                  )}
-                  {visibleColumns.supervisorId && (
-                    <td className="px-4 py-3 text-slate-700 border-r border-slate-100">
-                      {orden.supervisorId || "—"}
-                    </td>
-                  )}
-                  {visibleColumns.fechaProgramadaInicio && (
-                    <td className="px-4 py-3 text-slate-700 border-r border-slate-100">
-                      {formatDate(orden.fechaProgramadaInicio)}
-                    </td>
-                  )}
-                  {visibleColumns.fechaProgramadaFin && (
-                    <td className="px-4 py-3 text-slate-700 border-r border-slate-100">
-                      {formatDate(orden.fechaProgramadaFin)}
-                    </td>
-                  )}
-                  {visibleColumns.fechaInicioReal && (
-                    <td className="px-4 py-3 text-slate-700 border-r border-slate-100">
-                      {formatDate(orden.fechaInicioReal)}
-                    </td>
-                  )}
-                  {visibleColumns.fechaFinReal && (
-                    <td className="px-4 py-3 text-slate-700 border-r border-slate-100">
-                      {formatDate(orden.fechaFinReal)}
-                    </td>
-                  )}
-                  {visibleColumns.fechaCierre && (
-                    <td className="px-4 py-3 text-slate-700 border-r border-slate-100">
-                      {formatDate(orden.fechaCierre)}
-                    </td>
-                  )}
-                  {visibleColumns.observaciones && (
-                    <td className="px-4 py-3 text-slate-700 border-r border-slate-100 max-w-xs truncate">
-                      {orden.observaciones || "—"}
-                    </td>
-                  )}
-                  {visibleColumns.avisoId && (
-                    <td className="px-4 py-3 text-slate-700 border-r border-slate-100 font-mono text-xs">
-                      {orden.avisoId ? orden.avisoId.substring(0, 8) + "..." : "—"}
-                    </td>
-                  )}
-                  {visibleColumns.tratamientoId && (
-                    <td className="px-4 py-3 text-slate-700 border-r border-slate-100 font-mono text-xs">
-                      {orden.tratamientoId ? orden.tratamientoId.substring(0, 8) + "..." : "—"}
-                    </td>
-                  )}
-                  <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => onViewOrden(orden)}
-                      className="
-                        px-3 py-1.5 rounded-lg
-                        bg-blue-600 text-white text-xs font-semibold
-                        hover:bg-blue-700
-                        transition-all duration-200
-                        shadow-sm hover:shadow-md
-                      "
-                    >
-                      👁️ Ver
-                    </button>
-                  </td>
-                </tr>
-              ))
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-3">
+          <p className="text-sm text-gray-600">
+            Página <span className="font-bold text-gray-900">{safePage}</span> de{" "}
+            <span className="font-bold text-gray-900">{totalPages}</span>
+          </p>
+          <div className="flex gap-1">
+            <button
+              disabled={safePage <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              ←
+            </button>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const p = Math.max(1, Math.min(totalPages - 4, safePage - 2)) + i;
+              return (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    p === safePage
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            })}
+            <button
+              disabled={safePage >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import MantenimientoEstado from "../components/MantenimientoEstado";
 import MantenimientoLista from "../components/MantenimientoLista";
 import MantenimientoCalendario from "../components/MantenimientoCalendario";
 import MantenimientoKanban from "../components/MantenimientoKanban";
+import AvisosExcelExport from "../components/AvisosExcelExport";
 
 import ModalMantenimiento from "../modals/ModalMantenimiento";
 import ModalMantenimientoView from "../modals/ModalMantenimientoView";
@@ -15,7 +16,6 @@ import ModalTratamiento from "../../../components/inputs/ModalTratamiento";
 import ModalSeleccionTipoOT from "../../../features/OrdenTrabajo/Modalselecciontipoot";
 import ModalOTIndividual from "../../../features/OrdenTrabajo/Modalotindividual";
 import ModalOTGrupal from "../../../features/OrdenTrabajo/Modalotgrupal";
-import ModalOTMixto from "../../../features/OrdenTrabajo/ModalotMixto";
 import ModalConfiguracionCampos from "../../../components/ModalConfiguracionCampos";
 import ModalSeleccionEquiposOT from "../../OrdenTrabajo/Modalseleccionequiposot";
 
@@ -28,7 +28,6 @@ export default function Mantenimiento() {
   const [modalSeleccionOT, setModalSeleccionOT] = useState(false);
   const [modalIndividualOT, setModalIndividualOT] = useState(false);
   const [modalGrupalOT, setModalGrupalOT] = useState(false);
-  const [modalMixtoOT, setModalMixtoOT] = useState(false);
 
   // 🆕 Estado para equipos
   const [equiposData, setEquiposData] = useState([]);
@@ -61,7 +60,7 @@ const [indiceEquipoActual, setIndiceEquipoActual] = useState(0);
 
   useEffect(() => {
     if (m.avisoOrdenTrabajo) {
-      setModalSeleccionOT(true);
+      setModalGrupalOT(true);
     }
   }, [m.avisoOrdenTrabajo]);
 
@@ -71,7 +70,6 @@ const cerrarModalesOT = () => {
   setModalSeleccionOT(false);
   setModalIndividualOT(false);
   setModalGrupalOT(false);
-  setModalMixtoOT(false);
   setModalEquiposOT(false); 
   setEquiposSeleccionados([]);
   setIndiceEquipoActual(0); 
@@ -90,9 +88,12 @@ const cerrarModalesOT = () => {
 
 
   // 🆕 Función para manejar el guardado de OT
-  const handleGuardarOT = (payload) => {
-    m.guardarOrdenTrabajo(payload);
+  const handleGuardarOT = async (payload) => {
+    await m.guardarOrdenTrabajo(payload);
     cerrarModalesOT();
+    // Cerrar el modal de vista ya que el aviso cambió de estado
+    m.setViewOpen(false);
+    m.setViewData(null);
   };
 
   /* ================= FILTROS ================= */
@@ -105,8 +106,10 @@ const cerrarModalesOT = () => {
           !m.filters.search ||
           item.numeroAviso?.toLowerCase().includes(searchLower) ||
           item.descripcion?.toLowerCase().includes(searchLower) ||
+          item.descripcionResumida?.toLowerCase().includes(searchLower) ||
           item.cliente?.toLowerCase().includes(searchLower) ||
-          item.producto?.toLowerCase().includes(searchLower);
+          item.producto?.toLowerCase().includes(searchLower) ||
+          item.solicitante?.toLowerCase().includes(searchLower);
 
         const matchPrioridad =
           !m.filters.prioridad ||
@@ -122,11 +125,16 @@ const cerrarModalesOT = () => {
             ?.toLowerCase()
             .includes(m.filters.solicitante.toLowerCase());
 
+        const matchEstado =
+          !m.filters.estado ||
+          item.estado === m.filters.estado;
+
         return (
           matchSearch &&
           matchPrioridad &&
           matchTipo &&
-          matchSolicitante
+          matchSolicitante &&
+          matchEstado
         );
       });
 
@@ -193,6 +201,15 @@ const cerrarModalesOT = () => {
               setViewOpen={m.setViewOpen}
               equiposData={equiposData}
             />
+          )}
+
+          {/* ================= EXCEL ================= */}
+          {m.activeTab === "excel" && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <AvisosExcelExport
+                avisos={Object.values(m.columns).flatMap((c) => c.items)}
+              />
+            </div>
           )}
 
           {/* ================= CALENDARIO ================= */}
@@ -263,9 +280,7 @@ const cerrarModalesOT = () => {
       setModalGrupalOT(true);
     }
 
-    if (tipo === "mixto") {
-      setModalMixtoOT(true);
-    }
+
   }}
 />
 
@@ -326,17 +341,6 @@ const cerrarModalesOT = () => {
   }}
   onGenerarNumeroOT={generarNumeroOT}
 />
-
-
-      {/* PASO 2B: Modal Mixta */}
-      <ModalOTMixto
-        isOpen={modalMixtoOT}
-        onClose={cerrarModalesOT}
-        aviso={m.avisoOrdenTrabajo}
-        onGuardar={handleGuardarOT}
-        onGenerarNumeroOT={generarNumeroOT}
-      />
-
       {/* PASO 2C: Modal Grupal */}
       <ModalOTGrupal
         isOpen={modalGrupalOT}

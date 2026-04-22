@@ -1,24 +1,10 @@
-import api from "../../../services/api";
+// Re-exporta desde el módulo centralizado de adjuntos
+// Mantiene compatibilidad con el código existente
+export { uploadArchivos as default } from "../../adjuntos/services/adjuntosService";
+export { construirUrlArchivo, getExtension, uploadArchivos, uploadArchivo } from "../../adjuntos/services/adjuntosService";
 
+// Objeto legacy para compatibilidad con imports existentes
+import { uploadArchivos } from "../../adjuntos/services/adjuntosService";
 export const adjuntosService = {
-  uploadArchivos: async (files) => {
-    const formData = new FormData();
-
-    for (let file of files) {
-      formData.append("files", file);
-    }
-
-    const response = await api.post(
-      "adjuntos/upload",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
-
-    return response.data;
-    // devuelve [{nombre,url,tipo}]
-  },
+  uploadArchivos,
 };

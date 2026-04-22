@@ -17,8 +17,9 @@ import {
   getNotificacionesByOT,
   abrirPdfNotificacion,
 } from "../services/notificacionService";
+import { uploadArchivos } from "../../adjuntos/services/adjuntosService";
 import { getTrabajadores } from "../../mantenimiento/services/trabajadoresService";
-import { getOrdenTrabajoById } from "../../mantenimiento/services/ordenTrabajoService";
+import { getOrdenTrabajoById, updateOrdenTrabajoCompleta } from "../../mantenimiento/services/ordenTrabajoService";
 
 /* =========================================================
    HELPERS GENERALES
@@ -267,7 +268,8 @@ function ModalElegirEquipo({
    MODAL PRINCIPAL
 ========================================================= */
 
-const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
+const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) => {
+  const esVenta = tipoAviso === "venta";
   const [ordenTrabajo, setOrdenTrabajo] = useState(null);
   const [loadingOrden, setLoadingOrden] = useState(false);
 
@@ -289,7 +291,6 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
     horometro: "",
     numeroMisiones: "",
     numeroEquipo: "",
-    codigoRepuesto: "",
     descripcionMantenimiento: "",
     descripcionGeneral: "",
     observaciones: "",
@@ -305,13 +306,22 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
   const [busquedaNombre, setBusquedaNombre] = useState("");
 
   const [correctivos, setCorrectivos] = useState([]);
-  const [fotosAntes, setFotosAntes] = useState([]);
-  const [fotosDespues, setFotosDespues] = useState([]);
+  const [gruposAntesDespues, setGruposAntesDespues] = useState([
+    { id: 1, descripcion: "", fotosAntes: [], fotosDespues: [] },
+  ]);
 
   const [acta, setActa] = useState(null);
   const [informe, setInforme] = useState(null);
   const [checklistAdjunto, setChecklistAdjunto] = useState(null);
   const [archivoExtra, setArchivoExtra] = useState(null);
+
+  // Estado para venta (formulario simplificado)
+  const [ventaForm, setVentaForm] = useState({
+    actividadCompletada: false,
+    fechaCompletado: new Date().toISOString().slice(0, 16),
+    observaciones: "",
+  });
+  const [ventaLoading, setVentaLoading] = useState(false);
 
   /* =========================================================
      CARGAS
@@ -373,7 +383,6 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
       horometro: "",
       numeroMisiones: "",
       numeroEquipo: "",
-      codigoRepuesto: "",
       descripcionMantenimiento: "",
       descripcionGeneral: "",
       observaciones: "",
@@ -387,8 +396,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
     setTecnicosSeleccionados([]);
     setFiltroRol("");
     setBusquedaNombre("");
-    setFotosAntes([]);
-    setFotosDespues([]);
+    setGruposAntesDespues([{ id: Date.now(), descripcion: "", fotosAntes: [], fotosDespues: [] }]);
     setActa(null);
     setInforme(null);
     setChecklistAdjunto(null);
@@ -415,8 +423,8 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
 
   useEffect(() => {
     if (!isOpen) return;
-    setOpenSelectEquipo(true);
-  }, [isOpen]);
+    if (!esVenta) setOpenSelectEquipo(true);
+  }, [isOpen, esVenta]);
 
   /* =========================================================
      COMPUTED
@@ -472,6 +480,9 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
     if (!equipoSeleccionado?.id) return null;
     return notiByEquipoOTId.get(equipoSeleccionado.id) || null;
   }, [equipoSeleccionado, notiByEquipoOTId]);
+
+  // Detecta si el registro seleccionado es Ubicación Técnica (no muestra datos operativos)
+  const esUbicacion = !!equipoSeleccionado?.ubicacionTecnicaId;
 
   const yaExisteNotiEquipo = !!notiActual;
 
@@ -684,68 +695,45 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
   };
 
   /* =========================================================
-     ADJUNTOS PREVIEW
+     ADJUNTOS — sube archivos al servidor y devuelve URLs reales
   ========================================================= */
 
-  const convertirAdjuntos = () => {
-    const lista = [];
+  const uploadAdjuntos = async () => {
+    const tareas = [];
 
-    const mapFiles = (files, categoria) => {
-      Array.from(files || []).forEach((file) => {
-        lista.push({
-          nombre: file.name,
-          url: URL.createObjectURL(file),
-          extension: file.name.split(".").pop(),
-          categoria,
-          ordenTrabajoId: ordenTrabajo?.id || null,
-          ordenTrabajoEquipoId: equipoSeleccionado?.id || null,
-        });
-      });
-    };
-
-    if (fotosAntes?.length) mapFiles(fotosAntes, "ANTES");
-    if (fotosDespues?.length) mapFiles(fotosDespues, "DESPUES");
-
-    correctivos.forEach((c) => {
-      if (c.fotos?.length) mapFiles(c.fotos, "CORRECTIVO");
+    gruposAntesDespues.forEach((g, i) => {
+      const antes = Array.from(g.fotosAntes || []);
+      const despues = Array.from(g.fotosDespues || []);
+      if (antes.length) tareas.push({ files: antes, categoria: "ANTES", grupo: i, descripcion: g.descripcion || "" });
+      if (despues.length) tareas.push({ files: despues, categoria: "DESPUES", grupo: i, descripcion: g.descripcion || "" });
     });
 
-    if (acta) {
-      lista.push({
-        nombre: acta.name,
-        url: URL.createObjectURL(acta),
-        extension: acta.name.split(".").pop(),
-        categoria: "ACTA_CONFORMIDAD",
-      });
-    }
+    correctivos.forEach((c, i) => {
+      const arr = Array.from(c.fotos || []);
+      if (arr.length) tareas.push({ files: arr, categoria: "CORRECTIVO", grupo: i, descripcion: c.comentario || "" });
+    });
 
-    if (informe) {
-      lista.push({
-        nombre: informe.name,
-        url: URL.createObjectURL(informe),
-        extension: informe.name.split(".").pop(),
-        categoria: "INFORME",
-      });
-    }
+    if (acta) tareas.push({ files: [acta], categoria: "ACTA_CONFORMIDAD", grupo: 0, descripcion: "" });
+    if (informe) tareas.push({ files: [informe], categoria: "INFORME", grupo: 0, descripcion: "" });
+    if (checklistAdjunto) tareas.push({ files: [checklistAdjunto], categoria: "CHECKLIST", grupo: 0, descripcion: "" });
+    if (archivoExtra) tareas.push({ files: [archivoExtra], categoria: "OTRO", grupo: 0, descripcion: "" });
 
-    if (checklistAdjunto) {
-      lista.push({
-        nombre: checklistAdjunto.name,
-        url: URL.createObjectURL(checklistAdjunto),
-        extension: checklistAdjunto.name.split(".").pop(),
-        categoria: "CHECKLIST",
-      });
+    const lista = [];
+    for (const { files, categoria, grupo, descripcion } of tareas) {
+      const uploaded = await uploadArchivos(files);
+      uploaded.forEach((u) =>
+        lista.push({
+          nombre: u.nombre,
+          url: u.url,
+          extension: u.tipo || u.nombre.split(".").pop(),
+          categoria,
+          grupo,
+          descripcion,
+          ordenTrabajoId: ordenTrabajo?.id || null,
+          ordenTrabajoEquipoId: equipoSeleccionado?.id || null,
+        })
+      );
     }
-
-    if (archivoExtra) {
-      lista.push({
-        nombre: archivoExtra.name,
-        url: URL.createObjectURL(archivoExtra),
-        extension: archivoExtra.name.split(".").pop(),
-        categoria: "OTRO",
-      });
-    }
-
     return lista;
   };
 
@@ -802,7 +790,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
 
       setLoading(true);
 
-      const adjuntos = convertirAdjuntos();
+      const adjuntos = await uploadAdjuntos();
 
       const resumenCorrectivos = correctivos
         .map((c, i) => `${i + 1}. ${c.comentario}`.trim())
@@ -850,6 +838,32 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
       alert("❌ Error al crear notificación: " + msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /* =========================================================
+     VENTA SUBMIT
+  ========================================================= */
+
+  const handleSubmitVenta = async () => {
+    if (!ventaForm.actividadCompletada) {
+      alert("Debes marcar la actividad como completada");
+      return;
+    }
+    try {
+      setVentaLoading(true);
+      await updateOrdenTrabajoCompleta(ordenTrabajoId, {
+        estado: "CERRADO",
+        fechaFinReal: ventaForm.fechaCompletado || new Date().toISOString(),
+        observaciones: ventaForm.observaciones || null,
+      });
+      alert("✅ Actividad de venta confirmada. OT cerrada.");
+      onClose();
+    } catch (error) {
+      console.error(error);
+      alert("❌ Error al confirmar la actividad: " + (error?.response?.data?.message || error.message));
+    } finally {
+      setVentaLoading(false);
     }
   };
 
@@ -958,6 +972,100 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
   }, [listaTrabajadores, filtroRol, busquedaNombre, tecnicosSeleccionados]);
 
   if (!isOpen) return null;
+
+  /* ----------------------------------------------------------------
+     VENTA: UI simplificada — solo confirmar actividad
+  ---------------------------------------------------------------- */
+  if (esVenta && equiposOT.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-t-3xl flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <span>🛒</span> Confirmar Actividad de Venta
+              </h2>
+              <p className="text-orange-100 text-sm mt-1">
+                OT #{ordenTrabajo?.numeroOT || ordenTrabajoId}
+              </p>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-all">
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 space-y-5">
+            {/* Checkbox actividad */}
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={ventaForm.actividadCompletada}
+                onChange={(e) => setVentaForm(p => ({ ...p, actividadCompletada: e.target.checked }))}
+                className="mt-1 w-5 h-5 rounded border-2 border-orange-400 accent-orange-500 cursor-pointer"
+              />
+              <div>
+                <p className="font-bold text-slate-800 group-hover:text-orange-600 transition-colors">
+                  Actividad completada
+                </p>
+                <p className="text-sm text-slate-500">Marca esto para confirmar que la actividad de venta fue realizada</p>
+              </div>
+            </label>
+
+            {/* Fecha */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Fecha de cierre
+              </label>
+              <input
+                type="datetime-local"
+                value={ventaForm.fechaCompletado}
+                onChange={(e) => setVentaForm(p => ({ ...p, fechaCompletado: e.target.value }))}
+                className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 transition-all"
+              />
+            </div>
+
+            {/* Observaciones */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Observaciones <span className="text-slate-400 font-normal">(opcional)</span>
+              </label>
+              <textarea
+                value={ventaForm.observaciones}
+                onChange={(e) => setVentaForm(p => ({ ...p, observaciones: e.target.value }))}
+                rows={3}
+                placeholder="Notas adicionales sobre la actividad de venta..."
+                className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 transition-all resize-none"
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 pb-6 flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl font-bold text-slate-700 hover:bg-slate-50 transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSubmitVenta}
+              disabled={ventaLoading || !ventaForm.actividadCompletada}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+            >
+              {ventaLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              Confirmar y Cerrar OT
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1077,6 +1185,35 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
                   PDF
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* NOTIFICACIONES CREADAS — Regenerar PDF rápido */}
+          {notificacionesOT.length > 0 && (
+            <div className="px-6 pt-4">
+              <details open>
+                <summary className="cursor-pointer text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 select-none">
+                  Notificaciones creadas ({notificacionesOT.length}) — Regenerar PDF
+                </summary>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {notificacionesOT.map((noti) => {
+                    const eq = ordenTrabajo?.equipos?.find((e) => e.id === noti.ordenTrabajoEquipoId);
+                    const label = eq ? getRegistroOTLabel(eq) : `Noti #${noti.id}`;
+                    return (
+                      <button
+                        key={noti.id}
+                        type="button"
+                        onClick={() => abrirPdfNotificacion(noti.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-bold hover:bg-red-100 hover:border-red-400 transition-all"
+                        title={`PDF de ${label}`}
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </details>
             </div>
           )}
 
@@ -1376,76 +1513,64 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
                 </div>
 
                 {/* DATOS OPERATIVOS */}
-                <div className="bg-gradient-to-br from-green-50 to-green-100/50 rounded-2xl p-5 border border-green-200">
-                  <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <span className="text-xl">⚙️</span> Datos Operativos
-                  </h3>
+                {/* Datos Operativos — solo para Equipos, no para Ubicaciones Técnicas */}
+                {!esUbicacion && (
+                  <div className="bg-gradient-to-br from-green-50 to-green-100/50 rounded-2xl p-5 border border-green-200">
+                    <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <span className="text-xl">⚙️</span> Datos Operativos
+                    </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                        Horómetro
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        name="horometro"
-                        value={form.horometro}
-                        onChange={handleChange}
-                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                        className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-slate-100"
-                      />
-                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Horómetro
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          name="horometro"
+                          value={form.horometro}
+                          onChange={handleChange}
+                          disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                          className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-slate-100"
+                        />
+                      </div>
 
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                        Número de Misiones
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="0"
-                        name="numeroMisiones"
-                        value={form.numeroMisiones}
-                        onChange={handleChange}
-                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                        className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-slate-100"
-                      />
-                    </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Número de Misiones
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          name="numeroMisiones"
+                          value={form.numeroMisiones}
+                          onChange={handleChange}
+                          disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                          className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-slate-100"
+                        />
+                      </div>
 
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                        Número / Referencia
-                      </label>
-                      <input
-                        type="text"
-                        name="numeroEquipo"
-                        value={form.numeroEquipo}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg bg-slate-100"
-                        disabled
-                      />
-                      <p className="text-xs text-green-600 mt-1">
-                        ✓ Cargado desde el registro seleccionado
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                        Código de Repuesto
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Ej: REP-123"
-                        name="codigoRepuesto"
-                        value={form.codigoRepuesto}
-                        onChange={handleChange}
-                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                        className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-slate-100"
-                      />
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Código del Equipo
+                        </label>
+                        <input
+                          type="text"
+                          name="numeroEquipo"
+                          value={form.numeroEquipo}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg bg-slate-100"
+                          disabled
+                        />
+                        <p className="text-xs text-green-600 mt-1">
+                          ✓ Cargado desde el registro seleccionado
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* ESTADO */}
                 <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 rounded-2xl p-5 border border-orange-200">
@@ -1518,40 +1643,107 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId }) => {
                   </div>
                 </div>
 
-                {/* FOTOS */}
+                {/* FOTOS - grupos de antes/después */}
                 <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 rounded-2xl p-5 border border-indigo-200">
-                  <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <span className="text-xl">📸</span> Fotos del Mantenimiento
-                  </h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                      <span className="text-xl">📸</span> Fotos del Mantenimiento
+                    </h3>
+                    <button
+                      type="button"
+                      disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                      onClick={() =>
+                        setGruposAntesDespues((prev) => [
+                          ...prev,
+                          { id: Date.now(), descripcion: "", fotosAntes: [], fotosDespues: [] },
+                        ])
+                      }
+                      className="px-3 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      + Agregar grupo
+                    </button>
+                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {[
-                      { label: "Fotos Antes", state: fotosAntes, setter: setFotosAntes },
-                      {
-                        label: "Fotos Después",
-                        state: fotosDespues,
-                        setter: setFotosDespues,
-                      },
-                    ].map(({ label, state, setter }) => (
-                      <div key={label}>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                          {label}
-                        </label>
+                  <div className="space-y-4">
+                    {gruposAntesDespues.map((grupo, i) => (
+                      <div
+                        key={grupo.id}
+                        className="border border-indigo-200 rounded-xl p-4 bg-white"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-bold text-indigo-700">
+                            Grupo {i + 1}
+                          </span>
+                          {gruposAntesDespues.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setGruposAntesDespues((prev) =>
+                                  prev.filter((g) => g.id !== grupo.id)
+                                )
+                              }
+                              className="text-xs text-red-500 hover:text-red-700 font-semibold"
+                            >
+                              Eliminar
+                            </button>
+                          )}
+                        </div>
 
-                        <input
-                          type="file"
-                          multiple
-                          accept="image/*"
-                          disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                          onChange={(e) => setter(e.target.files)}
-                          className="w-full text-sm px-3 py-2 border-2 border-dashed border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all hover:border-indigo-400 cursor-pointer bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
-                        />
+                        <div className="mb-3">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Descripción del grupo
+                          </label>
+                          <input
+                            type="text"
+                            value={grupo.descripcion}
+                            disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                            onChange={(e) =>
+                              setGruposAntesDespues((prev) =>
+                                prev.map((g) =>
+                                  g.id === grupo.id
+                                    ? { ...g, descripcion: e.target.value }
+                                    : g
+                                )
+                              )
+                            }
+                            placeholder="Ej: Lubricación de motor principal..."
+                            className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-transparent disabled:bg-slate-100"
+                          />
+                        </div>
 
-                        {state?.length > 0 && (
-                          <p className="text-xs text-emerald-600 font-semibold mt-1.5">
-                            ✓ {state.length} archivo(s)
-                          </p>
-                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {[
+                            { label: "Fotos Antes", field: "fotosAntes" },
+                            { label: "Fotos Después", field: "fotosDespues" },
+                          ].map(({ label, field }) => (
+                            <div key={field}>
+                              <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                                {label}
+                              </label>
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                onChange={(e) =>
+                                  setGruposAntesDespues((prev) =>
+                                    prev.map((g) =>
+                                      g.id === grupo.id
+                                        ? { ...g, [field]: e.target.files }
+                                        : g
+                                    )
+                                  )
+                                }
+                                className="w-full text-sm px-3 py-2 border-2 border-dashed border-indigo-300 rounded-lg hover:border-indigo-400 cursor-pointer bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
+                              />
+                              {grupo[field]?.length > 0 && (
+                                <p className="text-xs text-emerald-600 font-semibold mt-1.5">
+                                  ✓ {grupo[field].length} archivo(s)
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>

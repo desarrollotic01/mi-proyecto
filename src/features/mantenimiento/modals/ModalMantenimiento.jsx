@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { 
-  X, ChevronRight, ChevronLeft, Save, FileText, Users, Settings, 
+import {
+  X, ChevronRight, ChevronLeft, Save, FileText, Users, Settings,
   AlertCircle, Plus, Trash2, Wrench, Package, MapPin, Calendar,
-  User, Building, Phone, Mail, Upload, CheckCircle, Search
+  User, Building, Phone, Mail, Upload, CheckCircle, Search, ShoppingCart
 } from "lucide-react";
 
 import { useAuth } from "../../../auth/context/AuthContext";
@@ -12,7 +12,8 @@ import { equipoService } from "../services/equipoService";
 import { UbicacionTecnicaService } from "../services/ubicacionService";
 import { getContactosPorCliente } from "../services/ContactoService";
 import { paisService } from "../services/paisService";
-
+import { getTrabajadores } from "../services/trabajadoresService";
+import AdjuntoUploader from "../../adjuntos/components/AdjuntoUploader";
 
 
 const opcionesProducto = [
@@ -22,7 +23,7 @@ const opcionesProducto = [
 ];
 
 /* ================= MODAL DE BÚSQUEDA ================= */
-function ModalBusqueda({ isOpen, onClose, title, data, onSelect, tipo, equiposSeleccionados = [] }) {
+function ModalBusqueda({ isOpen, onClose, title, data, onSelect, tipo, equiposSeleccionados = [], ubicacionesSeleccionadas = [] }) {
   const [searchTerm, setSearchTerm] = useState("");
 
   if (!isOpen) return null;
@@ -39,6 +40,10 @@ function ModalBusqueda({ isOpen, onClose, title, data, onSelect, tipo, equiposSe
     return equiposSeleccionados.includes(equipoId);
   };
 
+  const isUbicacionSeleccionada = (ubicacionId) => {
+    return ubicacionesSeleccionadas.includes(ubicacionId);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
       <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl">
@@ -50,6 +55,11 @@ function ModalBusqueda({ isOpen, onClose, title, data, onSelect, tipo, equiposSe
               {tipo === "equipos" && equiposSeleccionados.length > 0 && (
                 <p className="text-sm text-gray-500 mt-1">
                   {equiposSeleccionados.length} equipo{equiposSeleccionados.length !== 1 ? 's' : ''} seleccionado{equiposSeleccionados.length !== 1 ? 's' : ''}
+                </p>
+              )}
+              {tipo === "ubicacion" && ubicacionesSeleccionadas.length > 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  {ubicacionesSeleccionadas.length} ubicación{ubicacionesSeleccionadas.length !== 1 ? 'es' : ''} seleccionada{ubicacionesSeleccionadas.length !== 1 ? 's' : ''}
                 </p>
               )}
             </div>
@@ -86,16 +96,16 @@ function ModalBusqueda({ isOpen, onClose, title, data, onSelect, tipo, equiposSe
           ) : (
             <div className="space-y-2">
               {filteredData.map((item) => {
-                const yaSeleccionado = tipo === "equipos" && isEquipoSeleccionado(item.id);
-                
+                const yaSeleccionado =
+                  (tipo === "equipos" && isEquipoSeleccionado(item.id)) ||
+                  (tipo === "ubicacion" && isUbicacionSeleccionada(item.id));
+
                 return (
                   <button
                     key={item.id}
                     onClick={() => {
                       onSelect(item);
-                      if (tipo === "ubicacion") {
-                        onClose();
-                      }
+                      // Never auto-close — user clicks "Listo" to dismiss
                     }}
                     disabled={yaSeleccionado}
                     className={`w-full p-4 border rounded-xl text-left group transition-all ${
@@ -110,7 +120,7 @@ function ModalBusqueda({ isOpen, onClose, title, data, onSelect, tipo, equiposSe
                           {tipo === "equipos" ? (
                             <Package className={`w-5 h-5 ${yaSeleccionado ? "text-green-600" : "text-blue-600"}`} />
                           ) : (
-                            <MapPin className="w-5 h-5 text-green-600" />
+                            <MapPin className={`w-5 h-5 ${yaSeleccionado ? "text-green-600" : "text-emerald-600"}`} />
                           )}
                           <div>
                             <p className={`font-semibold ${yaSeleccionado ? "text-green-900" : "text-gray-900"}`}>
@@ -139,17 +149,15 @@ function ModalBusqueda({ isOpen, onClose, title, data, onSelect, tipo, equiposSe
           )}
         </div>
 
-        {/* Footer con botón cerrar para equipos */}
-        {tipo === "equipos" && (
-          <div className="p-6 border-t border-gray-100 bg-gray-50">
-            <button
-              onClick={onClose}
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
-            >
-              Listo - Cerrar
-            </button>
-          </div>
-        )}
+        {/* Footer con botón cerrar (siempre visible para multi-select) */}
+        <div className="p-6 border-t border-gray-100 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
+          >
+            Listo - Cerrar
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -170,6 +178,7 @@ export default function ModalMantenimiento({
   const [tipoAviso, setTipoAviso] = useState("mantenimiento");
   const [lookupOpen, setLookupOpen] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [submitErrors, setSubmitErrors] = useState([]);
   const { user } = useAuth();
   const [paises, setPaises] = useState([]);
 
@@ -184,7 +193,14 @@ export default function ModalMantenimiento({
   const tieneEquipos = (formData.equipos || []).length > 0;
 const tieneUbicacion = (formData.ubicaciones||[]).length > 0;
 
-  
+  const esPeru = paises.find(p => p.id === formData.paisId)?.nombre === "PERÚ";
+
+  const [departamentos, setDepartamentos] = useState([]);
+const [provincias, setProvincias] = useState([]);
+const [distritos, setDistritos] = useState([]);
+
+
+const [supervisores, setSupervisores] = useState([]);
 
 useEffect(() => {
   if (user?.nombre) {
@@ -203,11 +219,12 @@ useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [clientesData, equiposResp, ubicacionesResp,paisesResp] = await Promise.all([
+        const [clientesData, equiposResp, ubicacionesResp,paisesResp,supervisoresResp] = await Promise.all([
           clienteService.getClientes(),
           equipoService.getEquipos(),
           UbicacionTecnicaService.getUbicacionTecnicas(),
-          paisService.getPaises()
+          paisService.getPaises(),
+          getTrabajadores("supervisor")
         ]);
 
 
@@ -215,6 +232,7 @@ useEffect(() => {
         setClientes(clientesData);
         setEquiposData(equiposResp);
         setUbicacionesData(ubicacionesResp);
+        setSupervisores(supervisoresResp);
 
       } catch (error) {
         console.error("Error cargando datos:", error);
@@ -244,6 +262,32 @@ useEffect(() => {
     );
   };
 
+  const handleDepartamento = (e) => {
+  const dep = e.target.value;
+  setFormData(prev => ({
+    ...prev,
+    departamento: dep,
+    provincia: "",
+    distrito: "",
+  }));
+
+  // cargar provincias
+  const provs = getProvincias(dep); 
+  setProvincias(provs);
+};
+
+const handleProvincia = (e) => {
+  const prov = e.target.value;
+  setFormData(prev => ({
+    ...prev,
+    provincia: prov,
+    distrito: "",
+  }));
+
+  const dists = getDistritos(prov);
+  setDistritos(dists);
+};
+
   useEffect(() => {
     const direccionesValidas = direccionesDesdeEquipos();
 
@@ -265,37 +309,29 @@ useEffect(() => {
     const { name, value, files } = e.target;
 
     if (files) {
-      setFormData((p) => ({ ...p, [name]: files[0] }));
-      return;
-    }
+  if (name === "documentos") {
+    setFormData((p) => ({
+      ...p,
+      documentos: Array.from(files),
+    }));
+  } else {
+    setFormData((p) => ({
+      ...p,
+      [name]: files[0],
+    }));
+  }
+  return;
+}
 
     if (name === "ordenVenta") {
-      const ventaLimpia = value.trim();
-      let nuevoCodigo = "";
-
-      if (ventaLimpia) {
-        const numeros = listaAvisos.map((a) => {
-          if (!a.numeroAviso) return 0;
-          const partes = a.numeroAviso.split("AV");
-          return parseInt(partes.at(-1), 10) || 0;
-        });
-
-        const siguiente = Math.max(0, ...numeros) + 1;
-        nuevoCodigo = `${ventaLimpia}AV${String(siguiente).padStart(3, "0")}`;
-      }
-
-      setFormData((p) => ({
-        ...p,
-        ordenVenta: value,
-        numeroAviso: nuevoCodigo,
-      }));
+      setFormData((p) => ({ ...p, ordenVenta: value }));
       return;
     }
 
-    if (name === "cliente") {
+    if (name === "clienteId") {
       setFormData({
         ...formData,
-        cliente: value, 
+        clienteId: value, 
         nombreContacto: "",
         correoContacto: "",
         numeroContacto: "",
@@ -377,43 +413,67 @@ const getUbicacionData = (ubicacionId) => {
     }));
   };
 
- const handleGuardarAviso = async () => {
+const handleGuardarAviso = async () => {
   setSaving(true);
-  try {
+  setSubmitErrors([]);
 
-    // ✅ VALIDACIÓN NUEVA
+  try {
     if (tipoAviso === "mantenimiento" && !formData.tipoMantenimiento) {
-      alert("Debe seleccionar el tipo de mantenimiento");
-      setSaving(false);
+      setSubmitErrors(["Debe seleccionar el tipo de mantenimiento"]);
       return;
     }
 
-    const payload = {
-      ...formData,
-      tipoAviso,
-      tipoMantenimiento:
-        tipoAviso === "instalacion"
-          ? null
-          : formData.tipoMantenimiento,
-    };
+    const formDataToSend = new FormData();
 
-    delete payload.estadoAviso;
-    delete payload.ubicacionTecnicaId;
+    // Campos normales (excluir tipoAviso — se agrega abajo desde el estado)
+    Object.entries(formData).forEach(([key, value]) => {
+      if (["documentos", "documentoFinal", "equipos", "ubicaciones", "tipoAviso"].includes(key)) return;
+      if (value !== null && value !== undefined) {
+        formDataToSend.append(key, value);
+      }
+    });
 
-    await crearAviso(payload);
+    // tipoAviso desde el estado (una sola vez, correcto)
+    formDataToSend.append("tipoAviso", tipoAviso);
+
+    // Equipos (array)
+    if (formData.equipos?.length) {
+      formData.equipos.forEach((id) => formDataToSend.append("equipos", id));
+    }
+
+    // Ubicaciones (array)
+    if (formData.ubicaciones?.length) {
+      formData.ubicaciones.forEach((id) => formDataToSend.append("ubicaciones", id));
+    }
+
+    // Documentos
+    if (formData.documentos?.length) {
+      formData.documentos.forEach((file) => formDataToSend.append("documentos", file));
+    }
+
+    // Documento final
+    if (formData.documentoFinal) {
+      formDataToSend.append("documentoFinal", formData.documentoFinal);
+    }
+
+    await crearAviso(formDataToSend);
 
     onCreated?.();
     onClose();
+
   } catch (error) {
-    alert(
-      error.response?.data?.errors?.join("\n") ||
-      "Error al guardar aviso"
-    );
+    console.error(error);
+    // Mostrar errores del backend inline sin cerrar ni resetear el form
+    const serverErrors = error?.response?.data?.errors;
+    if (Array.isArray(serverErrors) && serverErrors.length > 0) {
+      setSubmitErrors(serverErrors);
+    } else {
+      setSubmitErrors(["Error al guardar el aviso. Intenta nuevamente."]);
+    }
   } finally {
     setSaving(false);
   }
 };
-
 
   // 🔄 CAMBIO: Función helper para obtener datos de un equipo por su ID
   const getEquipoData = (equipoId) => {
@@ -468,10 +528,7 @@ const getUbicacionData = (ubicacionId) => {
             <button
               onClick={() => {
                 setTipoAviso("instalacion");
-                setFormData(p => ({
-                  ...p,
-                  tipoMantenimiento: null,
-                }));
+                setFormData(p => ({ ...p, tipoMantenimiento: null }));
               }}
               className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
                 tipoAviso === "instalacion"
@@ -481,6 +538,21 @@ const getUbicacionData = (ubicacionId) => {
             >
               <Package className="w-5 h-5 inline mr-2" />
               Instalación
+            </button>
+            <button
+              onClick={() => {
+                setTipoAviso("venta");
+                setWizardStep(1);
+                setFormData(p => ({ ...p, tipoMantenimiento: null, ubicaciones: [] }));
+              }}
+              className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
+                tipoAviso === "venta"
+                  ? "bg-orange-500 text-white shadow-lg shadow-orange-500/30"
+                  : "bg-white text-gray-600 border border-gray-200 hover:border-orange-300"
+              }`}
+            >
+              <ShoppingCart className="w-5 h-5 inline mr-2" />
+              Venta (repuestos)
             </button>
           </div>
 
@@ -616,10 +688,10 @@ const getUbicacionData = (ubicacionId) => {
                 </div>
 
 
-                {/* 🔄 CAMBIO: Renderizamos equipos usando sus IDs */}
+                {/* Equipos */}
                 <div className="col-span-full">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Equipos
+                    Equipos {tipoAviso === "venta" && <span className="text-gray-400 font-normal">(opcional)</span>}
                   </label>
                   <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 min-h-[100px] bg-gray-50">
                     <div className="flex flex-wrap gap-2 mb-3">
@@ -645,25 +717,27 @@ const getUbicacionData = (ubicacionId) => {
                       })}
                     </div>
                   <button
-  onClick={() => !tieneUbicacion && setLookupOpen("equipos")}
-  disabled={tieneUbicacion}
+  onClick={() => !(tieneUbicacion && tipoAviso !== "venta") && setLookupOpen("equipos")}
+  disabled={tieneUbicacion && tipoAviso !== "venta"}
   className={`w-full px-4 py-3 border-2 border-dashed rounded-lg flex items-center justify-center gap-2 font-medium transition-colors
     ${
-      tieneUbicacion
+      tieneUbicacion && tipoAviso !== "venta"
         ? "border-gray-200 text-gray-400 bg-gray-100 cursor-not-allowed"
-        : "border-blue-300 text-blue-600 hover:bg-blue-50"
+        : tipoAviso === "venta"
+          ? "border-orange-300 text-orange-600 hover:bg-orange-50"
+          : "border-blue-300 text-blue-600 hover:bg-blue-50"
     }
   `}
 >
   <Plus className="w-5 h-5" />
-  Buscar y Agregar Equipos
+  {tipoAviso === "venta" ? "Agregar Equipo (opcional)" : "Buscar y Agregar Equipos"}
 </button>
 
                   </div>
                 </div>
 
-                {/* Ubicación Técnica con Modal */}
-           <div className="col-span-full">
+                {/* Ubicación Técnica con Modal — no aplica para venta */}
+                {tipoAviso !== "venta" && <div className="col-span-full">
   <label className="block text-sm font-semibold text-gray-700 mb-2">
     Ubicaciones Técnicas
   </label>
@@ -710,36 +784,78 @@ const getUbicacionData = (ubicacionId) => {
     </button>
 
   </div>
+</div>}
+
+
+                {/* DIRECCIÓN */}
+<div>
+  <label className="block text-sm font-semibold text-gray-700 mb-2">
+    Dirección de Atención
+  </label>
+
+  {/* 🇵🇪 PERÚ */}
+  {esPeru ? (
+    <div className="grid grid-cols-3 gap-3">
+      
+      {/* Departamento */}
+      <select
+        value={formData.departamento || ""}
+        onChange={handleDepartamento}
+        className="px-3 py-2 border rounded-xl"
+      >
+        <option value="">Departamento</option>
+        {departamentos.map((d) => (
+          <option key={d} value={d}>{d}</option>
+        ))}
+      </select>
+
+      {/* Provincia */}
+      <select
+        value={formData.provincia || ""}
+        onChange={handleProvincia}
+        className="px-3 py-2 border rounded-xl"
+        disabled={!formData.departamento}
+      >
+        <option value="">Provincia</option>
+        {provincias.map((p) => (
+          <option key={p} value={p}>{p}</option>
+        ))}
+      </select>
+
+      {/* Distrito */}
+      <select
+        value={formData.distrito || ""}
+        onChange={(e) =>
+          setFormData(prev => ({ ...prev, distrito: e.target.value }))
+        }
+        className="px-3 py-2 border rounded-xl"
+        disabled={!formData.provincia}
+      >
+        <option value="">Distrito</option>
+        {distritos.map((d) => (
+          <option key={d} value={d}>{d}</option>
+        ))}
+      </select>
+
+    </div>
+  ) : (
+    /* 🌎 OTROS PAÍSES */
+    <input
+      type="text"
+      name="direccionAtencion"
+      placeholder="Ingrese dirección"
+      value={formData.direccionAtencion || ""}
+      onChange={handleInputChange}
+      className="w-full px-4 py-2.5 border rounded-xl"
+    />
+  )}
+
+  <p className="text-xs text-gray-500 mt-1">
+    {esPeru
+      ? "Seleccione ubicación por niveles"
+      : "Ingrese dirección manual"}
+  </p>
 </div>
-
-
-                {formData.equipos?.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Dirección de Atención
-                    </label>
-
-                    <select
-                      name="direccionAtencion"
-                      value={formData.direccionAtencion || ""}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl
-                                focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Seleccionar dirección</option>
-
-                      {direccionesDesdeEquipos().map((dir) => (
-                        <option key={dir} value={dir}>
-                          {dir}
-                        </option>
-                      ))}
-                    </select>
-
-                    <p className="text-xs text-gray-500 mt-1">
-                      Se muestran las ubicaciones de los equipos seleccionados
-                    </p>
-                  </div>
-                )}
 
                 {/* Prioridad */}
                 <div>
@@ -862,28 +978,16 @@ const getUbicacionData = (ubicacionId) => {
 
                 {/* Documentos */}
                 <div className="col-span-full">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Documentos Adjuntos
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-2">
-                      Arrastra archivos aquí o haz clic para seleccionar
-                    </p>
-                    <input
-                      type="file"
-                      name="documentos"
-                      onChange={handleInputChange}
-                      className="hidden"
-                      id="file-upload"
-                    />
-                    <label
-                      htmlFor="file-upload"
-                      className="inline-block px-4 py-2 bg-blue-50 text-blue-600 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
-                    >
-                      Seleccionar Archivos
-                    </label>
-                  </div>
+                  <AdjuntoUploader
+                    mode="local"
+                    multiple
+                    maxFiles={10}
+                    label="Documentos Adjuntos"
+                    placeholder="Arrastra archivos aquí o haz clic para seleccionar"
+                    onFilesChange={(files) =>
+                      setFormData((p) => ({ ...p, documentos: files }))
+                    }
+                  />
                 </div>
               </>
             )}
@@ -896,8 +1000,8 @@ const getUbicacionData = (ubicacionId) => {
                     Cliente <span className="text-red-500">*</span>
                   </label>
                   <select
-                    name="cliente"
-                    value={formData.cliente || ""}
+                    name="clienteId"
+                    value={formData.clienteId || ""}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
                   >
@@ -1008,50 +1112,58 @@ const getUbicacionData = (ubicacionId) => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Supervisor Asignado
                   </label>
-                  <input
-                    type="text"
-                    name="supervisorAsignado"
-                    value={formData.supervisorAsignado || ""}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                    placeholder="Nombre del supervisor"
-                  />
+                  <select
+  name="supervisorId"
+  value={formData.supervisorId || ""}
+  onChange={handleInputChange}
+  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl"
+>
+  <option value="">Seleccionar supervisor</option>
+
+  {supervisores.map((s) => (
+    <option key={s.id} value={s.id}>
+      {s.nombre} {s.apellido}
+    </option>
+  ))}
+</select>
                 </div>
 
                 <div className="col-span-full">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Documento Final
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-2">
-                      Adjunta el documento final del servicio
-                    </p>
-                    <input
-                      type="file"
-                      name="documentoFinal"
-                      onChange={handleInputChange}
-                      className="hidden"
-                      id="doc-final"
-                    />
-                    <label
-                      htmlFor="doc-final"
-                      className="inline-block px-4 py-2 bg-blue-50 text-blue-600 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
-                    >
-                      Seleccionar Documento
-                    </label>
-                  </div>
+                  <AdjuntoUploader
+                    mode="local"
+                    multiple={false}
+                    label="Documentos de Cierre"
+                    placeholder="Adjunta el documento de cierre del servicio"
+                    onFilesChange={(files) =>
+                      setFormData((p) => ({ ...p, documentoFinal: files[0] ?? null }))
+                    }
+                  />
                 </div>
               </>
             )}
           </div>
         </div>
 
+        {/* ERRORES DE ENVÍO */}
+        {submitErrors.length > 0 && (
+          <div className="mx-6 mb-0 mt-0 p-4 bg-red-50 border border-red-200 rounded-xl">
+            {submitErrors.map((err, i) => (
+              <p key={i} className="text-sm text-red-700 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {err}
+              </p>
+            ))}
+          </div>
+        )}
+
         {/* FOOTER */}
         <div className="p-6 border-t border-gray-100 bg-gray-50">
           <div className="flex items-center justify-between">
             <button
-              onClick={() => wizardStep === 1 ? onClose() : setWizardStep(wizardStep - 1)}
+              onClick={() => {
+                setSubmitErrors([]);
+                wizardStep === 1 ? onClose() : setWizardStep(wizardStep - 1);
+              }}
               className="px-6 py-3 border border-gray-200 rounded-xl hover:bg-white transition-colors flex items-center gap-2 font-medium"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -1064,21 +1176,22 @@ const getUbicacionData = (ubicacionId) => {
 
             <button
               disabled={saving}
-              onClick={() => wizardStep < 3 ? setWizardStep(wizardStep + 1) : handleGuardarAviso()}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 font-medium disabled:opacity-50"
+              onClick={() => {
+                setSubmitErrors([]);
+                wizardStep < 3 ? setWizardStep(wizardStep + 1) : handleGuardarAviso();
+              }}
+              className={`px-6 py-3 bg-gradient-to-r text-white rounded-xl transition-all flex items-center gap-2 shadow-lg font-medium disabled:opacity-50 ${
+                tipoAviso === "venta"
+                  ? "from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-orange-500/30"
+                  : "from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-500/30"
+              }`}
             >
               {saving ? (
                 <>Guardando...</>
               ) : wizardStep < 3 ? (
-                <>
-                  Siguiente
-                  <ChevronRight className="w-4 h-4" />
-                </>
+                <>Siguiente<ChevronRight className="w-4 h-4" /></>
               ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  Guardar Aviso
-                </>
+                <><Save className="w-4 h-4" />Guardar Aviso</>
               )}
             </button>
           </div>
@@ -1104,6 +1217,7 @@ const getUbicacionData = (ubicacionId) => {
         data={ubicacionesData}
         onSelect={handleSelectUbicacion}
         tipo="ubicacion"
+        ubicacionesSeleccionadas={formData.ubicaciones || []}
       />
     </div>
   );

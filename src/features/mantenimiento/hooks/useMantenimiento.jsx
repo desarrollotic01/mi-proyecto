@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ESTADOS_AV } from "../config/camposMantenimiento";
 
 import {
@@ -96,6 +96,7 @@ const DEFAULT_ORDER = [
 
 export function useMantenimiento() {
   const calendarRef = useRef(null);
+  const filtersReadyRef = useRef(false);
 
   /* ================= NAV ================= */
   const [activeTab, setActiveTab] = useState("kanban");
@@ -128,6 +129,7 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
     prioridad: "",
     tipoMantenimiento: "",
     solicitante: "",
+    estado: "",
   });
 
   /* ================= CONFIG ================= */
@@ -190,16 +192,32 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
 
   // 🆕 FUNCIÓN PARA TRANSFORMAR AVISOS DEL BACKEND
   const transformarAviso = (aviso) => {
+    const toStr = (val, ...keys) => {
+      if (val === null || val === undefined) return "";
+      if (typeof val === "string") return val;
+      if (typeof val === "object") {
+        for (const k of keys) {
+          if (val[k]) return String(val[k]);
+        }
+        return "";
+      }
+      return String(val);
+    };
+
     return {
       ...aviso,
-      // 🔄 Transformar equiposRelacion → equipos (array de IDs)
+      // 🔄 equiposRelacion → array de IDs
       equipos: aviso.equiposRelacion?.map(rel => rel.equipoId) || [],
-      // Mantener el original por si se necesita
       equiposRelacionOriginal: aviso.equiposRelacion,
-      // 🔄 Transformar solicitante si viene como objeto
-      solicitante: aviso.solicitante?.nombreApellido || aviso.solicitante || "",
-      // 🔄 Asegurarse que el cliente sea string (razón social)
-      cliente: aviso.cliente?.razonSocial || aviso.cliente || "",
+      // 🔄 solicitante: string para mostrar, objeto original preservado
+      solicitante: toStr(aviso.solicitante, "nombreApellido"),
+      _solicitanteObj: aviso.solicitante,   // objeto { id, nombreApellido } para Excel
+      // 🔄 creador preservado como objeto { id, nombreApellido }
+      _creadorObj: aviso.creador,
+      // 🔄 supervisor preservado como objeto { id, nombre, apellido }
+      _supervisorObj: aviso.supervisor,
+      // 🔄 cliente: viene incluido como clienteData { id, razonSocial, sapCode }
+      cliente: toStr(aviso.clienteData, "razonSocial", "nombre") || toStr(aviso.cliente, "razonSocial", "nombre") || "",
     };
   };
 
@@ -242,20 +260,37 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
 
   /* ================= LOAD VIEW CONFIG ================= */
   useEffect(() => {
+    // Excel tab has no view config
+    if (activeTab === "excel") return;
+
     const cargarConfigVista = async () => {
+      filtersReadyRef.current = false;
       try {
         const config = await getViewConfig(activeTab);
         if (config) {
-          setCardFields(config.cardFields);
-          setColumnOrder(config.columnOrder);
-          setFilters(config.filters);
+          // Merge with defaults so new fields always exist
+          setCardFields({ ...DEFAULT_FIELDS, ...(config.cardFields || {}) });
+          setColumnOrder(config.columnOrder?.length ? config.columnOrder : DEFAULT_ORDER);
+          setFilters({
+            search: "",
+            prioridad: "",
+            tipoMantenimiento: "",
+            solicitante: "",
+            estado: "",
+            ...(config.filters || {}),
+          });
         } else {
           setCardFields(DEFAULT_FIELDS);
           setColumnOrder(DEFAULT_ORDER);
+          setFilters({ search: "", prioridad: "", tipoMantenimiento: "", solicitante: "", estado: "" });
         }
       } catch {
         setCardFields(DEFAULT_FIELDS);
         setColumnOrder(DEFAULT_ORDER);
+        setFilters({ search: "", prioridad: "", tipoMantenimiento: "", solicitante: "", estado: "" });
+      } finally {
+        // Allow filter auto-save after config has been loaded
+        setTimeout(() => { filtersReadyRef.current = true; }, 300);
       }
     };
 
@@ -271,6 +306,20 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
       calendarRef.current.getApi().changeView(calendarView);
     }
   }, [activeTab, calendarView]);
+
+  /* ================= AUTO-SAVE FILTERS ================= */
+  useEffect(() => {
+    if (activeTab === "excel") return;
+    if (!filtersReadyRef.current) return;
+    const timer = setTimeout(async () => {
+      try {
+        await saveViewConfig(activeTab, { cardFields, columnOrder, filters });
+      } catch {
+        // silently fail — filters are non-critical
+      }
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   
 
@@ -305,6 +354,17 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
     setConfigOpen(false);
   };
 
+  // Toggle un campo individual y guarda inmediatamente (para panel inline del Kanban)
+  const toggleCardField = async (key) => {
+    const newFields = { ...cardFields, [key]: !cardFields[key] };
+    setCardFields(newFields);
+    try {
+      await saveViewConfig(activeTab, { cardFields: newFields, columnOrder, filters });
+    } catch {
+      // silently fail
+    }
+  };
+
   const resetConfigVista = async () => {
     await resetViewConfig(activeTab);
     setCardFields(DEFAULT_FIELDS);
@@ -314,6 +374,7 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
       prioridad: "",
       tipoMantenimiento: "",
       solicitante: "",
+      estado: "",
     });
   };
 
@@ -328,6 +389,9 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
     await cargarAvisos();
     setTratamientoOpen(false);
     setAvisoTratamiento(null);
+    // Cerrar el modal de vista si estaba abierto (aviso cambió de estado)
+    setViewOpen(false);
+    setViewData(null);
   };
 
   /* ================= ORDEN DE TRABAJO ================= */
@@ -456,6 +520,7 @@ const iniciarOTs = (equipos) => {
 
     guardarConfigVista,
     resetConfigVista,
+    toggleCardField,
 
     onDragEnd, // 🆕 Agregar onDragEnd al return
     transformarAviso, // 🆕 Exportar por si se necesita

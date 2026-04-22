@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { trabajadorService } from '../../mantenimiento/services/trabajadoresService';
 import TrabajadorModal from '../components/TrabajadorModal';
+import ModalImportMasivo from '../../../components/inputs/ModalImportMasivo';
 import './TrabajadorPage.css';
 
 const TrabajadoresPage = () => {
@@ -13,6 +15,7 @@ const TrabajadoresPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTrabajador, setSelectedTrabajador] = useState(null);
   const [modalMode, setModalMode] = useState('create');
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     loadTrabajadores();
@@ -90,6 +93,25 @@ const TrabajadoresPage = () => {
   const roles = [...new Set(trabajadores.map(t => t.rol))];
   const empresas = [...new Set(trabajadores.map(t => t.empresa))];
 
+  const exportarExcel = () => {
+    const data = filteredTrabajadores.map((t, i) => ({
+      "#": i + 1,
+      Nombre: t.nombre || "",
+      Apellido: t.apellido || "",
+      DNI: t.dni || "",
+      Empresa: t.empresa || "",
+      Rol: getRolLabel(t.rol) || "",
+      Zona: t.zona || "",
+      Dirección: t.direccion || "",
+      "Fecha Nacimiento": t.fechaNacimiento || "",
+      Estado: t.activo ? "Activo" : "Inactivo",
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Trabajadores");
+    XLSX.writeFile(wb, `Trabajadores_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
   const getRolLabel = (rol) => {
     const labels = {
       'tecnico_electrico': 'Técnico Eléctrico',
@@ -116,6 +138,12 @@ const TrabajadoresPage = () => {
         <div className="header-actions">
           <button className="btn-refresh" onClick={loadTrabajadores} title="Actualizar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+          </button>
+          <button onClick={exportarExcel} className="btn-primary" style={{ background: '#0284c7' }}>
+            ↓ EXPORTAR EXCEL
+          </button>
+          <button onClick={() => setImportOpen(true)} className="btn-primary" style={{ background: '#16a34a' }}>
+            ↑ IMPORTAR EXCEL
           </button>
           <button onClick={handleCreate} className="btn-primary">
             + NUEVO REGISTRO
@@ -233,6 +261,12 @@ const TrabajadoresPage = () => {
           onSave={handleModalSave}
         />
       )}
+      <ModalImportMasivo
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        entidadInicial="trabajadores"
+        onSuccess={loadTrabajadores}
+      />
     </div>
   );
 };

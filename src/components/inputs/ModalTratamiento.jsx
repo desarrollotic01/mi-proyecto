@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState,useRef } from "react";
 import {
   X,
   Save,
@@ -38,6 +38,16 @@ import { planMantenimientoService } from "../../features/PlanMantenimiento/servi
 ══════════════════════════════════════════════ */
 
 const TIPOS_TRABAJO_CORRECTIVO = ["REPARACION", "CAMBIO"];
+
+const TIPOS_TRABAJO_INSTALACION = [
+  { value: "INSTALACION", label: "Instalación" },
+  { value: "MONTAJE", label: "Montaje" },
+  { value: "CONEXION", label: "Conexión" },
+  { value: "CONFIGURACION", label: "Configuración" },
+  { value: "PRUEBA", label: "Prueba / Commissioning" },
+  { value: "PUESTA_EN_MARCHA", label: "Puesta en marcha" },
+  { value: "CAMBIO", label: "Cambio" },
+];
 
 const TIPOS_TRABAJO_PREVENTIVO = [
   { value: "APLICACION", label: "Aplicación" },
@@ -108,6 +118,8 @@ const normalizeLinea = (l = {}) => ({
   costCenter: l.costCenter || l.costingCode || "",
   projectCode: l.projectCode || "",
   rubro: l.rubro || "",
+  rubroId: l.rubroId || l.rubro?.id || null,
+  paqueteTrabajoId: l.paqueteTrabajoId || null,
   rubroSapCode: l.rubroSapCode || "",
   paqueteTrabajo: l.paqueteTrabajo || "",
   observacion: l.observacion || "",
@@ -115,10 +127,7 @@ const normalizeLinea = (l = {}) => ({
 });
 
 const emptySolicitudForm = () => ({
-  department: "",
-  email: "",
   requiredDate: "",
-  comments: "",
   lineas: [normalizeLinea()],
 });
 
@@ -127,8 +136,6 @@ const normalizeSolicitudForm = (form) => {
   const lineas = Array.isArray(f.lineas) ? f.lineas : [];
   return {
     ...emptySolicitudForm(),
-    ...f,
-    email: f.email || f.requester || "",
     requiredDate: f.requiredDate ? String(f.requiredDate).slice(0, 10) : "",
     lineas: lineas.length > 0 ? lineas.map(normalizeLinea) : [normalizeLinea()],
   };
@@ -156,11 +163,12 @@ const createPreventivaExtra = () => ({
    GRID COLUMNS — definido una sola vez
 ══════════════════════════════════════════════ */
 const GRID_COLS = "1fr 1fr 1fr 1.5fr 1fr 1fr 0.7fr 0.7fr 0.7fr 88px 88px 40px";
+const GRID_COLS_INSTALACION = "1fr 1fr 1fr 1.5fr 1fr 0.7fr 0.7fr 0.7fr 88px 88px 40px";
 
 /* ══════════════════════════════════════════════
    COMPONENTE PRINCIPAL
 ══════════════════════════════════════════════ */
-export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) {
+export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess, autoSelectPlanId }) {
   const [equipos, setEquipos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingPlanes, setLoadingPlanes] = useState(false);
@@ -179,6 +187,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
   const [tratamientoExistente, setTratamientoExistente] = useState(null);
 
   const [planesPorTarget, setPlanesPorTarget] = useState({});
+  const [descripcionVenta, setDescripcionVenta] = useState("");
 
   const [data, setData] = useState({
     actividadesManuales: {},
@@ -196,7 +205,9 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     title: "",
   });
 
-  const esCorrectivo = aviso?.tipoMantenimiento === "Correctivo";
+  const esVenta = aviso?.tipoAviso === "venta";
+  const esInstalacion = aviso?.tipoAviso === "instalacion";
+  const esCorrectivo = !esInstalacion && aviso?.tipoMantenimiento === "Correctivo";
   const esPreventivo =
     aviso?.tipoAviso === "mantenimiento" &&
     aviso?.tipoMantenimiento === "Preventivo";
@@ -300,98 +311,93 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
   const planItemsToLineas = (planSel) => {
     const lineas = [];
+    // Items a nivel raíz del plan
     for (const it of getPlanRootItems(planSel)) {
-      lineas.push(normalizeLinea({ ...it, origen: "PLAN" }));
+      lineas.push(normalizeLinea({
+        ...it,
+        origen: "PLAN",
+        // Proyecto y Centro de Costo vienen del aviso, no del plan
+        projectCode: it.projectCode || aviso?.ordenVenta || "",
+        costCenter: it.costCenter || it.costingCode || aviso?.centroCosto || "",
+      }));
     }
+    // Items dentro de cada actividad del plan
     for (const act of getActividadesFromPlan(planSel)) {
       for (const it of getItemsFromActividad(act)) {
-        lineas.push(
-          normalizeLinea({
-            ...it,
-            description: it.description || act.tarea || "Recurso de plan",
-            origen: "PLAN",
-          })
-        );
+        lineas.push(normalizeLinea({
+          ...it,
+          description: it.description || act.tarea || "Recurso de plan",
+          origen: "PLAN",
+          projectCode: it.projectCode || aviso?.ordenVenta || "",
+          costCenter: it.costCenter || it.costingCode || aviso?.centroCosto || "",
+        }));
       }
     }
-    const keyOf = (l) =>
-      `${(l.itemId || "").trim()}__${(l.itemCode || "").trim()}__${(l.description || "").trim()}__${(l.warehouseCode || "").trim()}__${(l.costCenter || "").trim()}__${(l.projectCode || "").trim()}__${(l.rubroSapCode || "").toString().trim()}__${(l.paqueteTrabajo || "").trim()}__${l.origen || ""}`;
-    const map = new Map();
-    for (const l of lineas) {
-      const k = keyOf(l);
-      if (!map.has(k)) map.set(k, { ...l });
-      else map.get(k).quantity += Number(l.quantity) || 0;
-    }
-    return Array.from(map.values()).filter((l) => l.itemCode || l.description);
+    // NO deduplicar: cada item del plan es independiente aunque tengan el mismo código.
+    // El usuario los creó como items separados y deben aparecer todos.
+    return lineas.filter((l) => l.itemCode || l.description);
   };
 
   const hydrateFromTratamiento = async (tratamiento) => {
     if (!tratamiento) return;
     setTratamientoExistente(tratamiento);
-
-    const solicitudesCompraDb = tratamiento?.solicitudesCompra || [];
-    const solicitudCompraGeneralDb = solicitudesCompraDb.find((s) => s.esGeneral) || null;
-    const solicitudesCompraPorTargetDb = {};
-    for (const s of solicitudesCompraDb.filter((x) => !x.esGeneral)) {
-      const key = String(s.equipo_id || s.ubicacion_tecnica_id);
-      solicitudesCompraPorTargetDb[key] = normalizeSolicitudForm({
-        department: s.department || "",
-        email: s.requester || "",
-        requiredDate: s.requiredDate ? String(s.requiredDate).slice(0, 10) : "",
-        comments: s.comments || "",
-        lineas: (s.lineas || []).map((l) => normalizeLinea({ ...l, costCenter: l.costingCode })),
-      });
+    if (tratamiento?.requerimientos?.descripcionVenta) {
+      setDescripcionVenta(tratamiento.requerimientos.descripcionVenta);
     }
-    setSolicitudesCompra({
-      solicitudGeneral: normalizeSolicitudForm(
-        solicitudCompraGeneralDb
-          ? {
-              department: solicitudCompraGeneralDb.department || "",
-              email: solicitudCompraGeneralDb.requester || "",
-              requiredDate: solicitudCompraGeneralDb.requiredDate
-                ? String(solicitudCompraGeneralDb.requiredDate).slice(0, 10)
-                : "",
-              comments: solicitudCompraGeneralDb.comments || "",
-              lineas: (solicitudCompraGeneralDb.lineas || []).map((l) =>
-                normalizeLinea({ ...l, costCenter: l.costingCode })
-              ),
-            }
-          : emptySolicitudForm()
-      ),
-      solicitudesPorEquipo: solicitudesCompraPorTargetDb,
+
+    // Helper para normalizar línea inyectando valores del aviso si faltan
+    const normLineaConAviso = (l) => normalizeLinea({
+      ...l,
+      costCenter: l.costCenter || l.costingCode || aviso?.centroCosto || "",
+      projectCode: l.projectCode || aviso?.ordenVenta || "",
     });
 
-    const solicitudesAlmacenDb = tratamiento?.solicitudesAlmacen || [];
-    const solicitudAlmacenGeneralDb = solicitudesAlmacenDb.find((s) => s.esGeneral) || null;
-    const solicitudesAlmacenPorTargetDb = {};
-    for (const s of solicitudesAlmacenDb.filter((x) => !x.esGeneral)) {
-      const key = String(s.equipo_id || s.ubicacion_tecnica_id);
-      solicitudesAlmacenPorTargetDb[key] = normalizeSolicitudForm({
-        department: s.department || "",
-        email: s.requester || "",
-        requiredDate: s.requiredDate ? String(s.requiredDate).slice(0, 10) : "",
-        comments: s.comments || "",
-        lineas: (s.lineas || []).map((l) => normalizeLinea({ ...l, costCenter: l.costingCode })),
-      });
-    }
-    setSolicitudesAlmacen({
-      solicitudGeneral: normalizeSolicitudForm(
-        solicitudAlmacenGeneralDb
-          ? {
-              department: solicitudAlmacenGeneralDb.department || "",
-              email: solicitudAlmacenGeneralDb.requester || "",
-              requiredDate: solicitudAlmacenGeneralDb.requiredDate
-                ? String(solicitudAlmacenGeneralDb.requiredDate).slice(0, 10)
-                : "",
-              comments: solicitudAlmacenGeneralDb.comments || "",
-              lineas: (solicitudAlmacenGeneralDb.lineas || []).map((l) =>
-                normalizeLinea({ ...l, costCenter: l.costingCode })
-              ),
-            }
-          : emptySolicitudForm()
-      ),
-      solicitudesPorEquipo: solicitudesAlmacenPorTargetDb,
-    });
+   const solicitudesCompraDb = tratamiento?.solicitudesCompra || [];
+const solicitudCompraGeneralDb = solicitudesCompraDb.find((s) => s.esGeneral) || null;
+const solicitudesCompraPorTargetDb = {};
+for (const s of solicitudesCompraDb.filter((x) => !x.esGeneral)) {
+  const key = String(s.equipo_id || s.ubicacion_tecnica_id);
+  solicitudesCompraPorTargetDb[key] = normalizeSolicitudForm({
+    requiredDate: s.requiredDate ? String(s.requiredDate).slice(0, 10) : "",
+    lineas: (s.lineas || []).map(normLineaConAviso),
+  });
+}
+setSolicitudesCompra({
+  solicitudGeneral: normalizeSolicitudForm(
+    solicitudCompraGeneralDb
+      ? {
+          requiredDate: solicitudCompraGeneralDb.requiredDate
+            ? String(solicitudCompraGeneralDb.requiredDate).slice(0, 10)
+            : "",
+          lineas: (solicitudCompraGeneralDb.lineas || []).map(normLineaConAviso),
+        }
+      : emptySolicitudForm()
+  ),
+  solicitudesPorEquipo: solicitudesCompraPorTargetDb,
+});
+const solicitudesAlmacenDb = tratamiento?.solicitudesAlmacen || [];
+const solicitudAlmacenGeneralDb = solicitudesAlmacenDb.find((s) => s.esGeneral) || null;
+const solicitudesAlmacenPorTargetDb = {};
+for (const s of solicitudesAlmacenDb.filter((x) => !x.esGeneral)) {
+  const key = String(s.equipo_id || s.ubicacion_tecnica_id);
+  solicitudesAlmacenPorTargetDb[key] = normalizeSolicitudForm({
+    requiredDate: s.requiredDate ? String(s.requiredDate).slice(0, 10) : "",
+    lineas: (s.lineas || []).map(normLineaConAviso),
+  });
+}
+setSolicitudesAlmacen({
+  solicitudGeneral: normalizeSolicitudForm(
+    solicitudAlmacenGeneralDb
+      ? {
+          requiredDate: solicitudAlmacenGeneralDb.requiredDate
+            ? String(solicitudAlmacenGeneralDb.requiredDate).slice(0, 10)
+            : "",
+          lineas: (solicitudAlmacenGeneralDb.lineas || []).map(normLineaConAviso),
+        }
+      : emptySolicitudForm()
+  ),
+  solicitudesPorEquipo: solicitudesAlmacenPorTargetDb,
+});
 
     const planesSeleccionados = {};
     const preventivoPorEquipo = {};
@@ -448,33 +454,65 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
       }
     }
 
-    setData({ actividadesManuales, planesSeleccionados, preventivoPorEquipo });
+    // For instalación, merge all per-target manual activities into a single __general__ pool
+    const esInstalacionLocal = aviso?.tipoAviso === "instalacion";
+    if (esInstalacionLocal) {
+      const generalActs = Object.values(actividadesManuales).flat();
+      setData({
+        actividadesManuales: { "__general__": generalActs },
+        planesSeleccionados: {},
+        preventivoPorEquipo: {},
+      });
+    } else {
+      setData({ actividadesManuales, planesSeleccionados, preventivoPorEquipo });
+    }
   };
 
-  useEffect(() => {
-    if (!isOpen || !aviso) return;
-    let active = true;
-    const load = async () => {
-      setErrorMsg("");
-      setSolicitudesCompra(null);
-      setSolicitudesAlmacen(null);
-      setCollapsed({});
-      setTratamientoExistente(null);
-      setPlanesPorTarget({});
-      setData({ actividadesManuales: {}, planesSeleccionados: {}, preventivoPorEquipo: {} });
-      try {
-        const eData = await equipoService.getEquipos();
-        if (!active) return;
-        setEquipos(eData || []);
-      } catch {
-        if (!active) return;
-        setEquipos([]);
-      }
-    };
-    load();
-    return () => { active = false; };
-  }, [isOpen, aviso?.id]);
+ // REEMPLAZAR el useEffect que tiene [isOpen, aviso?.id] por estos dos:
 
+// 1. Solo corre cuando el modal se ABRE (isOpen cambia de false a true)
+const prevIsOpenRef = useRef(false);
+const autoSelectDoneRef = useRef(false);
+
+useEffect(() => {
+  if (!isOpen || !aviso) return;
+  
+  // Solo resetear si el modal estaba cerrado y acaba de abrirse
+  if (!prevIsOpenRef.current) {
+    setErrorMsg("");
+    setSolicitudesCompra(null);
+    setSolicitudesAlmacen(null);
+    setCollapsed({});
+    setTratamientoExistente(null);
+    setPlanesPorTarget({});
+    setData({ actividadesManuales: {}, planesSeleccionados: {}, preventivoPorEquipo: {} });
+    setDescripcionVenta("");
+  }
+  
+  prevIsOpenRef.current = isOpen;
+
+  let active = true;
+  const load = async () => {
+    try {
+      const eData = await equipoService.getEquipos();
+      if (!active) return;
+      setEquipos(eData || []);
+    } catch {
+      if (!active) return;
+      setEquipos([]);
+    }
+  };
+  load();
+  return () => { active = false; };
+}, [isOpen, aviso?.id]);
+
+// Asegurarse de limpiar las refs cuando el modal se cierra
+useEffect(() => {
+  if (!isOpen) {
+    prevIsOpenRef.current = false;
+    autoSelectDoneRef.current = false;
+  }
+}, [isOpen]);
   useEffect(() => {
     if (!isOpen || !aviso || !targets.length) return;
     let active = true;
@@ -509,7 +547,8 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
   }, [isOpen, aviso?.id, targets]);
 
   useEffect(() => {
-    if (!isOpen || !aviso || targets.length === 0) return;
+    const esVentaLocal = aviso?.tipoAviso === "venta";
+    if (!isOpen || !aviso || (!esVentaLocal && targets.length === 0)) return;
     let active = true;
     const loadTratamiento = async () => {
       try {
@@ -525,6 +564,16 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     loadTratamiento();
     return () => { active = false; };
   }, [isOpen, aviso?.id, targets.length]);
+
+  // Auto-seleccionar el plan de la guía para cada target cuando se carga desde AlertasGuia
+  useEffect(() => {
+    if (!isOpen || !autoSelectPlanId || targets.length === 0 || autoSelectDoneRef.current) return;
+    autoSelectDoneRef.current = true;
+    targets.forEach((target) => {
+      seleccionarPlan(String(target.id), autoSelectPlanId);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, autoSelectPlanId, targets.length]);
 
   const abrirModalCampo = (targetId, idx, act, mode, field) => {
     const label = field === "descripcion" ? "Descripción" : "Observación";
@@ -600,20 +649,13 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
           comments: "",
           lineas: [],
         };
+        // Mantener líneas manuales, reemplazar las del plan por las nuevas
         const manuales = (actual.lineas || []).filter((l) => l.origen !== "PLAN");
-        const keyOf = (l) =>
-          `${(l.itemCode || "").trim()}__${(l.description || "").trim()}__${(l.rubro || "").trim()}__${(l.paqueteTrabajo || "").trim()}__${l.origen || ""}`;
-        const map = new Map();
-        for (const l of [...manuales, ...lineasAuto]) {
-          const k = keyOf(l);
-          if (!map.has(k)) map.set(k, { ...l });
-          else map.get(k).quantity += Number(l.quantity) || 0;
-        }
         return {
           ...base,
           solicitudesPorEquipo: {
             ...(base.solicitudesPorEquipo || {}),
-            [targetId]: { ...actual, lineas: Array.from(map.values()) },
+            [targetId]: { ...actual, lineas: [...manuales, ...lineasAuto] },
           },
         };
       });
@@ -689,14 +731,14 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
     });
   };
 
-  const agregarActividad = (targetId) =>
+  const agregarActividad = (targetId, defaultTipoTrabajo) =>
     setData((prev) => ({
       ...prev,
       actividadesManuales: {
         ...prev.actividadesManuales,
         [targetId]: [
           ...(prev.actividadesManuales[targetId] || []),
-          { ...ACTIVIDAD_VACIA, idLocal: ensureId() },
+          { ...ACTIVIDAD_VACIA, idLocal: ensureId(), ...(defaultTipoTrabajo ? { tipoTrabajo: defaultTipoTrabajo } : {}) },
         ],
       },
     }));
@@ -756,62 +798,75 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
   };
 
   const validateBeforeSave = () => {
+    if (esVenta) {
+      if (!descripcionVenta.trim()) return "La descripción es obligatoria para avisos de venta.";
+      return "";
+    }
+
+    if (esInstalacion) {
+      const acts = data.actividadesManuales?.["__general__"] || [];
+      if (acts.length === 0) return "Agrega al menos 1 actividad de instalación.";
+      for (const [idx, a] of acts.entries()) {
+        if (!a.tarea || !String(a.tarea).trim()) return `Actividad #${idx + 1} sin tarea.`;
+        if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0)
+          return `Actividad #${idx + 1}: cantidad de técnicos inválida.`;
+      }
+      return "";
+    }
+
     if (!targets.length) return "El aviso no tiene equipos ni ubicaciones asociadas.";
+
     if (esPreventivo) {
       for (const target of targets) {
         const planId = data.planesSeleccionados?.[target.id];
-        if (!planId)
-          return `Selecciona un plan para ${target.type === TARGET_TYPES.EQUIPO ? "el equipo" : "la ubicación técnica"}: ${target.nombre}`;
+        if (!planId) continue; // plan selection is optional per target
         const acts = data.preventivoPorEquipo?.[target.id]?.actividades || [];
-        if (!acts.length) return `No se cargaron actividades del plan para ${target.nombre}.`;
         for (const [i, a] of acts.entries()) {
           if (!a.tarea || !String(a.tarea).trim()) return `${target.nombre}: actividad #${i + 1} sin tarea.`;
           if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0)
-            return `${target.nombre}: actividad #${i + 1} cantidadTecnicos inválida.`;
+            return `${target.nombre}: actividad #${i + 1} — cantidad de técnicos inválida.`;
         }
       }
     }
+
     if (esCorrectivo) {
       for (const target of targets) {
         const acts = data.actividadesManuales?.[target.id] || [];
-        if (acts.length === 0) return `${target.nombre}: agrega al menos 1 actividad.`;
+        // activities per target are optional — only validate rows that exist
         for (const [idx, a] of acts.entries()) {
           if (!a.tarea || !String(a.tarea).trim()) return `${target.nombre}: actividad #${idx + 1} sin tarea.`;
           if (a.tipoTrabajo && !TIPOS_TRABAJO_CORRECTIVO.includes(a.tipoTrabajo))
             return `${target.nombre}: tipoTrabajo inválido (solo REPARACION/CAMBIO).`;
-          if (!a.rolTecnico) return `${target.nombre}: actividad #${idx + 1} sin rolTecnico.`;
           if (!a.cantidadTecnicos || Number(a.cantidadTecnicos) <= 0)
-            return `${target.nombre}: actividad #${idx + 1} cantidadTecnicos inválida.`;
+            return `${target.nombre}: actividad #${idx + 1} — cantidad de técnicos inválida.`;
         }
       }
     }
+
     return "";
   };
 
   const buildSolicitudForBackend = (form) => {
-    const f = normalizeSolicitudForm(form);
-    return {
-      department: f.department || "",
-      requester: f.email?.trim() || "",
-      requiredDate: f.requiredDate || "",
-      comments: f.comments || "",
-      lineas: Array.isArray(f.lineas)
-        ? f.lineas.map((l) => ({
-            itemId: l.itemId || null,
-            itemCode: l.itemCode || "",
-            description: l.description || "",
-            quantity: Number(l.quantity) || 1,
-            warehouseCode: l.warehouseCode || "",
-            costingCode: l.costCenter || l.costingCode || "",
-            projectCode: l.projectCode || "",
-            rubro: l.rubro || "",
-            rubroSapCode: l.rubroSapCode || "",
-            paqueteTrabajo: l.paqueteTrabajo || "",
-            observacion: l.observacion || "",
-          }))
-        : [],
-    };
+  const f = normalizeSolicitudForm(form);
+  return {
+    requiredDate: f.requiredDate || "",
+    lineas: Array.isArray(f.lineas)
+      ? f.lineas.map((l) => ({
+          itemId: l.itemId || null,
+          itemCode: l.itemCode || "",
+          description: l.description || "",
+          quantity: Number(l.quantity) || 1,
+          warehouseCode: l.warehouseCode || "",
+          costingCode: l.costCenter || l.costingCode || "",
+          projectCode: l.projectCode || "",
+          rubroId: l.rubroId || null,
+          paqueteTrabajoId: l.paqueteTrabajoId || null,
+          observacion: l.observacion || "",
+        }))
+      : [],
   };
+};
+ 
 
   const buildSolicitudesPorEquipoForBackend = (obj = {}) => {
     const result = {};
@@ -831,7 +886,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
           componente: a.componente || null,
           tarea: a.tarea || null,
           descripcion: a.descripcion || null,
-          tipoTrabajo: a.tipoTrabajo || "REPARACION",
+          tipoTrabajo: targetId === "__general__" ? null : (a.tipoTrabajo || "REPARACION"),
           rolTecnico: a.rolTecnico || null,
           cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
           duracionEstimadaValor: valor,
@@ -869,6 +924,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         actividadesManuales: actividadesManualesNormalizadas,
         planesSeleccionados: data.planesSeleccionados,
         actividadesPlanEditadas,
+        ...(esVenta ? { descripcionVenta } : {}),
       },
       solicitudCompraGeneral: solicitudesCompra?.solicitudGeneral
         ? buildSolicitudForBackend(solicitudesCompra.solicitudGeneral)
@@ -924,7 +980,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex justify-center items-center p-3">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex justify-center items-center p-3">
         <div className="bg-white w-[98vw] max-w-[110rem] h-[96vh] rounded-2xl shadow-2xl flex flex-col border border-slate-200">
 
           {/* ── Header ── */}
@@ -991,7 +1047,7 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               )}
               {targets.length > 0 && (
                 <div className="mt-5">
-                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Objetivos Asociados</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Equipos Asociados</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                     {targets.map((t) => (
                       <div
@@ -1017,10 +1073,33 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               )}
             </Section>
 
+            {/* ── VENTA ── */}
+            {esVenta && (
+              <Section title="Descripción del Tratamiento">
+                <p className="text-sm text-slate-600 mb-3">
+                  Describe el tratamiento o actividad realizada para este aviso de venta.
+                </p>
+                <textarea
+                  className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm bg-white text-slate-900 outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 resize-none"
+                  rows={5}
+                  placeholder="Describe el tratamiento de venta..."
+                  value={descripcionVenta}
+                  onChange={(e) => setDescripcionVenta(e.target.value)}
+                />
+              </Section>
+            )}
+
             {/* ── CORRECTIVO ── */}
-            {esCorrectivo && (
+            {!esVenta && esCorrectivo && (
               <Section title="Actividades por objetivo (Correctivo)">
-                <p className="text-sm text-slate-600">Crea actividades manuales por cada objetivo.</p>
+                <p className="text-sm text-slate-600">
+                  Crea actividades manuales por cada equipo u objetivo. Las actividades son opcionales por objetivo.
+                </p>
+                {targets.length === 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                    Este aviso no tiene equipos ni ubicaciones técnicas asociadas.
+                  </div>
+                )}
                 <div className="space-y-3">
                   {targets.map((target) => {
                     const actividades = data.actividadesManuales[target.id] || [];
@@ -1099,12 +1178,87 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               </Section>
             )}
 
+            {/* ── INSTALACIÓN (general, no por objetivo) ── */}
+            {!esVenta && esInstalacion && (() => {
+              const actividadesGral = data.actividadesManuales["__general__"] || [];
+              return (
+                <Section title="Actividades de Instalación">
+                  <p className="text-sm text-slate-600">
+                    Agrega las actividades generales de instalación. Los equipos y ubicaciones del aviso son opcionales.
+                  </p>
+
+                  {/* Equipos / ubicaciones del aviso — sólo informativo */}
+                  {targets.length > 0 && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                      <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2">
+                        Equipos / ubicaciones del aviso — opcionales
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {targets.map((t) => (
+                          <span
+                            key={t.id}
+                            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-emerald-300 bg-white text-emerald-800 font-medium"
+                          >
+                            {t.type === TARGET_TYPES.EQUIPO
+                              ? <Package className="w-3 h-3" />
+                              : <MapPinned className="w-3 h-3" />}
+                            {t.nombre}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Panel único de actividades generales */}
+                  <div className="border border-emerald-200 rounded-xl bg-white overflow-hidden">
+                    <div className="p-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-xs text-slate-500">
+                          {actividadesGral.length} actividad{actividadesGral.length !== 1 ? "es" : ""}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => agregarActividad("__general__")}
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-700 text-white text-sm hover:bg-emerald-600 transition"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Agregar actividad
+                        </button>
+                      </div>
+
+                      {actividadesGral.length === 0 ? (
+                        <div className="border border-dashed border-emerald-200 rounded-xl p-8 text-center text-slate-500">
+                          <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                          <p className="text-sm">Aún no hay actividades. Agrega una.</p>
+                        </div>
+                      ) : (
+                        <div style={{ overflowX: "auto" }}>
+                          <ActividadesInstalacionHeader />
+                          {actividadesGral.map((act, idx) => (
+                            <ActividadInstalacionRow
+                              key={act.idLocal || idx}
+                              idx={idx}
+                              act={act}
+                              onChange={(campo, valor) => actualizarActividad("__general__", idx, campo, valor)}
+                              onDelete={() => eliminarActividad("__general__", idx)}
+                              onOpenObservacion={() => abrirModalCampo("__general__", idx, act, "correctivo", "observaciones")}
+                              onOpenDescripcion={() => abrirModalCampo("__general__", idx, act, "correctivo", "descripcion")}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Section>
+              );
+            })()}
+
             {/* ── PREVENTIVO ── */}
             {esPreventivo && (
-              <Section title="Plan por objetivo + edición de actividades">
+              <Section title="Asignación de Actividades">
                 <p className="text-sm text-slate-600">
-                  Selecciona un plan y luego edita las actividades. Las actividades del plan solo
-                  permiten editar tiempo, unidad y cantidad de técnicos.
+                  Selecciona un plan de mantenimiento por objetivo (opcional). Las actividades del plan solo
+                  permiten editar tiempo, unidad y cantidad de técnicos. Puedes dejar objetivos sin plan si no aplica.
                 </p>
                 <div className="space-y-4">
                   {targets.map((target) => {
@@ -1263,8 +1417,8 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               >
                 <ShoppingCart className="w-4 h-4" />
                 {solicitudesCompra
-                  ? `Compra cargada ✓${cantSolicitudesCompraIndividuales > 0 ? ` (+${cantSolicitudesCompraIndividuales} objetivo${cantSolicitudesCompraIndividuales > 1 ? "s" : ""})` : ""}`
-                  : "Solicitud de Compra"}
+                  ? `Requerimiento cargada ✓${cantSolicitudesCompraIndividuales > 0 ? ` (+${cantSolicitudesCompraIndividuales} objetivo${cantSolicitudesCompraIndividuales > 1 ? "s" : ""})` : ""}`
+                  : "Requerimiento de Compra"}
               </button>
               <button
                 onClick={() => setShowSolicitudAlmacen(true)}
@@ -1276,8 +1430,8 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
               >
                 <Package className="w-4 h-4" />
                 {solicitudesAlmacen
-                  ? `Solicitud de Almacén ✓${cantSolicitudesAlmacenIndividuales > 0 ? ` (+${cantSolicitudesAlmacenIndividuales} objetivo${cantSolicitudesAlmacenIndividuales > 1 ? "s" : ""})` : ""}`
-                  : "Solicitud de Almacén"}
+                  ? `Requerimiento para Almacén ✓${cantSolicitudesAlmacenIndividuales > 0 ? ` (+${cantSolicitudesAlmacenIndividuales} objetivo${cantSolicitudesAlmacenIndividuales > 1 ? "s" : ""})` : ""}`
+                  : "Requerimiento de Almacén"}
               </button>
               <button
                 onClick={handleGuardarCambios}
@@ -1309,6 +1463,8 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
         equiposInfo={equipos}
         initialValue={solicitudesCompra}
+        ordenVenta={aviso?.ordenVenta || ""}
+        centroCosto={aviso?.centroCosto || ""}
       />
       <ModalSolicitudAlmacen
         isOpen={showSolicitudAlmacen}
@@ -1319,6 +1475,8 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
         ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
         equiposInfo={equipos}
         initialValue={solicitudesAlmacen}
+        ordenVenta={aviso?.ordenVenta || ""}
+        centroCosto={aviso?.centroCosto || ""}
       />
       <ModalConfiguracionCampos isOpen={showConfigCampos} onClose={() => setShowConfigCampos(false)} />
       <ModalMantenimientoView
@@ -1345,16 +1503,18 @@ export default function ModalTratamiento({ isOpen, aviso, onClose, onSuccess }) 
    HEADERS
 ══════════════════════════════════════════════ */
 
+const HEADER_OPTIONAL_STYLE = "opacity-70 font-normal normal-case tracking-normal";
+
 function ActividadesCorrectivasHeader() {
   return (
     <div
       className="grid items-center gap-1 mb-1 px-3 py-2 bg-slate-900 rounded-xl text-xs font-semibold text-slate-300 uppercase tracking-wide"
       style={{ gridTemplateColumns: GRID_COLS }}
     >
-      <span>Sistema</span>
-      <span>Subsistema</span>
-      <span>Componente</span>
-      <span>Tarea</span>
+      <span>Sistema <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
+      <span>Subsistema <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
+      <span>Componente <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
+      <span>Tarea <span className="text-rose-400">*</span></span>
       <span>Tipo trabajo</span>
       <span>Rol técnico</span>
       <span>Técnicos</span>
@@ -1373,10 +1533,10 @@ function ActividadesPreventivasHeader() {
       className="grid items-center gap-1 mb-1 px-3 py-2 bg-slate-900 rounded-xl text-xs font-semibold text-slate-300 uppercase tracking-wide"
       style={{ gridTemplateColumns: GRID_COLS }}
     >
-      <span>Sistema</span>
-      <span>Subsistema</span>
-      <span>Componente</span>
-      <span>Tarea</span>
+      <span>Sistema <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
+      <span>Subsistema <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
+      <span>Componente <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
+      <span>Tarea <span className="text-rose-400">*</span></span>
       <span>Tipo trabajo</span>
       <span>Rol técnico</span>
       <span>Técnicos</span>
@@ -1443,6 +1603,96 @@ function ActividadCorrectivaRow({ idx, act, onChange, onDelete, onOpenObservacio
       </button>
 
       {/* Botón Observación */}
+      <button
+        onClick={onOpenObservacion}
+        title={tieneObs ? act.observaciones : "Sin observación"}
+        className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+          tieneObs
+            ? "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+        }`}
+      >
+        <StickyNote className="w-3.5 h-3.5 shrink-0" />
+        {tieneObs ? "Ver" : "—"}
+      </button>
+
+      <button
+        onClick={onDelete}
+        className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors mx-auto"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   CABECERA Y FILA INSTALACIÓN
+══════════════════════════════════════════════ */
+
+function ActividadesInstalacionHeader() {
+  return (
+    <div
+      className="grid items-center gap-1 mb-1 px-3 py-2 bg-emerald-900 rounded-xl text-xs font-semibold text-slate-300 uppercase tracking-wide"
+      style={{ gridTemplateColumns: GRID_COLS_INSTALACION }}
+    >
+      <span>Sistema <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
+      <span>Subsistema <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
+      <span>Componente <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
+      <span>Tarea <span className="text-rose-400">*</span></span>
+      <span>Rol técnico</span>
+      <span>Técnicos</span>
+      <span>Duración</span>
+      <span>Unidad</span>
+      <span>Desc.</span>
+      <span>Obs.</span>
+      <span />
+    </div>
+  );
+}
+
+function ActividadInstalacionRow({ idx, act, onChange, onDelete, onOpenObservacion, onOpenDescripcion }) {
+  const tieneObs  = !!String(act.observaciones || "").trim();
+  const tieneDesc = !!String(act.descripcion   || "").trim();
+
+  const inputCls =
+    "w-full px-2 py-1.5 border border-slate-200 rounded-lg bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-200";
+
+  return (
+    <div
+      className="grid items-center gap-1 px-3 py-2 border border-emerald-100 rounded-xl mb-1 bg-emerald-50/30 hover:bg-emerald-50 transition-colors"
+      style={{ gridTemplateColumns: GRID_COLS_INSTALACION }}
+    >
+      <input placeholder="Sistema"    value={act.sistema    ?? ""} onChange={(e) => onChange("sistema",    e.target.value)} className={inputCls} />
+      <input placeholder="Subsistema" value={act.subsistema ?? ""} onChange={(e) => onChange("subsistema", e.target.value)} className={inputCls} />
+      <input placeholder="Componente" value={act.componente ?? ""} onChange={(e) => onChange("componente", e.target.value)} className={inputCls} />
+      <input placeholder="Tarea *"    value={act.tarea      ?? ""} onChange={(e) => onChange("tarea",      e.target.value)} className={inputCls} />
+
+      <select value={act.rolTecnico ?? "tecnico_mecanico"} onChange={(e) => onChange("rolTecnico", e.target.value)} className={inputCls}>
+        {ROLES_TECNICOS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+      </select>
+
+      <input type="number" min={1}   value={act.cantidadTecnicos    ?? ""} onChange={(e) => onChange("cantidadTecnicos",    Number(e.target.value))} className={inputCls} />
+      <input type="number" min={0}   value={act.duracionEstimadaValor ?? ""} onChange={(e) => onChange("duracionEstimadaValor", Number(e.target.value))} className={inputCls} />
+
+      <select value={act.unidadDuracion ?? "min"} onChange={(e) => onChange("unidadDuracion", e.target.value)} className={inputCls}>
+        <option value="min">Min</option>
+        <option value="h">Hrs</option>
+      </select>
+
+      <button
+        onClick={onOpenDescripcion}
+        title={tieneDesc ? act.descripcion : "Sin descripción"}
+        className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+          tieneDesc
+            ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
+            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+        }`}
+      >
+        <AlignLeft className="w-3.5 h-3.5 shrink-0" />
+        {tieneDesc ? "Ver" : "—"}
+      </button>
+
       <button
         onClick={onOpenObservacion}
         title={tieneObs ? act.observaciones : "Sin observación"}
@@ -1570,7 +1820,7 @@ function ModalObservacionActividad({ isOpen, title, field, value, onChange, onCl
   if (!isOpen) return null;
   const esDesc = field === "descripcion";
   return (
-    <div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[80] bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4">
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -1651,7 +1901,6 @@ function Info({ label, value }) {
   return (
     <div className="bg-white border border-slate-100 rounded-xl p-2">
       <p className="text-xs font-semibold text-slate-500 uppercase">{label}</p>
-      <p className="text-sm font-medium text-slate-900">{value}</p>
     </div>
   );
 }

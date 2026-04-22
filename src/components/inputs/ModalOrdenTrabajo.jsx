@@ -9,7 +9,7 @@ export default function ModalOrdenTrabajo({
   supervisores = [], // Lista de supervisores disponibles
   onGenerarNumeroOT, // Función para obtener el número autogenerado
 }) {
-  const [modoAgrupacion, setModoAgrupacion] = useState("individual"); // "individual" | "grupal"
+  const [modoAgrupacion] = useState("grupal"); // siempre grupal
   const [numeroOTGenerado, setNumeroOTGenerado] = useState("");
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   
@@ -62,6 +62,9 @@ export default function ModalOrdenTrabajo({
           };
         });
         setEquipos(equiposIniciales);
+      } else if (aviso?.tipoAviso === "venta") {
+        // Venta: equipos opcionales, empezar vacío
+        setEquipos([]);
       } else {
         // Si no hay equipos, inicializar con uno vacío
         setEquipos([{
@@ -80,6 +83,8 @@ export default function ModalOrdenTrabajo({
   }, [isOpen, aviso, onGenerarNumeroOT]);
 
   if (!isOpen) return null;
+
+  const esVenta = aviso?.tipoAviso === "venta";
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -160,6 +165,8 @@ export default function ModalOrdenTrabajo({
       }
     }
 
+    // Para venta no se validan equipos (son opcionales)
+    if (!esVenta) {
     // Validar equipos duplicados
     if (!validarEquiposDuplicados()) {
       newErrors.equiposDuplicados = "No puedes asignar el mismo equipo más de una vez";
@@ -214,6 +221,7 @@ export default function ModalOrdenTrabajo({
         }
       }
     });
+    } // fin if (!esVenta)
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -232,6 +240,27 @@ export default function ModalOrdenTrabajo({
       return;
     }
 
+    // Para venta: equipos solo si existen y tienen equipoId
+    const equiposPayload = esVenta
+      ? equipos.filter(eq => eq.equipoId).map(eq => ({
+          equipoId: eq.equipoId,
+          descripcionEquipo: eq.descripcionEquipo?.trim() || "",
+          personalAsignado: formData.supervisorId,
+          tipoActividad: "Venta",
+          fechaInicioProgramada: formData.fechaProgramadaInicio,
+          fechaFinProgramada: formData.fechaProgramadaFin,
+          estado: "PENDIENTE"
+        }))
+      : equipos.map(eq => ({
+          equipoId: eq.equipoId,
+          descripcionEquipo: eq.descripcionEquipo.trim(),
+          personalAsignado: eq.personalAsignado.trim(),
+          tipoActividad: eq.tipoActividad === "Otro" ? eq.tipoActividadPersonalizada.trim() : eq.tipoActividad,
+          fechaInicioProgramada: eq.fechaInicioProgramada,
+          fechaFinProgramada: eq.fechaFinProgramada,
+          estado: eq.estado
+        }));
+
     const payload = {
       numeroOT: numeroOTGenerado,
       descripcionGeneral: formData.descripcionGeneral.trim(),
@@ -241,17 +270,9 @@ export default function ModalOrdenTrabajo({
       fechaProgramadaInicio: formData.fechaProgramadaInicio,
       fechaProgramadaFin: formData.fechaProgramadaFin,
       observaciones: formData.observaciones || null,
-      estado: "CREADO", // Estado inicial
-      modoAgrupacion, // Para referencia futura
-      equipos: equipos.map(eq => ({
-        equipoId: eq.equipoId,
-        descripcionEquipo: eq.descripcionEquipo.trim(),
-        personalAsignado: eq.personalAsignado.trim(),
-        tipoActividad: eq.tipoActividad === "Otro" ? eq.tipoActividadPersonalizada.trim() : eq.tipoActividad,
-        fechaInicioProgramada: eq.fechaInicioProgramada,
-        fechaFinProgramada: eq.fechaFinProgramada,
-        estado: eq.estado
-      }))
+      estado: "CREADO",
+      modoAgrupacion,
+      equipos: equiposPayload,
     };
 
     onGuardar(payload);
@@ -333,44 +354,6 @@ export default function ModalOrdenTrabajo({
                 <X className="w-6 h-6 text-slate-300 group-hover:text-white transition-colors" />
               </button>
             </div>
-          </div>
-
-          {/* TOGGLE MODO AGRUPACIÓN */}
-          <div className="p-6 border-b border-slate-200 bg-white">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Users className="w-5 h-5 text-slate-600" />
-                <span className="text-sm font-semibold text-slate-700">Modo de Asignación:</span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setModoAgrupacion("individual")}
-                  className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
-                    modoAgrupacion === "individual"
-                      ? "bg-violet-600 text-white shadow-lg shadow-violet-500/30"
-                      : "bg-slate-200 text-slate-600 hover:bg-slate-300"
-                  }`}
-                >
-                  Por Equipo Individual
-                </button>
-                <button
-                  onClick={() => setModoAgrupacion("grupal")}
-                  className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
-                    modoAgrupacion === "grupal"
-                      ? "bg-violet-600 text-white shadow-lg shadow-violet-500/30"
-                      : "bg-slate-200 text-slate-600 hover:bg-slate-300"
-                  }`}
-                >
-                  Agrupación Grupal
-                </button>
-              </div>
-            </div>
-            {modoAgrupacion === "grupal" && (
-              <p className="mt-3 text-xs text-slate-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
-                <Info className="w-4 h-4 inline mr-1" />
-                En modo grupal, todos los equipos comparten las mismas fechas programadas generales.
-              </p>
-            )}
           </div>
 
           {/* CONTENIDO */}
@@ -506,224 +489,253 @@ export default function ModalOrdenTrabajo({
               </div>
 
               {/* EQUIPOS */}
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60">
-                <div className="flex items-center justify-between mb-6">
-                  <h4 className="text-xl font-bold text-slate-900 flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-violet-500 to-violet-600 rounded-lg">
-                      <Settings className="w-5 h-5 text-white" />
+              {esVenta ? (
+                /* VENTA: equipos opcionales — solo mostrar los del aviso si existen */
+                equiposDisponibles.length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-200/60">
+                    <h4 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-3">
+                      <div className="p-2 bg-gradient-to-br from-orange-400 to-orange-500 rounded-lg">
+                        <Settings className="w-5 h-5 text-white" />
+                      </div>
+                      Equipos del Aviso
+                      <span className="text-sm font-normal text-slate-500 ml-1">(incluidos automáticamente)</span>
+                    </h4>
+                    <div className="space-y-3">
+                      {equiposDisponibles.map((eq) => (
+                        <div key={eq.id} className="flex items-center gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl">
+                          <div className="p-2 bg-orange-100 rounded-lg">
+                            <Settings className="w-4 h-4 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-800 text-sm">{eq.nombre || eq.codigo || "Equipo sin nombre"}</p>
+                            {eq.tipoEquipo && <p className="text-xs text-slate-500">{eq.tipoEquipo}</p>}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    Equipos Asignados
-                  </h4>
-                  <button
-                    onClick={agregarEquipo}
-                    disabled={equipos.length >= equiposDisponibles.length}
-                    className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl hover:from-violet-700 hover:to-purple-700 transition-all font-semibold shadow-lg shadow-violet-500/30 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Agregar Equipo
-                  </button>
-                </div>
-
-                {errors.equiposDuplicados && (
-                  <div className="mb-4 p-4 bg-red-50 border-2 border-red-300 rounded-xl flex items-center gap-2 text-red-700">
-                    <AlertCircle className="w-5 h-5" />
-                    <span className="font-semibold">{errors.equiposDuplicados}</span>
                   </div>
-                )}
-
-                {equiposDisponibles.length === 0 && (
-                  <div className="p-6 bg-amber-50 border-2 border-amber-200 rounded-xl text-center">
-                    <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-                    <p className="text-amber-800 font-semibold">No hay equipos disponibles en este aviso</p>
+                )
+              ) : (
+                /* MANTENIMIENTO / INSTALACIÓN: formulario completo de equipos */
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60">
+                  <div className="flex items-center justify-between mb-6">
+                    <h4 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                      <div className="p-2 bg-gradient-to-br from-violet-500 to-violet-600 rounded-lg">
+                        <Settings className="w-5 h-5 text-white" />
+                      </div>
+                      Equipos Asignados
+                    </h4>
+                    <button
+                      onClick={agregarEquipo}
+                      disabled={equipos.length >= equiposDisponibles.length}
+                      className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl hover:from-violet-700 hover:to-purple-700 transition-all font-semibold shadow-lg shadow-violet-500/30 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Agregar Equipo
+                    </button>
                   </div>
-                )}
 
-                <div className="space-y-5">
-                  {equipos.map((equipo, index) => (
-                    <div key={index} className="relative bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 border-2 border-slate-200">
-                      <div className="absolute top-4 right-4 flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${getEstadoBadgeColor(equipo.estado)}`}>
-                          {equipo.estado}
-                        </span>
-                        {equipos.length > 1 && (
-                          <button
-                            onClick={() => eliminarEquipo(index)}
-                            className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                  {errors.equiposDuplicados && (
+                    <div className="mb-4 p-4 bg-red-50 border-2 border-red-300 rounded-xl flex items-center gap-2 text-red-700">
+                      <AlertCircle className="w-5 h-5" />
+                      <span className="font-semibold">{errors.equiposDuplicados}</span>
+                    </div>
+                  )}
 
-                      <div className="mb-5">
-                        <span className="inline-block px-3 py-1 bg-violet-600 text-white text-xs font-bold rounded-full">
-                          Equipo #{index + 1}
-                        </span>
-                      </div>
+                  {equiposDisponibles.length === 0 && (
+                    <div className="p-6 bg-amber-50 border-2 border-amber-200 rounded-xl text-center">
+                      <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+                      <p className="text-amber-800 font-semibold">No hay equipos disponibles en este aviso</p>
+                    </div>
+                  )}
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-20">
-                        {/* Selector de Equipo */}
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            Seleccionar Equipo <span className="text-red-500">*</span>
-                          </label>
-                          <select
-                            value={equipo.equipoId}
-                            onChange={(e) => handleEquipoChange(index, 'equipoId', e.target.value)}
-                            className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
-                              errors[`equipo_${index}_equipoId`] ? 'border-red-400 bg-red-50/50' : 'border-slate-200 bg-white'
-                            }`}
-                          >
-                            <option value="">-- Seleccionar equipo --</option>
-                            {equiposDisponibles.map(equipoDisp => (
-                              <option 
-                                key={equipoDisp.id} 
-                                value={equipoDisp.id}
-                                disabled={equiposYaSeleccionados.includes(equipoDisp.id) && equipoDisp.id !== equipo.equipoId}
-                              >
-                                {equipoDisp.nombre || equipoDisp.codigo} - {equipoDisp.tipo || "Sin tipo"}
-                                {equiposYaSeleccionados.includes(equipoDisp.id) && equipoDisp.id !== equipo.equipoId ? " (Ya asignado)" : ""}
-                              </option>
-                            ))}
-                          </select>
-                          {errors[`equipo_${index}_equipoId`] && (
-                            <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
-                              <AlertCircle className="w-3 h-3" />
-                              {errors[`equipo_${index}_equipoId`]}
-                            </p>
+                  <div className="space-y-5">
+                    {equipos.map((equipo, index) => (
+                      <div key={index} className="relative bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 border-2 border-slate-200">
+                        <div className="absolute top-4 right-4 flex items-center gap-2">
+                          <span className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${getEstadoBadgeColor(equipo.estado)}`}>
+                            {equipo.estado}
+                          </span>
+                          {equipos.length > 1 && (
+                            <button
+                              onClick={() => eliminarEquipo(index)}
+                              className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           )}
                         </div>
 
-                        {/* Descripción del Trabajo (OBLIGATORIA Y DESTACADA) */}
-                        <div className="md:col-span-2 bg-amber-50 p-4 rounded-lg border-2 border-amber-200">
-                          <label className="block text-sm font-bold text-amber-900 mb-2 flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4" />
-                            Descripción del Trabajo a Realizar <span className="text-red-500">*</span>
-                          </label>
-                          <textarea
-                            value={equipo.descripcionEquipo}
-                            onChange={(e) => handleEquipoChange(index, 'descripcionEquipo', e.target.value)}
-                            rows={2}
-                            placeholder="Describe detalladamente el trabajo específico para este equipo..."
-                            className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium resize-none ${
-                              errors[`equipo_${index}_descripcionEquipo`] ? 'border-red-400 bg-red-50/50' : 'border-amber-300 bg-white'
-                            }`}
-                          />
-                          {errors[`equipo_${index}_descripcionEquipo`] && (
-                            <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
-                              <AlertCircle className="w-3 h-3" />
-                              {errors[`equipo_${index}_descripcionEquipo`]}
-                            </p>
-                          )}
+                        <div className="mb-5">
+                          <span className="inline-block px-3 py-1 bg-violet-600 text-white text-xs font-bold rounded-full">
+                            Equipo #{index + 1}
+                          </span>
                         </div>
 
-                        {/* Personal Asignado */}
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            Personal Asignado <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={equipo.personalAsignado}
-                            onChange={(e) => handleEquipoChange(index, 'personalAsignado', e.target.value)}
-                            placeholder="Nombre del técnico responsable"
-                            className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
-                              errors[`equipo_${index}_personalAsignado`] ? 'border-red-400 bg-red-50/50' : 'border-slate-200 bg-white'
-                            }`}
-                          />
-                          {errors[`equipo_${index}_personalAsignado`] && (
-                            <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
-                              <AlertCircle className="w-3 h-3" />
-                              {errors[`equipo_${index}_personalAsignado`]}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Tipo de Actividad */}
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            Tipo de Actividad <span className="text-red-500">*</span>
-                          </label>
-                          <select
-                            value={equipo.tipoActividad}
-                            onChange={(e) => handleEquipoChange(index, 'tipoActividad', e.target.value)}
-                            className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium bg-white"
-                          >
-                            {tiposActividad.map(tipo => (
-                              <option key={tipo} value={tipo}>{tipo}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Actividad Personalizada (si eligió "Otro") */}
-                        {equipo.tipoActividad === "Otro" && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-20">
+                          {/* Selector de Equipo */}
                           <div className="md:col-span-2">
                             <label className="block text-sm font-semibold text-slate-700 mb-2">
-                              Especificar Tipo de Actividad <span className="text-red-500">*</span>
+                              Seleccionar Equipo <span className="text-red-500">*</span>
                             </label>
-                            <input
-                              type="text"
-                              value={equipo.tipoActividadPersonalizada}
-                              onChange={(e) => handleEquipoChange(index, 'tipoActividadPersonalizada', e.target.value)}
-                              placeholder="Escribe el tipo de actividad..."
+                            <select
+                              value={equipo.equipoId}
+                              onChange={(e) => handleEquipoChange(index, 'equipoId', e.target.value)}
                               className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
-                                errors[`equipo_${index}_tipoActividadPersonalizada`] ? 'border-red-400 bg-red-50/50' : 'border-slate-200 bg-white'
+                                errors[`equipo_${index}_equipoId`] ? 'border-red-400 bg-red-50/50' : 'border-slate-200 bg-white'
                               }`}
-                            />
-                            {errors[`equipo_${index}_tipoActividadPersonalizada`] && (
+                            >
+                              <option value="">-- Seleccionar equipo --</option>
+                              {equiposDisponibles.map(equipoDisp => (
+                                <option
+                                  key={equipoDisp.id}
+                                  value={equipoDisp.id}
+                                  disabled={equiposYaSeleccionados.includes(equipoDisp.id) && equipoDisp.id !== equipo.equipoId}
+                                >
+                                  {equipoDisp.nombre || equipoDisp.codigo} - {equipoDisp.tipo || "Sin tipo"}
+                                  {equiposYaSeleccionados.includes(equipoDisp.id) && equipoDisp.id !== equipo.equipoId ? " (Ya asignado)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                            {errors[`equipo_${index}_equipoId`] && (
                               <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
                                 <AlertCircle className="w-3 h-3" />
-                                {errors[`equipo_${index}_tipoActividadPersonalizada`]}
+                                {errors[`equipo_${index}_equipoId`]}
                               </p>
                             )}
                           </div>
-                        )}
 
-                        {/* Fechas del Equipo */}
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            Fecha Inicio <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="datetime-local"
-                            value={equipo.fechaInicioProgramada}
-                            onChange={(e) => handleEquipoChange(index, 'fechaInicioProgramada', e.target.value)}
-                            className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
-                              errors[`equipo_${index}_fechaInicioProgramada`] ? 'border-red-400 bg-red-50/50' : 'border-slate-200 bg-white'
-                            }`}
-                          />
-                          {errors[`equipo_${index}_fechaInicioProgramada`] && (
-                            <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
-                              <AlertCircle className="w-3 h-3" />
-                              {errors[`equipo_${index}_fechaInicioProgramada`]}
-                            </p>
-                          )}
-                        </div>
+                          {/* Descripción del Trabajo */}
+                          <div className="md:col-span-2 bg-amber-50 p-4 rounded-lg border-2 border-amber-200">
+                            <label className="block text-sm font-bold text-amber-900 mb-2 flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4" />
+                              Descripción del Trabajo a Realizar <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                              value={equipo.descripcionEquipo}
+                              onChange={(e) => handleEquipoChange(index, 'descripcionEquipo', e.target.value)}
+                              rows={2}
+                              placeholder="Describe detalladamente el trabajo específico para este equipo..."
+                              className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium resize-none ${
+                                errors[`equipo_${index}_descripcionEquipo`] ? 'border-red-400 bg-red-50/50' : 'border-amber-300 bg-white'
+                              }`}
+                            />
+                            {errors[`equipo_${index}_descripcionEquipo`] && (
+                              <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
+                                <AlertCircle className="w-3 h-3" />
+                                {errors[`equipo_${index}_descripcionEquipo`]}
+                              </p>
+                            )}
+                          </div>
 
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            Fecha Fin <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="datetime-local"
-                            value={equipo.fechaFinProgramada}
-                            onChange={(e) => handleEquipoChange(index, 'fechaFinProgramada', e.target.value)}
-                            className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
-                              errors[`equipo_${index}_fechaFinProgramada`] ? 'border-red-400 bg-red-50/50' : 'border-slate-200 bg-white'
-                            }`}
-                          />
-                          {errors[`equipo_${index}_fechaFinProgramada`] && (
-                            <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
-                              <AlertCircle className="w-3 h-3" />
-                              {errors[`equipo_${index}_fechaFinProgramada`]}
-                            </p>
+                          {/* Personal Asignado */}
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                              Personal Asignado <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={equipo.personalAsignado}
+                              onChange={(e) => handleEquipoChange(index, 'personalAsignado', e.target.value)}
+                              placeholder="Nombre del técnico responsable"
+                              className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
+                                errors[`equipo_${index}_personalAsignado`] ? 'border-red-400 bg-red-50/50' : 'border-slate-200 bg-white'
+                              }`}
+                            />
+                            {errors[`equipo_${index}_personalAsignado`] && (
+                              <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
+                                <AlertCircle className="w-3 h-3" />
+                                {errors[`equipo_${index}_personalAsignado`]}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Tipo de Actividad */}
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                              Tipo de Actividad <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={equipo.tipoActividad}
+                              onChange={(e) => handleEquipoChange(index, 'tipoActividad', e.target.value)}
+                              className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium bg-white"
+                            >
+                              {tiposActividad.map(tipo => (
+                                <option key={tipo} value={tipo}>{tipo}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Actividad Personalizada */}
+                          {equipo.tipoActividad === "Otro" && (
+                            <div className="md:col-span-2">
+                              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                Especificar Tipo de Actividad <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={equipo.tipoActividadPersonalizada}
+                                onChange={(e) => handleEquipoChange(index, 'tipoActividadPersonalizada', e.target.value)}
+                                placeholder="Escribe el tipo de actividad..."
+                                className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
+                                  errors[`equipo_${index}_tipoActividadPersonalizada`] ? 'border-red-400 bg-red-50/50' : 'border-slate-200 bg-white'
+                                }`}
+                              />
+                              {errors[`equipo_${index}_tipoActividadPersonalizada`] && (
+                                <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
+                                  <AlertCircle className="w-3 h-3" />
+                                  {errors[`equipo_${index}_tipoActividadPersonalizada`]}
+                                </p>
+                              )}
+                            </div>
                           )}
+
+                          {/* Fechas del Equipo */}
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                              Fecha Inicio <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={equipo.fechaInicioProgramada}
+                              onChange={(e) => handleEquipoChange(index, 'fechaInicioProgramada', e.target.value)}
+                              className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
+                                errors[`equipo_${index}_fechaInicioProgramada`] ? 'border-red-400 bg-red-50/50' : 'border-slate-200 bg-white'
+                              }`}
+                            />
+                            {errors[`equipo_${index}_fechaInicioProgramada`] && (
+                              <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
+                                <AlertCircle className="w-3 h-3" />
+                                {errors[`equipo_${index}_fechaInicioProgramada`]}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                              Fecha Fin <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={equipo.fechaFinProgramada}
+                              onChange={(e) => handleEquipoChange(index, 'fechaFinProgramada', e.target.value)}
+                              className={`w-full px-4 py-2.5 border-2 rounded-lg focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-medium ${
+                                errors[`equipo_${index}_fechaFinProgramada`] ? 'border-red-400 bg-red-50/50' : 'border-slate-200 bg-white'
+                              }`}
+                            />
+                            {errors[`equipo_${index}_fechaFinProgramada`] && (
+                              <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1 font-medium">
+                                <AlertCircle className="w-3 h-3" />
+                                {errors[`equipo_${index}_fechaFinProgramada`]}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* OBSERVACIONES */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60">
@@ -774,7 +786,12 @@ export default function ModalOrdenTrabajo({
             </div>
             
             <p className="text-slate-700 mb-6">
-              ¿Estás seguro de crear la Orden de Trabajo <strong>{numeroOTGenerado}</strong> con <strong>{equipos.length} equipo(s)</strong> asignado(s)?
+              ¿Estás seguro de crear la Orden de Trabajo <strong>{numeroOTGenerado}</strong>
+              {esVenta
+                ? equiposDisponibles.length > 0
+                  ? ` con ${equiposDisponibles.length} equipo(s) del aviso?`
+                  : " (sin equipos asignados)?"
+                : ` con ${equipos.length} equipo(s) asignado(s)?`}
             </p>
 
             <div className="flex gap-3">

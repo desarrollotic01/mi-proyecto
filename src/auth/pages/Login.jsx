@@ -6,8 +6,8 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const [alias, setAlias] = useState("");
-  const [password, setPassword] = useState("");
+  const [usuario, setUsuario] = useState("");
+  const [contraseña, setContraseña] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -18,7 +18,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(alias, password);
+      await login(usuario, contraseña);
       navigate("/Avisos");
     } catch (err) {
       setError(
@@ -93,9 +93,9 @@ export default function Login() {
                 </div>
                 <input
                   type="text"
-                  placeholder="Ingresa tu alias"
-                  value={alias}
-                  onChange={(e) => setAlias(e.target.value)}
+                  placeholder="Ingresa tu usuario"
+                  value={usuario}
+                  onChange={(e) => setUsuario(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent transition-all duration-300"
                   disabled={isLoading}
                 />
@@ -116,8 +116,8 @@ export default function Login() {
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Ingresa tu contraseña"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={contraseña}
+                  onChange={(e) => setContraseña(e.target.value)}
                   className="w-full pl-10 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent transition-all duration-300"
                   disabled={isLoading}
                 />

@@ -1,6 +1,6 @@
 // components/OTActividadPreventivaItem.jsx
-import { ROLES_TECNICOS, getRolLabel } from "../helpers/otHelpers";
-
+import { Trash2 } from "lucide-react";
+import { ROLES_TECNICOS } from "../helpers/otHelpers";
 
 const TIPOS_TRABAJO_PREVENTIVO = [
   { value: "REVISION", label: "Revisión" },
@@ -10,9 +10,12 @@ const TIPOS_TRABAJO_PREVENTIVO = [
   { value: "CALIBRACION", label: "Calibración" },
   { value: "INSPECCION", label: "Inspección" },
   { value: "CAMBIO", label: "Cambio" },
+  { value: "APLICACION", label: "Aplicación" },
+  { value: "REPARACION", label: "Reparación" },
 ];
+
 // ─── Constantes de columnas ───────────────────────────────────────────────────
-const GRID = "28px 1fr 1fr 1fr 1.5fr 1.1fr 1.1fr 58px 58px 62px 58px 58px";
+const GRID = "28px 1fr 1fr 1fr 1.5fr 1.1fr 1.1fr 58px 58px 62px 58px 58px 32px";
 
 // ─── Estilos reutilizables ────────────────────────────────────────────────────
 const cellStyle = {
@@ -24,51 +27,40 @@ const cellStyle = {
   overflow: "hidden",
 };
 
-function makeInputStyle(disabled) {
-  return {
-    width: "100%",
-    height: 26,
-    border: "none",
-    background: "transparent",
-    fontSize: 12,
-    color: disabled ? "var(--color-text-secondary)" : "var(--color-text-primary)",
-    fontFamily: "var(--font-sans)",
-    padding: "0 4px",
-    outline: "none",
-    cursor: disabled ? "default" : "text",
-  };
-}
+const inputStyle = {
+  width: "100%",
+  height: 26,
+  border: "none",
+  background: "transparent",
+  fontSize: 12,
+  color: "var(--color-text-primary)",
+  fontFamily: "var(--font-sans)",
+  padding: "0 4px",
+  outline: "none",
+};
 
-function ExcelInput({ value, onChange, type = "text", placeholder, disabled, min }) {
-  const style = makeInputStyle(disabled);
+function ExcelInput({ value, onChange, type = "text", placeholder, min }) {
   return (
     <input
       type={type}
       value={value ?? ""}
       onChange={onChange}
       placeholder={placeholder}
-      disabled={disabled}
       min={min}
-      style={style}
-      onFocus={(e) => {
-        if (!disabled) e.target.style.background = "var(--color-background-info)";
-      }}
+      style={inputStyle}
+      onFocus={(e) => (e.target.style.background = "var(--color-background-info)")}
       onBlur={(e) => (e.target.style.background = "transparent")}
     />
   );
 }
 
-function ExcelSelect({ value, onChange, disabled, children }) {
-  const style = makeInputStyle(disabled);
+function ExcelSelect({ value, onChange, children }) {
   return (
     <select
       value={value ?? ""}
       onChange={onChange}
-      disabled={disabled}
-      style={{ ...style, cursor: disabled ? "default" : "pointer" }}
-      onFocus={(e) => {
-        if (!disabled) e.target.style.background = "var(--color-background-info)";
-      }}
+      style={{ ...inputStyle, cursor: "pointer" }}
+      onFocus={(e) => (e.target.style.background = "var(--color-background-info)")}
       onBlur={(e) => (e.target.style.background = "transparent")}
     >
       {children}
@@ -76,24 +68,22 @@ function ExcelSelect({ value, onChange, disabled, children }) {
   );
 }
 
-function ObsButton({ filled, onClick, disabled }) {
+function ObsButton({ filled, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
       style={{
         fontSize: 11,
         padding: "2px 6px",
         borderRadius: 4,
-        cursor: disabled ? "not-allowed" : "pointer",
+        cursor: "pointer",
         whiteSpace: "nowrap",
         border: filled
           ? "0.5px solid #639922"
           : "0.5px solid var(--color-border-secondary)",
         background: filled ? "#EAF3DE" : "var(--color-background-primary)",
         color: filled ? "#27500A" : "var(--color-text-secondary)",
-        opacity: disabled ? 0.4 : 1,
       }}
     >
       Obs.
@@ -101,24 +91,22 @@ function ObsButton({ filled, onClick, disabled }) {
   );
 }
 
-function DescButton({ filled, onClick, disabled }) {
+function DescButton({ filled, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
       style={{
         fontSize: 11,
         padding: "2px 6px",
         borderRadius: 4,
-        cursor: disabled ? "not-allowed" : "pointer",
+        cursor: "pointer",
         whiteSpace: "nowrap",
         border: filled
           ? "0.5px solid #378ADD"
           : "0.5px solid var(--color-border-secondary)",
         background: filled ? "#E6F1FB" : "var(--color-background-primary)",
         color: filled ? "#0C447C" : "var(--color-text-secondary)",
-        opacity: disabled ? 0.4 : 1,
       }}
     >
       Desc.
@@ -131,7 +119,7 @@ export function OTActividadesPreventivasHeader() {
   const cols = [
     "#", "Sistema", "Subsistema", "Componente", "Tarea",
     "Tipo trabajo", "Rol técnico", "Tec.", "Dur.", "Unidad",
-    "Desc.", "Obs.",
+    "Desc.", "Obs.", "",
   ];
   return (
     <div
@@ -167,17 +155,17 @@ export function OTActividadesPreventivasHeader() {
   );
 }
 
-// ─── Fila de actividad preventiva ────────────────────────────────────────────
-export default function OTActividadPreventivaItem({ act, index, onChange, onOpenObservacion, onOpenDescripcion }) {
-  const esPlan = !!act.planMantenimientoActividadId;
-
-  const puedeEditar = (campo) => {
-    if (!esPlan) return true;
-    return ["cantidadTecnicos", "duracionEstimadaValor", "unidadDuracion", "observaciones"].includes(campo);
-  };
-
-  const tieneObs = !!String(act.observaciones || "").trim();
-  const tieneDesc = !!String(act.descripcion || "").trim();
+// ─── Fila de actividad preventiva — todas editables ──────────────────────────
+export default function OTActividadPreventivaItem({
+  act,
+  index,
+  onChange,
+  onDelete,
+  onOpenObservacion,
+  onOpenDescripcion,
+}) {
+  const tieneObs  = !!String(act.observaciones || "").trim();
+  const tieneDesc = !!String(act.descripcion   || "").trim();
 
   return (
     <div
@@ -207,7 +195,7 @@ export default function OTActividadPreventivaItem({ act, index, onChange, onOpen
       <div style={cellStyle}>
         <ExcelInput
           value={act.sistema}
-          disabled={!puedeEditar("sistema")}
+          placeholder="Sistema"
           onChange={(e) => onChange("sistema", e.target.value)}
         />
       </div>
@@ -216,7 +204,7 @@ export default function OTActividadPreventivaItem({ act, index, onChange, onOpen
       <div style={cellStyle}>
         <ExcelInput
           value={act.subsistema}
-          disabled={!puedeEditar("subsistema")}
+          placeholder="Subsistema"
           onChange={(e) => onChange("subsistema", e.target.value)}
         />
       </div>
@@ -225,7 +213,7 @@ export default function OTActividadPreventivaItem({ act, index, onChange, onOpen
       <div style={cellStyle}>
         <ExcelInput
           value={act.componente}
-          disabled={!puedeEditar("componente")}
+          placeholder="Componente"
           onChange={(e) => onChange("componente", e.target.value)}
         />
       </div>
@@ -234,7 +222,7 @@ export default function OTActividadPreventivaItem({ act, index, onChange, onOpen
       <div style={cellStyle}>
         <ExcelInput
           value={act.tarea}
-          disabled={!puedeEditar("tarea")}
+          placeholder="Tarea"
           onChange={(e) => onChange("tarea", e.target.value)}
         />
       </div>
@@ -243,7 +231,6 @@ export default function OTActividadPreventivaItem({ act, index, onChange, onOpen
       <div style={cellStyle}>
         <ExcelSelect
           value={act.tipoTrabajo ?? "REVISION"}
-          disabled={!puedeEditar("tipoTrabajo")}
           onChange={(e) => onChange("tipoTrabajo", e.target.value)}
         >
           {TIPOS_TRABAJO_PREVENTIVO.map((t) => (
@@ -258,7 +245,6 @@ export default function OTActividadPreventivaItem({ act, index, onChange, onOpen
       <div style={cellStyle}>
         <ExcelSelect
           value={act.rolTecnico ?? "tecnico_mecanico"}
-          disabled={!puedeEditar("rolTecnico")}
           onChange={(e) => onChange("rolTecnico", e.target.value)}
         >
           {ROLES_TECNICOS.map((r) => (
@@ -275,7 +261,6 @@ export default function OTActividadPreventivaItem({ act, index, onChange, onOpen
           type="number"
           value={act.cantidadTecnicos}
           min={1}
-          disabled={!puedeEditar("cantidadTecnicos")}
           onChange={(e) => onChange("cantidadTecnicos", Number(e.target.value))}
         />
       </div>
@@ -285,8 +270,7 @@ export default function OTActividadPreventivaItem({ act, index, onChange, onOpen
         <ExcelInput
           type="number"
           value={act.duracionEstimadaValor}
-          min={1}
-          disabled={!puedeEditar("duracionEstimadaValor")}
+          min={0}
           onChange={(e) => onChange("duracionEstimadaValor", Number(e.target.value))}
         />
       </div>
@@ -295,7 +279,6 @@ export default function OTActividadPreventivaItem({ act, index, onChange, onOpen
       <div style={cellStyle}>
         <ExcelSelect
           value={act.unidadDuracion ?? "min"}
-          disabled={!puedeEditar("unidadDuracion")}
           onChange={(e) => onChange("unidadDuracion", e.target.value)}
         >
           <option value="min">Min</option>
@@ -305,16 +288,35 @@ export default function OTActividadPreventivaItem({ act, index, onChange, onOpen
 
       {/* Descripción */}
       <div style={{ ...cellStyle, justifyContent: "center" }}>
-        <DescButton
-          filled={tieneDesc}
-          disabled={esPlan}
-          onClick={onOpenDescripcion}
-        />
+        <DescButton filled={tieneDesc} onClick={onOpenDescripcion} />
       </div>
 
       {/* Observación */}
-      <div style={{ ...cellStyle, borderRight: "none", justifyContent: "center" }}>
+      <div style={{ ...cellStyle, justifyContent: "center" }}>
         <ObsButton filled={tieneObs} onClick={onOpenObservacion} />
+      </div>
+
+      {/* Eliminar */}
+      <div style={{ ...cellStyle, borderRight: "none", justifyContent: "center" }}>
+        <button
+          type="button"
+          onClick={onDelete}
+          title="Eliminar actividad"
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "#A32D2D",
+            padding: "2px 4px",
+            borderRadius: 4,
+            display: "flex",
+            alignItems: "center",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#FCEBEB")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+        >
+          <Trash2 size={13} />
+        </button>
       </div>
     </div>
   );

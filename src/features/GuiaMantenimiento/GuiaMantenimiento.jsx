@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
+import * as XLSX from "xlsx";
 import { guiaMantenimientoService } from "./services/guiaMantenimientoService";
 import ModalCrearGuiaMantenimiento from "./Components/ModalCrearGuiaMantenimiento";
+import GanttGuias from "./Components/GanttGuias";
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────
 const ESTADO_CFG = {
@@ -172,6 +174,7 @@ export default function GuiaMantenimientoPage() {
   const [sortDir, setSortDir]     = useState("desc");
   const [filterCrit, setFilterCrit] = useState("all");
   const [filterEstado, setFilterEstado] = useState("all");
+  const [viewMode, setViewMode]   = useState("tabla"); // "tabla" | "gantt"
 
   const loadGuias = useCallback(async () => {
     try {
@@ -250,16 +253,51 @@ export default function GuiaMantenimientoPage() {
             <p style={{ color:"#475569", fontSize:10, fontWeight:700, letterSpacing:"0.14em", margin:"0 0 3px" }}>SISTEMA DE MANTENIMIENTO</p>
             <h1 style={{ color:"#fff", margin:0, fontSize:20, fontWeight:700 }}>Guías de Mantenimiento</h1>
           </div>
-          <button onClick={() => setOpenModal(true)} style={{ background:"#3b82f6", color:"#fff", border:"none", padding:"9px 18px", borderRadius:9, cursor:"pointer", fontWeight:700, fontSize:13, display:"flex", alignItems:"center", gap:6 }}>
-            ＋ Nueva Guía
-          </button>
+          <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+            {/* View Toggle */}
+            <div style={{ display:"flex", background:"rgba(255,255,255,0.08)", borderRadius:9, padding:3 }}>
+              {[["tabla","☰ Tabla"],["gantt","📊 Gantt"]].map(([mode, label]) => (
+                <button key={mode} onClick={() => setViewMode(mode)}
+                  style={{ padding:"6px 14px", borderRadius:7, border:"none", fontSize:12, fontWeight:700, cursor:"pointer", transition:"all 0.15s",
+                    background: viewMode === mode ? "#fff" : "transparent",
+                    color: viewMode === mode ? "#0f172a" : "rgba(255,255,255,0.55)",
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                const data = sorted.map(r => ({
+                  "N° Alerta": r.numeroAlerta || "",
+                  Plan: r.planNombre || "",
+                  Producto: r.producto || "",
+                  "O. Venta": r.ordenVenta || "",
+                  Criticidad: r.creticidad || "",
+                  Período: PERIODO_LABEL[r.periodo] || r.periodo || "",
+                  "Activo": r.periodoActivo ? "Sí" : "No",
+                  "Próxima Fecha": r.proximaFecha ? fmt(r.proximaFecha) : "—",
+                  "Estado Próxima": r.estadoProx || "",
+                }));
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Guías");
+                XLSX.writeFile(wb, `Guias_Mantenimiento_${new Date().toISOString().slice(0,10)}.xlsx`);
+              }}
+              style={{ background:"#10b981", color:"#fff", border:"none", padding:"9px 18px", borderRadius:9, cursor:"pointer", fontWeight:700, fontSize:13, display:"flex", alignItems:"center", gap:6 }}
+            >
+              ↓ Exportar Excel
+            </button>
+            <button onClick={() => setOpenModal(true)} style={{ background:"#3b82f6", color:"#fff", border:"none", padding:"9px 18px", borderRadius:9, cursor:"pointer", fontWeight:700, fontSize:13, display:"flex", alignItems:"center", gap:6 }}>
+              ＋ Nueva Guía
+            </button>
+          </div>
         </div>
       </div>
 
-      <div style={{ maxWidth:1400, margin:"0 auto", padding:"22px 28px" }}>
-
-        {/* Stats */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:18 }}>
+      {/* Stats — siempre en contenedor centrado */}
+      <div style={{ maxWidth:1400, margin:"0 auto", padding:"22px 28px 18px" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12 }}>
           {[
             { label:"Total",       value:stats.total,      icon:"📋", c:"#3b82f6", bg:"#eff6ff" },
             { label:"Pendientes",  value:stats.pendientes, icon:"⏳", c:"#d97706", bg:"#fffbeb" },
@@ -275,8 +313,19 @@ export default function GuiaMantenimientoPage() {
             </div>
           ))}
         </div>
+      </div>
 
-        {/* Toolbar */}
+      {/* Gantt — ancho completo */}
+      {viewMode === "gantt" && !loading && (
+        <div style={{ padding:"0 24px 24px" }}>
+          <GanttGuias guias={sorted.map(r => r._raw)} />
+        </div>
+      )}
+
+      <div style={{ maxWidth:1400, margin:"0 auto", padding:"0 28px 22px" }}>
+
+        {/* Tabla view — toolbar + grid */}
+        {viewMode === "tabla" && <>
         <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:"12px 12px 0 0", padding:"12px 16px", display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", borderBottom:"1px solid #f1f5f9" }}>
           {/* Search */}
           <div style={{ position:"relative", flex:"1 1 220px", minWidth:180 }}>
@@ -423,6 +472,7 @@ export default function GuiaMantenimientoPage() {
             </div>
           )}
         </div>
+        </>}
       </div>
 
       {/* Modals */}

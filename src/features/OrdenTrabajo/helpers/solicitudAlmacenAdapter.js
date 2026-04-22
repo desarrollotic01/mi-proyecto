@@ -11,12 +11,11 @@ const emptyLinea = () => ({
   itemCode: "",
   description: "",
   quantity: 1,
-  warehouseCode: "",
+  warehouseCode: "01",
   costCenter: "",
   projectCode: "",
-  rubro: "",
-  rubroSapCode: "",
-  paqueteTrabajo: "",
+  rubroId: null,
+  paqueteTrabajoId: null,
 });
 
 const emptyForm = () => ({
@@ -76,12 +75,11 @@ export const mapSolicitudesAlmacenToModalValue = (solicitudes = []) => {
               Number.isFinite(Number(l.quantity)) && Number(l.quantity) > 0
                 ? Number(l.quantity)
                 : 1,
-            warehouseCode: l.warehouseCode || "",
+            warehouseCode: l.warehouseCode || "01",
             costCenter: l.costingCode || "",
             projectCode: l.projectCode || "",
-            rubro: l.rubro?.nombre || l.rubro || "",
-            rubroSapCode: l.rubroSapCode || "",
-            paqueteTrabajo: l.paqueteTrabajo || "",
+            rubroId: l.rubroId || null,
+            paqueteTrabajoId: l.paqueteTrabajoId || null,
           }))
         : [emptyLinea()],
     });
@@ -107,12 +105,11 @@ export const mapSolicitudesAlmacenToModalValue = (solicitudes = []) => {
                   Number.isFinite(Number(l.quantity)) && Number(l.quantity) > 0
                     ? Number(l.quantity)
                     : 1,
-                warehouseCode: l.warehouseCode || "",
+                warehouseCode: l.warehouseCode || "01",
                 costCenter: l.costingCode || "",
                 projectCode: l.projectCode || "",
-                rubro: l.rubro?.nombre || l.rubro || "",
-                rubroSapCode: l.rubroSapCode || "",
-                paqueteTrabajo: l.paqueteTrabajo || "",
+                rubroId: l.rubroId || null,
+                paqueteTrabajoId: l.paqueteTrabajoId || null,
               }))
             : [emptyLinea()],
         })
@@ -155,14 +152,10 @@ export const buildSolicitudAlmacenUpdatePayload = (form) => ({
     description: l.description || "",
     quantity: Number(l.quantity) || 0,
     warehouseCode: l.warehouseCode || "",
-    costCenter: l.costCenter || "",
     costingCode: l.costCenter || "",
     projectCode: l.projectCode || "",
-    rubroSapCode:
-      l.rubroSapCode === "" || l.rubroSapCode === null || l.rubroSapCode === undefined
-        ? null
-        : Number(l.rubroSapCode),
-    paqueteTrabajo: l.paqueteTrabajo || "",
+    rubroId: l.rubroId || null,
+    paqueteTrabajoId: l.paqueteTrabajoId || null,
   })),
 });
 
@@ -186,11 +179,8 @@ export const buildSolicitudAlmacenCreatePayload = (form, extra = {}) => ({
         warehouseCode: l.warehouseCode || "",
         costingCode: l.costCenter || l.costingCode || "",
         projectCode: l.projectCode || "",
-        rubroSapCode:
-          l.rubroSapCode === "" || l.rubroSapCode === undefined || l.rubroSapCode === null
-            ? null
-            : Number(l.rubroSapCode),
-        paqueteTrabajo: l.paqueteTrabajo || "",
+        rubroId: l.rubroId || null,
+        paqueteTrabajoId: l.paqueteTrabajoId || null,
       }))
     : [],
 });

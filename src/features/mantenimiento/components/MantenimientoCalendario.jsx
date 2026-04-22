@@ -20,34 +20,16 @@ export default function MantenimientoCalendario({
 }) {
   const events = Object.values(filteredColumns)
     .flatMap((col) => col.items)
-    .map((item) => {
-      let title = "Aviso";
-      
-      // Agregar tipo de aviso al título
-      const tipoIcon = item.tipoAviso === "mantenimiento" ? "🔧" : "📦";
-      
-      if (cardFields.numeroAviso) {
-        title = `${tipoIcon} #${item.numeroAviso}`;
-      } else if (cardFields.cliente) {
-        title = `${tipoIcon} ${item.cliente || "Aviso"}`;
-      }
-
-      // Agregar más info al título si hay espacio
-      if (cardFields.cliente && item.cliente && cardFields.numeroAviso) {
-        title += ` - ${item.cliente.substring(0, 15)}${item.cliente.length > 15 ? '...' : ''}`;
-      }
-
-      return {
-        id: item.id,
-        title,
-        date: item.fechaAtencion || new Date().toISOString().slice(0, 10),
-        backgroundColor: ESTADOS_AV[item.estado]?.color || "#6B7280",
-        borderColor: ESTADOS_AV[item.estado]?.color || "#6B7280",
-        textColor: "#FFFFFF",
-        extendedProps: item,
-        classNames: ["cursor-pointer", "transition-all", "hover:opacity-90"],
-      };
-    });
+    .map((item) => ({
+      id: item.id,
+      title: item.numeroAviso || "Aviso",
+      date: item.fechaAtencion || new Date().toISOString().slice(0, 10),
+      backgroundColor: ESTADOS_AV[item.estado]?.color || "#6B7280",
+      borderColor: ESTADOS_AV[item.estado]?.color || "#6B7280",
+      textColor: "#FFFFFF",
+      extendedProps: item,
+      classNames: ["cursor-pointer", "transition-all", "hover:opacity-90"],
+    }));
 
   const [currentTitle, setCurrentTitle] = useState("");
 
@@ -181,6 +163,41 @@ export default function MantenimientoCalendario({
               setViewData(info.event.extendedProps);
               setViewStep(1);
               setViewOpen(true);
+            }}
+            eventContent={(arg) => {
+              const item = arg.event.extendedProps;
+              const bg = arg.event.backgroundColor;
+              return (
+                <div
+                  className="w-full h-full overflow-hidden rounded px-1.5 py-1 cursor-pointer"
+                  style={{ backgroundColor: bg }}
+                >
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className="text-[9px] font-bold opacity-70 uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.75)" }}>
+                      N° Aviso
+                    </span>
+                    <span className="text-[10px] font-bold text-white truncate">
+                      {item.numeroAviso || "—"}
+                    </span>
+                  </div>
+                  {item.cliente && (
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span className="text-[9px] font-bold opacity-70 uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.75)" }}>
+                        Cliente
+                      </span>
+                      <span className="text-[10px] text-white truncate">{item.cliente}</span>
+                    </div>
+                  )}
+                  {item.descripcion && (
+                    <div className="flex items-start gap-1">
+                      <span className="text-[9px] font-bold opacity-70 uppercase tracking-wide shrink-0" style={{ color: "rgba(255,255,255,0.75)" }}>
+                        Desc.
+                      </span>
+                      <span className="text-[9px] text-white/80 line-clamp-1">{item.descripcion}</span>
+                    </div>
+                  )}
+                </div>
+              );
             }}
             dayMaxEvents={3}
             eventDisplay="block"

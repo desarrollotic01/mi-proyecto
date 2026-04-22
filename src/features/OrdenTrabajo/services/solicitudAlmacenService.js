@@ -54,3 +54,18 @@ export const createSolicitudAlmacen = async (data) => {
   }
 };
 
+export const enviarBloqueAlmacen = async ({ bloqueId, ordenTrabajoId, destinatarioId, ccEmails = [] }) => {
+  try {
+    const response = await api.post(`/solicitudalmacen/bloque/enviar`, {
+      bloqueId,
+      ordenTrabajoId,
+      destinatarioId,
+      ccEmails,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error al enviar bloque de almacén:", error);
+    throw error;
+  }
+};
+

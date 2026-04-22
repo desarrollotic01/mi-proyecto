@@ -21,6 +21,16 @@ export const getSolicitudCompraById = async (id) => {
   }
 };
 
+export const syncSolicitudCompraById = async (id) => {
+  try {
+    const response = await api.post(`/solicitudcompra/${id}/enviar-sap`);
+    return response.data;
+  } catch (error) {
+    console.error("Error al sincronizar solicitud de compra con SAP:", error);
+    throw error;
+  }
+};
+
 export const createSolicitudCompra = async (data) => {
   try {
     const response = await api.post(`/solicitudcompra`, data);

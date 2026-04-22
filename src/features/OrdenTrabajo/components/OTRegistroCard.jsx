@@ -17,6 +17,7 @@ import { useState } from "react";
 
 import {
   esEquipoRegistro,
+  esInstalacionRegistro,
   getEstadoBadgeColor,
   getRegistroLabel,
   getRegistroNombre,
@@ -192,6 +193,7 @@ export default function OTRegistroCard({
   errors = {},
   esPreventivo = false,
   esCorrectivo = false,
+  equiposReferencia = [],
   onOpenDetalleEquipo,
   onRegistroChange,
   onSeleccionarPlan,
@@ -203,30 +205,35 @@ export default function OTRegistroCard({
   onOpenObservacion,
   onOpenDescripcion,
 }) {
+  const esInstalacion = esInstalacionRegistro(registro);
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
 
       {/* ── Cabecera oscura ── */}
-      <div className="flex items-center justify-between gap-4 px-6 py-4 bg-slate-900">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center justify-center w-9 h-9 bg-white/15 text-white rounded-xl font-bold shrink-0 text-sm">
-            {index + 1}
+      <div className="bg-slate-900 px-6 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center justify-center w-9 h-9 bg-white/15 text-white rounded-xl font-bold shrink-0 text-sm">
+              {index + 1}
+            </div>
+            <div className="min-w-0">
+              <h5 className="text-base font-semibold text-white leading-tight">
+                {getRegistroNombre(registro)}
+              </h5>
+              <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                {esInstalacion
+                  ? <Package className="w-3.5 h-3.5" />
+                  : esEquipoRegistro(registro)
+                    ? <Package className="w-3.5 h-3.5" />
+                    : <MapPin className="w-3.5 h-3.5" />}
+                {getRegistroLabel(registro)} · {getRegistroSubtitulo(registro)}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h5 className="text-base font-semibold text-white leading-tight">
-              {getRegistroNombre(registro)}
-            </h5>
-            <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-              {esEquipoRegistro(registro)
-                ? <Package className="w-3.5 h-3.5" />
-                : <MapPin className="w-3.5 h-3.5" />}
-              {getRegistroLabel(registro)} · {getRegistroSubtitulo(registro)}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {esEquipoRegistro(registro) && (
-            <button
+          <div className="flex items-center gap-2 shrink-0">
+            {esEquipoRegistro(registro) && (
+              <button
               onClick={() => onOpenDetalleEquipo?.(registro.equipoId)}
               className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
               type="button"
@@ -239,6 +246,23 @@ export default function OTRegistroCard({
             {registro.estado}
           </span>
         </div>
+        </div>
+        {/* Equipos del aviso como referencia informativa */}
+        {equiposReferencia.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {equiposReferencia.map((eq, i) => (
+              <span
+                key={i}
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 text-white/80 text-xs rounded-lg border border-white/15"
+              >
+                {eq.tipo === "EQUIPO"
+                  ? <Package className="w-3 h-3 shrink-0" />
+                  : <MapPin className="w-3 h-3 shrink-0" />}
+                {eq.nombre}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Secciones divididas por línea ── */}
@@ -251,13 +275,15 @@ export default function OTRegistroCard({
           </Label>
           <textarea
             value={
-              esEquipoRegistro(registro)
-                ? registro.descripcionEquipo
-                : registro.descripcionUbicacion
+              !esInstalacion && !esEquipoRegistro(registro)
+                ? registro.descripcionUbicacion
+                : registro.descripcionEquipo
             }
             onChange={(e) =>
               onRegistroChange(
-                esEquipoRegistro(registro) ? "descripcionEquipo" : "descripcionUbicacion",
+                !esInstalacion && !esEquipoRegistro(registro)
+                  ? "descripcionUbicacion"
+                  : "descripcionEquipo",
                 e.target.value
               )
             }

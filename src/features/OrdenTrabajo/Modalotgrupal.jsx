@@ -268,6 +268,52 @@ function buildOTPayload({
 }
 
 /* =========================================================
+   HELPER: mapea array de solicitudes compra al formato del modal
+   (extraído fuera del componente para evitar stale closures)
+========================================================= */
+function buildInitialSolicitudesCompra(solicitudesCompraArr) {
+  const arr = Array.isArray(solicitudesCompraArr) ? solicitudesCompraArr : [];
+  const mapLinea = (l) => ({
+    id: l.id,
+    itemId: l.itemId || "",
+    itemCode: l.itemCode || "",
+    description: l.description || "",
+    quantity: Number(l.quantity) || 1,
+    warehouseCode: l.warehouseCode || "",
+    costCenter: l.costingCode || "",
+    projectCode: l.projectCode || "",
+    rubroId: l.rubroId || null,
+    paqueteTrabajoId: l.paqueteTrabajoId || null,
+  });
+  const general = arr.find((s) => s?.esGeneral === true) || null;
+  const individuales = arr.filter((s) => !s?.esGeneral);
+  const solicitudesPorEquipo = {};
+  for (const sol of individuales) {
+    const key = String(sol.equipo_id || sol.ubicacion_tecnica_id || "");
+    if (!key) continue;
+    solicitudesPorEquipo[key] = {
+      department: sol.department || "",
+      email: sol.requester || sol.email || "",
+      requiredDate: sol.requiredDate ? String(sol.requiredDate).slice(0, 10) : "",
+      comments: sol.comments || "",
+      lineas: Array.isArray(sol.lineas) ? sol.lineas.map(mapLinea) : [],
+    };
+  }
+  return {
+    solicitudGeneral: general
+      ? {
+          department: general.department || "",
+          email: general.requester || general.email || "",
+          requiredDate: general.requiredDate ? String(general.requiredDate).slice(0, 10) : "",
+          comments: general.comments || "",
+          lineas: Array.isArray(general.lineas) ? general.lineas.map(mapLinea) : [],
+        }
+      : null,
+    solicitudesPorEquipo,
+  };
+}
+
+/* =========================================================
    COMPONENTE PRINCIPAL
 ========================================================= */
 
@@ -312,8 +358,12 @@ export default function ModalOTGrupal({
 
   const esPreventivo = tipoMantenimiento === "Preventivo";
   const esCorrectivo = tipoMantenimiento === "Correctivo";
+  const esVenta = (aviso?.tipoAviso || initialData?.aviso?.tipoAviso) === "venta";
+  const esInstalacion = (aviso?.tipoAviso || initialData?.aviso?.tipoAviso) === "instalacion";
 
   const tratamiento = tratamientoData?.tratamiento || tratamientoData || null;
+
+  const [equiposAvisoDisplay, setEquiposAvisoDisplay] = useState([]);
 
   const [showSolicitudAlmacenModal, setShowSolicitudAlmacenModal] = useState(false);
   const [guardandoSolicitudAlmacen, setGuardandoSolicitudAlmacen] = useState(false);
@@ -321,10 +371,14 @@ export default function ModalOTGrupal({
   const [showSolicitudCompraModal, setShowSolicitudCompraModal] = useState(false);
   const [guardandoSolicitudCompra, setGuardandoSolicitudCompra] = useState(false);
 
+  const [solicitudesCompraOT, setSolicitudesCompraOT] = useState(null);
+const [solicitudesAlmacenOT, setSolicitudesAlmacenOT] = useState(null);
+
   const [formData, setFormData] = useState({
     descripcionGeneral: "",
     descripcionDetallada: "",
     supervisorId: "",
+    encargadoId: "",
     fechaProgramadaInicio: "",
     fechaProgramadaFin: "",
     observaciones: "",
@@ -375,9 +429,8 @@ export default function ModalOTGrupal({
           warehouseCode: l.warehouseCode || "",
           costingCode: l.costCenter || "",
           projectCode: l.projectCode || "",
-          rubro: l.rubro || "",
-          rubroSapCode: l.rubroSapCode || "",
-          paqueteTrabajo: l.paqueteTrabajo || "",
+          rubroId: l.rubroId || null,
+          paqueteTrabajoId: l.paqueteTrabajoId || null,
         }))
       : [],
   });
@@ -413,9 +466,8 @@ export default function ModalOTGrupal({
               warehouseCode: l.warehouseCode || "",
               costCenter: l.costingCode || "",
               projectCode: l.projectCode || "",
-              rubro: l.rubro || "",
-              rubroSapCode: l.rubroSapCode || "",
-              paqueteTrabajo: l.paqueteTrabajo || "",
+              rubroId: l.rubroId || null,
+              paqueteTrabajoId: l.paqueteTrabajoId || null,
             }))
           : [],
       };
@@ -439,9 +491,8 @@ export default function ModalOTGrupal({
                   warehouseCode: l.warehouseCode || "",
                   costCenter: l.costingCode || "",
                   projectCode: l.projectCode || "",
-                  rubro: l.rubro || "",
-                  rubroSapCode: l.rubroSapCode || "",
-                  paqueteTrabajo: l.paqueteTrabajo || "",
+                  rubroId: l.rubroId || null,
+                  paqueteTrabajoId: l.paqueteTrabajoId || null,
                 }))
               : [],
           }
@@ -464,9 +515,8 @@ export default function ModalOTGrupal({
           warehouseCode: l.warehouseCode || "",
           costingCode: l.costCenter || "",
           projectCode: l.projectCode || "",
-          rubro: l.rubro || "",
-          rubroSapCode: l.rubroSapCode || "",
-          paqueteTrabajo: l.paqueteTrabajo || "",
+          rubroId: l.rubroId || null,
+          paqueteTrabajoId: l.paqueteTrabajoId || null,
         }))
       : [],
   });
@@ -490,6 +540,7 @@ export default function ModalOTGrupal({
     if (!isOpen) {
       tratamientoAplicadoRef.current = false;
       setEquipos([]);
+      setEquiposAvisoDisplay([]);
       setPlanesPorEquipo({});
       setTratamientoData(null);
       setArchivosAdjuntos([]);
@@ -499,6 +550,7 @@ export default function ModalOTGrupal({
         descripcionGeneral: "",
         descripcionDetallada: "",
         supervisorId: "",
+        encargadoId: "",
         fechaProgramadaInicio: "",
         fechaProgramadaFin: "",
         observaciones: "",
@@ -546,6 +598,7 @@ export default function ModalOTGrupal({
         descripcionGeneral: aviso.descripcion || "",
         descripcionDetallada: "",
         supervisorId: "",
+        encargadoId: "",
         fechaProgramadaInicio: aviso.fechaSugerida || "",
         fechaProgramadaFin: aviso.fechaSugeridaFin || "",
         observaciones: "",
@@ -556,7 +609,30 @@ export default function ModalOTGrupal({
   useEffect(() => {
     if (!isOpen || !aviso?.id) return;
     getTratamientoByAviso(aviso.id)
-      .then((data) => setTratamientoData(data))
+      .then((data) => {
+        setTratamientoData(data);
+        // Para venta: pre-llenar descripcionGeneral desde descripcionVenta del tratamiento
+        const descripcionVenta =
+          data?.requerimientos?.descripcionVenta ||
+          data?.tratamiento?.requerimientos?.descripcionVenta;
+        if (aviso?.tipoAviso === "venta" && descripcionVenta) {
+          setFormData((prev) => ({
+            ...prev,
+            descripcionGeneral: descripcionVenta,
+          }));
+        }
+        // Calculamos directo desde `data` para evitar stale closures con los useMemo
+        const compraArr =
+          data?.solicitudesCompra ||
+          data?.tratamiento?.solicitudesCompra ||
+          [];
+        const almacenArr =
+          data?.solicitudesAlmacen ||
+          data?.tratamiento?.solicitudesAlmacen ||
+          [];
+        setSolicitudesCompraOT(buildInitialSolicitudesCompra(compraArr));
+        setSolicitudesAlmacenOT(mapSolicitudesAlmacenToModalValue(almacenArr));
+      })
       .catch((err) => {
         console.error("[OTGrupal] Error cargando tratamiento:", err);
         setTratamientoData(null);
@@ -564,7 +640,95 @@ export default function ModalOTGrupal({
   }, [isOpen, aviso?.id]);
 
   useEffect(() => {
+    if (!isOpen || !esInstalacion || !tratamientoData || mode !== "create") return;
+    if (tratamientoAplicadoRef.current) return;
+    tratamientoAplicadoRef.current = true;
+
+    // Cargar equipos y ubicaciones del aviso para mostrarlos como referencia
+    if (aviso?.id) {
+      getEquiposDisponiblesPorAviso(aviso.id)
+        .then((resp) => {
+          const equiposList = (resp || []).map((rel) => ({
+            nombre: rel.equipo.nombre || rel.equipo.codigo,
+            tipo: "EQUIPO",
+          }));
+          const ubicacionesList = (aviso?.ubicacionesRelacion || []).map((rel) => {
+            const ut = rel.ubicacionTecnica || rel.ubicacion || {};
+            return { nombre: ut.nombre || ut.codigo || ut.descripcion, tipo: "UBICACION" };
+          });
+          setEquiposAvisoDisplay([...equiposList, ...ubicacionesList]);
+        })
+        .catch(() => {
+          const ubicacionesList = (aviso?.ubicacionesRelacion || []).map((rel) => {
+            const ut = rel.ubicacionTecnica || rel.ubicacion || {};
+            return { nombre: ut.nombre || ut.codigo || ut.descripcion, tipo: "UBICACION" };
+          });
+          setEquiposAvisoDisplay(ubicacionesList);
+        });
+    }
+
+    const teGeneral = (tratamientoData.equipos || []).find(
+      (te) => !te.equipoId && !te.ubicacionTecnicaId
+    );
+    const actividadesOT = (teGeneral?.actividades || []).map((a) =>
+      mkActOT(
+        {
+          id: a.id,
+          planMantenimientoActividadId: a.planMantenimientoActividadId,
+          codigoActividad: a.codigoActividad,
+          sistema: a.sistema,
+          subsistema: a.subsistema,
+          componente: a.componente,
+          tarea: a.tarea,
+          descripcion: a.descripcion,
+          tipoTrabajo: a.tipoTrabajo,
+          rolTecnico: a.rolTecnico,
+          cantidadTecnicos: a.cantidadTecnicos,
+          duracionEstimadaValor: a.duracionEstimadaValor,
+          unidadDuracion: a.unidadDuracion,
+          duracionEstimadaMin: a.duracionEstimadaMin,
+          observaciones: a.observaciones,
+          estado: "PENDIENTE",
+          origen: a.origen || "TRATAMIENTO",
+        },
+        { forceSelected: true, esCorrectivo }
+      )
+    );
+
+    setEquipos([
+      {
+        id: null,
+        equipoId: null,
+        ubicacionTecnicaId: null,
+        equipoNombre: "Instalación",
+        equipoTipo: "Instalación",
+        ubicacionTecnicaNombre: "",
+        ubicacionTecnicaCodigo: "",
+        descripcionEquipo: "",
+        descripcionUbicacion: "",
+        prioridad: "MEDIA",
+        estado: "PENDIENTE",
+        fechaInicioProgramada: "",
+        fechaFinProgramada: "",
+        fechaInicioReal: "",
+        fechaFinReal: "",
+        observacionesEquipo: "",
+        observaciones: "",
+        trabajadoresAsignados: [],
+        trabajadoresData: [],
+        encargadoId: null,
+        planMantenimientoId: null,
+        planMantenimiento: null,
+        actividadesOT,
+        adjuntos: [],
+        subiendoAdjuntos: false,
+      },
+    ]);
+  }, [isOpen, esInstalacion, tratamientoData, mode, esCorrectivo]);
+
+  useEffect(() => {
     if (!isOpen || !aviso?.id || mode !== "create") return;
+    if (esInstalacion) return; // instalación uses a single general block, not per-equipo
     const cargarRegistros = async () => {
       try {
         const equiposResp = await getEquiposDisponiblesPorAviso(aviso.id).catch(() => []);
@@ -645,6 +809,7 @@ export default function ModalOTGrupal({
       mode !== "create" ||
       !tratamientoData ||
       !equipos.length ||
+      esInstalacion ||
       tratamientoAplicadoRef.current
     ) return;
 
@@ -921,171 +1086,67 @@ export default function ModalOTGrupal({
     }
   };
 
-  const handleGuardarSolicitudesCompraDesdeOT = async (result) => {
-    try {
-      setGuardandoSolicitudCompra(true);
-      const tratamientoId = tratamiento?.id || tratamientoData?.id;
-      if (!tratamientoId) throw new Error("No se encontró el tratamiento");
+ const handleGuardarSolicitudesCompraDesdeOT = (result) => {
+  setSolicitudesCompraOT(result);
+  setShowSolicitudCompraModal(false);
+};
 
-      const generalExistente = solicitudesCompraArr.find((s) => s?.esGeneral === true) || null;
-      const individualesExistentes = solicitudesCompraArr.filter((s) => !s?.esGeneral);
+  const handleGuardarSolicitudesAlmacenDesdeOT = (result) => {
+  setSolicitudesAlmacenOT(result);
+  setShowSolicitudAlmacenModal(false);
+};
 
-      if (result?.solicitudGeneral && !isSolicitudVacia(result.solicitudGeneral)) {
-        if (generalExistente) {
-          await updateSolicitudCompra(
-            generalExistente.id,
-            buildSolicitudCompraUpdatePayload(result.solicitudGeneral)
-          );
-        } else {
-          await createSolicitudCompra(
-            buildSolicitudCompraCreatePayload(result.solicitudGeneral, {
-              esGeneral: true,
-              equipo_id: null,
-              ubicacion_tecnica_id: null,
-            })
-          );
-        }
-      }
 
-      const formsPorEquipo = result?.solicitudesPorEquipo || {};
-      for (const [key, form] of Object.entries(formsPorEquipo)) {
-        if (!form || isSolicitudVacia(form)) continue;
-        const existente = individualesExistentes.find(
-          (s) => String(s.equipo_id || s.ubicacion_tecnica_id || "") === String(key)
-        );
-        if (existente) {
-          await updateSolicitudCompra(existente.id, buildSolicitudCompraUpdatePayload(form));
-        } else {
-          const meta = getTargetMeta(key);
-          await createSolicitudCompra(
-            buildSolicitudCompraCreatePayload(form, {
-              esGeneral: false,
-              equipo_id: meta.equipo_id,
-              ubicacion_tecnica_id: meta.ubicacion_tecnica_id,
-            })
-          );
-        }
-      }
-
-      const updated = await getTratamientoByAviso(aviso.id);
-      setTratamientoData(updated);
-      setShowSolicitudCompraModal(false);
-    } catch (error) {
-      console.error("Error guardando solicitudes de compra:", error);
-      alert(
-        error?.response?.data?.message ||
-          error?.response?.data?.errors?.[0] ||
-          error?.message ||
-          "Error al guardar solicitudes de compra"
-      );
-    } finally {
-      setGuardandoSolicitudCompra(false);
-    }
-  };
-
-  const handleGuardarSolicitudesAlmacenDesdeOT = async (result) => {
-    try {
-      setGuardandoSolicitudAlmacen(true);
-      const tratamientoId = tratamiento?.id || tratamientoData?.id;
-      if (!tratamientoId) throw new Error("No se encontró el tratamiento");
-
-      const generalExistente = solicitudesAlmacenArr.find((s) => s?.esGeneral === true) || null;
-      const individualesExistentes = solicitudesAlmacenArr.filter((s) => !s?.esGeneral);
-
-      if (result?.solicitudGeneral && !isSolicitudVacia(result.solicitudGeneral)) {
-        if (generalExistente) {
-          await updateSolicitudAlmacen(
-            generalExistente.id,
-            buildSolicitudAlmacenUpdatePayload(result.solicitudGeneral)
-          );
-        } else {
-          await createSolicitudAlmacen(
-            buildSolicitudAlmacenCreatePayload(result.solicitudGeneral, {
-              tratamiento_id: tratamientoId,
-              esGeneral: true,
-              equipo_id: null,
-              ubicacion_tecnica_id: null,
-            })
-          );
-        }
-      }
-
-      const formsPorEquipo = result?.solicitudesPorEquipo || {};
-      for (const [key, form] of Object.entries(formsPorEquipo)) {
-        if (!form || isSolicitudVacia(form)) continue;
-        const existente = individualesExistentes.find(
-          (s) => String(s.equipo_id || s.ubicacion_tecnica_id || "") === String(key)
-        );
-        if (existente) {
-          await updateSolicitudAlmacen(existente.id, buildSolicitudAlmacenUpdatePayload(form));
-        } else {
-          const meta = getTargetMeta(key);
-          await createSolicitudAlmacen(
-            buildSolicitudAlmacenCreatePayload(form, {
-              tratamiento_id: tratamientoId,
-              esGeneral: false,
-              equipo_id: meta.equipo_id,
-              ubicacion_tecnica_id: meta.ubicacion_tecnica_id,
-            })
-          );
-        }
-      }
-
-      const updated = await getTratamientoByAviso(aviso.id);
-      setTratamientoData(updated);
-      setShowSolicitudAlmacenModal(false);
-    } catch (error) {
-      console.error("Error guardando solicitudes de almacén:", error);
-      alert(
-        error?.response?.data?.message ||
-          error?.response?.data?.errors?.[0] ||
-          error?.message ||
-          "Error al guardar solicitudes de almacén"
-      );
-    } finally {
-      setGuardandoSolicitudAlmacen(false);
-    }
-  };
 
   const handleSubmitInternal = () => {
-    const newErrors = validateOTForm({ formData, equipos, esPreventivo, esCorrectivo });
+    const newErrors = validateOTForm({ formData, equipos, esPreventivo, esCorrectivo, esVenta, esInstalacion });
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
     setMostrarConfirmacion(true);
   };
 
-  const confirmarGuardado = () => {
-    const tratamientoId =
-      initialData?.tratamientoId ||
-      tratamientoData?.id ||
-      tratamientoData?.tratamiento?.id ||
-      null;
+const confirmarGuardado = () => {
+  const tratamientoId =
+    initialData?.tratamientoId ||
+    tratamientoData?.id ||
+    tratamientoData?.tratamiento?.id || null;
 
-    if (!tratamientoId && mode === "create") {
-      alert("Este aviso no tiene tratamiento cargado.");
-      return;
-    }
+  if (!tratamientoId && mode === "create") {
+    alert("Este aviso no tiene tratamiento cargado.");
+    return;
+  }
 
-    const payload = buildOTPayload({
-      numeroOT: numeroOTGenerado,
-      formData,
-      aviso,
-      tratamientoId,
-      equipos,
-      archivosAdjuntos,
-      esPreventivo,
-      mode,
-      initialData,
-    });
+  const otPayload = buildOTPayload({
+    numeroOT: numeroOTGenerado,
+    formData, aviso, tratamientoId,
+    equipos, archivosAdjuntos,
+    esPreventivo, mode, initialData,
+  });
 
-    onGuardar(payload);
-  };
-
+  onGuardar({
+    ...otPayload,
+    tipoAviso: aviso?.tipoAviso || null,
+    ...(esVenta && formData.encargadoId ? { encargadoId: formData.encargadoId } : {}),
+    modo: "GRUPAL",
+    solicitudesCompra: solicitudesCompraOT
+      ? {
+          general: solicitudesCompraOT.solicitudGeneral || null,
+          porEquipo: solicitudesCompraOT.solicitudesPorEquipo || {},
+        }
+      : null,
+    solicitudesAlmacen: solicitudesAlmacenOT
+      ? {
+          general: solicitudesAlmacenOT.solicitudGeneral || null,
+          porEquipo: solicitudesAlmacenOT.solicitudesPorEquipo || {},
+        }
+      : null,
+  });
+};
   if (!isOpen) return null;
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-3">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-3">
         <div className="bg-white rounded-3xl shadow-2xl w-[99vw] max-w-[145rem] h-[97vh] flex flex-col border border-slate-200 overflow-hidden">
 
           {/* ── Header ── */}
@@ -1168,17 +1229,19 @@ export default function ModalOTGrupal({
                     <FieldError message={errors.supervisorId} />
                   </div>
 
-                  <div className="md:col-span-2">
-                    <Label>Descripción General del Trabajo *</Label>
-                    <textarea
-                      name="descripcionGeneral"
-                      value={formData.descripcionGeneral}
-                      onChange={handleChange}
-                      rows={3}
-                      className={textareaClass(errors.descripcionGeneral)}
-                    />
-                    <FieldError message={errors.descripcionGeneral} />
-                  </div>
+                  {!esVenta && (
+                    <div className="md:col-span-2">
+                      <Label>Descripción General del Trabajo *</Label>
+                      <textarea
+                        name="descripcionGeneral"
+                        value={formData.descripcionGeneral}
+                        onChange={handleChange}
+                        rows={3}
+                        className={textareaClass(errors.descripcionGeneral)}
+                      />
+                      <FieldError message={errors.descripcionGeneral} />
+                    </div>
+                  )}
 
                   <div className="md:col-span-2">
                     <Label>Descripción Detallada</Label>
@@ -1192,7 +1255,7 @@ export default function ModalOTGrupal({
                   </div>
 
                   <div>
-                    <Label>Fecha y Hora de Inicio *</Label>
+                    <Label>Fecha y Hora de Inicio Total*</Label>
                     <input
                       type="datetime-local"
                       name="fechaProgramadaInicio"
@@ -1204,7 +1267,7 @@ export default function ModalOTGrupal({
                   </div>
 
                   <div>
-                    <Label>Fecha y Hora de Fin *</Label>
+                    <Label>Fecha y Hora de Fin Total*</Label>
                     <input
                       type="datetime-local"
                       name="fechaProgramadaFin"
@@ -1216,6 +1279,55 @@ export default function ModalOTGrupal({
                   </div>
                 </div>
               </div>
+
+              {/* Cuadro de venta — debajo de Información General */}
+              {esVenta && (
+                <div className="bg-orange-50 rounded-2xl p-6 shadow-sm border border-orange-200">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="p-2.5 rounded-xl bg-orange-500">
+                      <FileText className="w-5 h-5 text-white" />
+                    </div>
+                    <h4 className="text-xl font-semibold text-slate-900">
+                      Tratamiento de Venta
+                    </h4>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Descripción editable */}
+                    <div>
+                      <Label>Descripción del tratamiento *</Label>
+                      <textarea
+                        name="descripcionGeneral"
+                        value={formData.descripcionGeneral}
+                        onChange={handleChange}
+                        rows={4}
+                        placeholder="Descripción del tratamiento de venta..."
+                        className={textareaClass(errors.descripcionGeneral)}
+                      />
+                      <FieldError message={errors.descripcionGeneral} />
+                    </div>
+
+                    {/* Encargado */}
+                    <div>
+                      <Label>Encargado *</Label>
+                      <select
+                        name="encargadoId"
+                        value={formData.encargadoId}
+                        onChange={handleChange}
+                        className={inputClass(errors.encargadoId)}
+                      >
+                        <option value="">Seleccione un encargado</option>
+                        {trabajadores.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.nombre} - {t.cargo || t.rol || "Técnico"}
+                          </option>
+                        ))}
+                      </select>
+                      <FieldError message={errors.encargadoId} />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Registros (equipos / ubicaciones) */}
               {equipos.map((registro, index) => (
@@ -1229,6 +1341,7 @@ export default function ModalOTGrupal({
                   errors={errors}
                   esPreventivo={esPreventivo}
                   esCorrectivo={esCorrectivo}
+                  equiposReferencia={esInstalacion ? equiposAvisoDisplay : []}
                   onOpenDetalleEquipo={setEquipoDetalleModal}
                   onRegistroChange={(field, value) =>
                     handleEquipoChange(index, field, value)
@@ -1388,7 +1501,7 @@ export default function ModalOTGrupal({
         equiposRelacion={aviso?.equiposRelacion || []}
         ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
         equiposInfo={equiposInfo}
-        initialValue={initialSolicitudesCompra}
+        initialValue={solicitudesCompraOT || initialSolicitudesCompra}
       />
 
       <ModalSolicitudAlmacen
@@ -1399,7 +1512,8 @@ export default function ModalOTGrupal({
         equiposRelacion={aviso?.equiposRelacion || []}
         ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
         equiposInfo={equiposInfo}
-        initialValue={initialSolicitudesAlmacen}
+        initialValue={solicitudesAlmacenOT || initialSolicitudesAlmacen}
+        mostrarDestinatario={true}  
       />
 
       {/* Modal de texto (observación / descripción de actividad) */}
@@ -1426,7 +1540,7 @@ export default function ModalOTGrupal({
 
       {/* Confirmación de guardado */}
       {mostrarConfirmacion && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200">
             <h3 className="text-xl font-semibold text-slate-900 mb-2">
               {mode === "edit" ? "¿Confirmar cambios?" : "¿Confirmar creación?"}
@@ -1484,7 +1598,7 @@ function ModalTextoActividad({ titulo, valor, onClose, onGuardar }) {
   const [texto, setTexto] = useState(valor);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[80] p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h3 className="text-base font-semibold text-slate-900">{titulo}</h3>

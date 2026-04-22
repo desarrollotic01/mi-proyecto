@@ -35,20 +35,24 @@ export const toMinutes = (valor, unidad) => {
 export const getRegistroId = (r) => r.equipoId || r.ubicacionTecnicaId || null;
 export const esEquipoRegistro = (r) => !!r.equipoId;
 export const esUbicacionRegistro = (r) => !!r.ubicacionTecnicaId;
+export const esInstalacionRegistro = (r) => !r.equipoId && !r.ubicacionTecnicaId;
 
 export const getRegistroNombre = (r) => {
   if (r.equipoId) return r.equipoNombre || `Equipo ${r.equipoId}`;
-  return r.ubicacionTecnicaNombre || `Ubicación técnica ${r.ubicacionTecnicaId}`;
+  if (r.ubicacionTecnicaId) return r.ubicacionTecnicaNombre || `Ubicación técnica ${r.ubicacionTecnicaId}`;
+  return r.equipoNombre || "Instalación";
 };
 
 export const getRegistroSubtitulo = (r) => {
   if (r.equipoId) return r.equipoTipo || "Equipo";
-  return r.ubicacionTecnicaCodigo || "Ubicación técnica";
+  if (r.ubicacionTecnicaId) return r.ubicacionTecnicaCodigo || "Ubicación técnica";
+  return r.equipoTipo || "General";
 };
 
 export const getRegistroLabel = (r) => {
   if (r.equipoId) return "Equipo";
-  return "Ubicación técnica";
+  if (r.ubicacionTecnicaId) return "Ubicación técnica";
+  return "Instalación";
 };
 
 export const getRolLabel = (value) =>

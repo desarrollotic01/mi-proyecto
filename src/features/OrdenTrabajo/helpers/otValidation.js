@@ -9,6 +9,8 @@ export const validateOTForm = ({
   equipos,
   esPreventivo,
   esCorrectivo,
+  esVenta = false,
+  esInstalacion = false,
 }) => {
   const newErrors = {};
 
@@ -18,6 +20,10 @@ export const validateOTForm = ({
 
   if (!formData.supervisorId) {
     newErrors.supervisorId = "El supervisor es requerido";
+  }
+
+  if (esVenta && !formData.encargadoId) {
+    newErrors.encargadoId = "El encargado es requerido para OT de venta";
   }
 
   if (!formData.fechaProgramadaInicio) {
@@ -35,10 +41,14 @@ export const validateOTForm = ({
     }
   }
 
+  // Para venta no se validan equipos (son opcionales y sin personal por equipo)
+  if (esVenta) return newErrors;
+
   equipos.forEach((equipo, index) => {
-    const descripcionTrabajo = equipo.equipoId
-      ? equipo.descripcionEquipo
-      : equipo.descripcionUbicacion;
+    const esRegistroInstalacion = !equipo.equipoId && !equipo.ubicacionTecnicaId;
+    const descripcionTrabajo = (!esInstalacion && !esRegistroInstalacion && !equipo.equipoId)
+      ? equipo.descripcionUbicacion
+      : equipo.descripcionEquipo;
 
     if (!descripcionTrabajo?.trim()) {
       newErrors[`equipo_${index}_descripcion`] =

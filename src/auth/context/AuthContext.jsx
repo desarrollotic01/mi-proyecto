@@ -1,33 +1,31 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { loginRequest, meRequest } from "../services/authService";
+import { loginRequest, meRequest, logoutRequest } from "../services/authService";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [permisos, setPermisos] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem("token");
-
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+      if (!token) { setLoading(false); return; }
 
       try {
-        // 🔐 Siempre validar token en backend
-        const data = await meRequest(token);
-        const userData = data.user || data.usuario || data;
+        const data = await meRequest();
+        const userData = data.data || data;
+        const userPermisos = userData.rol?.permisos?.map(p => p.nombre) || [];
 
         setUser(userData);
+        setPermisos(userPermisos);
         localStorage.setItem("user", JSON.stringify(userData));
-      } catch (error) {
-        // ❌ Token inválido o expirado
+      } catch {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         setUser(null);
+        setPermisos([]);
       } finally {
         setLoading(false);
       }
@@ -36,23 +34,33 @@ export function AuthProvider({ children }) {
     initAuth();
   }, []);
 
-  const login = async (alias, password) => {
-    const data = await loginRequest(alias, password);
-
+  const login = async (usuario, contraseña) => {
+    const data = await loginRequest(usuario, contraseña);
     localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(data.usuario));
 
-    setUser(data.usuario);
+    // Cargar perfil completo con permisos
+    const me = await meRequest();
+    const userData = me.data || me;
+    const userPermisos = userData.rol?.permisos?.map(p => p.nombre) || [];
+
+    setUser(userData);
+    setPermisos(userPermisos);
+    localStorage.setItem("user", JSON.stringify(userData));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await logoutRequest();
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setUser(null);
+    setPermisos([]);
   };
 
+  // Verificar si el usuario tiene un permiso específico
+  const hasPermiso = (permiso) => permisos.includes("all_access") || permisos.includes(permiso);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, permisos, loading, login, logout, hasPermiso }}>
       {children}
     </AuthContext.Provider>
   );

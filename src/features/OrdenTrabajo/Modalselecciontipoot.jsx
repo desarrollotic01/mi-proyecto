@@ -42,15 +42,6 @@ export default function ModalSeleccionTipoOT({
             onClick={() => onSeleccionar("individual")}
           />
 
-          {/* OT MIXTA */}
-          <TipoCard
-            icon={Layers}
-            title="OT Mixta"
-            description="Combina múltiples equipos o actividades dentro de una misma OT."
-            color="purple"
-            onClick={() => onSeleccionar("mixto")}
-          />
-
           {/* OT GRUPAL */}
           <TipoCard
             icon={Users}

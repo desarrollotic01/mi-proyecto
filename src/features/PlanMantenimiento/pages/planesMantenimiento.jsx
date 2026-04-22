@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import { planMantenimientoService } from "../services/planMantenimientoService";
 import {
   Plus,
@@ -8,6 +9,7 @@ import {
   Search,
   Filter,
   BadgeCheck,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import ModalCrearPlan from "../components/ModalCrearPlan";
@@ -111,13 +113,39 @@ export default function PlanesMantenimiento() {
               </h1>
               <p className="text-slate-600 ml-16">Gestiona y organiza tus planes de mantenimiento</p>
             </div>
-            <button
-              onClick={() => setMostrarModalCrear(true)}
-              className="self-start lg:self-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/30 transition-all duration-200 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5"
-            >
-              <Plus size={20} strokeWidth={2.5} />
-              <span className="font-semibold">Nuevo Plan</span>
-            </button>
+            <div className="flex items-center gap-3 self-start lg:self-auto">
+              <button
+                onClick={() => {
+                  const data = planesFiltrados.map((p) => ({
+                    Código: p.codigoPlan || "",
+                    Nombre: p.nombre || "",
+                    Tipo: p.tipo || "",
+                    "Modelo Equipo": p.modeloEquipo || "",
+                    "Tipo Equipo": p.tipoEquipo || "",
+                    Equipos: getEquiposLabel(p),
+                    Estado: p.activo ? "Activo" : "Inactivo",
+                    Específico: p.esEspecifico ? "Sí" : "No",
+                    "Fecha Creación": p.createdAt ? new Date(p.createdAt).toLocaleDateString("es-PE") : "",
+                    Actividades: (p.actividades || []).length,
+                  }));
+                  const ws = XLSX.utils.json_to_sheet(data);
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, "Planes");
+                  XLSX.writeFile(wb, `Planes_Mantenimiento_${new Date().toISOString().slice(0,10)}.xlsx`);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-all duration-200 font-semibold"
+              >
+                <FileSpreadsheet size={18} />
+                Exportar Excel
+              </button>
+              <button
+                onClick={() => setMostrarModalCrear(true)}
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/30 transition-all duration-200 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5"
+              >
+                <Plus size={20} strokeWidth={2.5} />
+                <span className="font-semibold">Nuevo Plan</span>
+              </button>
+            </div>
           </div>
 
           {/* STATS */}

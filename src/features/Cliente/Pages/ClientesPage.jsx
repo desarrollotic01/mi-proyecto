@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import * as XLSX from "xlsx";
 import {
   Search,
   AlertCircle,
@@ -10,32 +11,35 @@ import {
   FileSpreadsheet,
   Users,
   Building2,
-  Eye // Importamos el icono de ojo para el detalle
+  Eye,
+  Download,
+  ChevronDown,
+  ChevronRight as ChevronRightIcon,
+  Mail,
+  Phone,
+  User,
 } from "lucide-react";
 
 import { clienteService } from "../../mantenimiento/services/clienteService.js";
 
-import ContactosModal from "../Components/ContactosModal.jsx";
 import PortalModal from "../Components/PortalModal.jsx";
 import GestionarSedeModal from "../Components/GestionarSedeModal.jsx";
-// 1. IMPORTA TU NUEVO MODAL AQUÍ
-import ClienteDetailModal from "../Components/ClienteDetailModal.jsx"; 
+import ClienteDetailModal from "../Components/ClienteDetailModal.jsx";
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState([]);
-  
-  // 2. ESTADOS PARA EL MODAL DE DETALLE
+
   const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [selectedClienteInfo, setSelectedClienteInfo] = useState(null);
 
   const [portalModalOpen, setPortalModalOpen] = useState(false);
   const [selectedClientePortal, setSelectedClientePortal] = useState(null);
 
-  const [contactosModalOpen, setContactosModalOpen] = useState(false);
-  const [selectedClienteContactos, setSelectedClienteContactos] = useState(null);
-
   const [sedesModalOpen, setSedesModalOpen] = useState(false);
   const [selectedClienteSedes, setSelectedClienteSedes] = useState(null);
+
+  // Contactos expandidos inline
+  const [expandedContactos, setExpandedContactos] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterEstado, setFilterEstado] = useState("Todos");
@@ -65,8 +69,71 @@ export default function ClientesPage() {
       setError("Error al cargar los clientes. Verifica que el backend esté corriendo.");
       console.error(err);
     } finally {
-      loading(false);
+      setLoading(false);
     }
+  };
+
+  const exportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // ── Hoja 1: Clientes ──
+    const filasClientes = filteredClientes.map((c, i) => ({
+      "#": i + 1,
+      "SAP Code": c.sapCode || "",
+      "Razón Social": c.razonSocial || "",
+      "RUC": c.ruc || "",
+      "Dirección": c.direccion || "",
+      "Teléfono": c.telefono || "",
+      "Correo": c.correo || "",
+      "Tipo Cliente": c.tipoCliente || "",
+      "Estado": c.estado || "",
+      "Activo SAP": c.activoSAP ? "Sí" : "No",
+      "N° Contactos": Array.isArray(c.contactos) ? c.contactos.length : 0,
+      "Creado": c.createdAt ? new Date(c.createdAt).toLocaleString("es-PE") : "",
+      "Actualizado": c.updatedAt ? new Date(c.updatedAt).toLocaleString("es-PE") : "",
+    }));
+    const wsClientes = XLSX.utils.json_to_sheet(filasClientes);
+    wsClientes["!cols"] = Object.keys(filasClientes[0] || {}).map((key) => ({
+      wch: Math.max(key.length, ...filasClientes.map((r) => String(r[key] || "").length)) + 2,
+    }));
+    XLSX.utils.book_append_sheet(wb, wsClientes, "Clientes");
+
+    // ── Hoja 2: Contactos ──
+    const filasContactos = [];
+    filteredClientes.forEach((c) => {
+      const contactos = Array.isArray(c.contactos) ? c.contactos : [];
+      if (contactos.length === 0) {
+        filasContactos.push({
+          "SAP Code": c.sapCode || "",
+          "Razón Social": c.razonSocial || "",
+          "Nombre Contacto": "",
+          "Cargo": "",
+          "Correo Contacto": "",
+          "Teléfono Contacto": "",
+          "Estado Contacto": "",
+        });
+      } else {
+        contactos.forEach((ct) => {
+          filasContactos.push({
+            "SAP Code": c.sapCode || "",
+            "Razón Social": c.razonSocial || "",
+            "Nombre Contacto": ct.nombre || "",
+            "Cargo": ct.cargo || "",
+            "Correo Contacto": ct.correo || "",
+            "Teléfono Contacto": ct.telefono || "",
+            "Estado Contacto": ct.activo !== false ? "Activo" : "Inactivo",
+          });
+        });
+      }
+    });
+    const wsContactos = XLSX.utils.json_to_sheet(filasContactos);
+    wsContactos["!cols"] = Object.keys(filasContactos[0] || {}).map((key) => ({
+      wch: Math.max(key.length, ...filasContactos.map((r) => String(r[key] || "").length)) + 2,
+    }));
+    XLSX.utils.book_append_sheet(wb, wsContactos, "Contactos");
+
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `clientes_${fecha}.xlsx`);
   };
 
   const formatDate = (value) => {
@@ -220,6 +287,17 @@ export default function ClientesPage() {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 Recargar
               </button>
+
+              <button
+                onClick={exportToExcel}
+                disabled={filteredClientes.length === 0}
+                className="px-4 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-semibold flex items-center gap-2 transition-colors"
+                type="button"
+                title={`Exportar ${filteredClientes.length} cliente${filteredClientes.length !== 1 ? "s" : ""} a Excel`}
+              >
+                <Download className="w-4 h-4" />
+                Exportar Excel ({filteredClientes.length})
+              </button>
             </div>
           </div>
         </div>
@@ -257,7 +335,8 @@ export default function ClientesPage() {
                   </tr>
                 ) : (
                   currentItems.map((c, index) => (
-                    <tr key={c.id} className="odd:bg-white even:bg-gray-50 hover:bg-blue-50 transition-colors border-b border-gray-100">
+                    <React.Fragment key={c.id}>
+                    <tr className={`transition-colors border-b border-gray-100 ${expandedContactos === c.id ? "bg-blue-50" : "odd:bg-white even:bg-gray-50 hover:bg-blue-50"}`}>
                       
                       {/* 4. BOTÓN PARA ABRIR LA FICHA MODERNA */}
                       <td className="px-4 py-3 border-r border-gray-100 text-center">
@@ -319,14 +398,20 @@ export default function ClientesPage() {
 
                       <td className="px-4 py-3 border-r border-gray-100 text-center">
                         <button
-                          onClick={() => {
-                            setSelectedClienteContactos(c);
-                            setContactosModalOpen(true);
-                          }}
-                          className="inline-flex items-center justify-center px-3 py-2 text-blue-600 hover:bg-blue-100 rounded-lg font-semibold gap-2"
+                          onClick={() => setExpandedContactos((prev) => prev === c.id ? null : c.id)}
+                          className={`inline-flex items-center justify-center px-3 py-2 rounded-lg font-semibold gap-1.5 transition-colors ${
+                            expandedContactos === c.id
+                              ? "bg-blue-600 text-white"
+                              : "text-blue-600 hover:bg-blue-100"
+                          }`}
                           type="button"
                         >
-                          <Users size={16} /> Ver ({Array.isArray(c.contactos) ? c.contactos.length : 0})
+                          {expandedContactos === c.id
+                            ? <ChevronDown size={15} />
+                            : <ChevronRightIcon size={15} />
+                          }
+                          <Users size={15} />
+                          ({Array.isArray(c.contactos) ? c.contactos.length : 0})
                         </button>
                       </td>
 
@@ -356,6 +441,100 @@ export default function ClientesPage() {
                         </button>
                       </td>
                     </tr>
+
+                    {/* ── Fila expandida: Contactos ── */}
+                    {expandedContactos === c.id && (
+                      <tr key={`${c.id}-contactos`} className="bg-blue-50/60 border-b border-blue-100">
+                        <td colSpan={16} className="px-6 pb-5 pt-2">
+                          <div className="rounded-2xl border border-blue-100 overflow-hidden shadow-sm bg-white">
+                            {/* Cabecera */}
+                            <div className="flex items-center gap-2 px-4 py-3 bg-blue-600">
+                              <Users size={16} className="text-white" />
+                              <p className="text-sm font-bold text-white">
+                                Contactos de {c.razonSocial || "este cliente"}
+                              </p>
+                              <span className="ml-auto text-xs font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">
+                                {Array.isArray(c.contactos) ? c.contactos.length : 0} contacto{(Array.isArray(c.contactos) ? c.contactos.length : 0) !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+
+                            {/* Lista de contactos */}
+                            {!Array.isArray(c.contactos) || c.contactos.length === 0 ? (
+                              <div className="text-center py-8 text-gray-400">
+                                <Users size={32} className="mx-auto mb-2 opacity-30" />
+                                <p className="text-sm">No hay contactos registrados</p>
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                      <th className="px-4 py-2.5 text-left">Nombre</th>
+                                      <th className="px-4 py-2.5 text-left">Cargo</th>
+                                      <th className="px-4 py-2.5 text-left">Correo</th>
+                                      <th className="px-4 py-2.5 text-left">Teléfono</th>
+                                      <th className="px-4 py-2.5 text-center">Estado</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {c.contactos.map((ct, idx) => (
+                                      <tr key={ct.id || idx} className="hover:bg-blue-50/40 transition-colors">
+                                        <td className="px-4 py-3">
+                                          <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                              <User size={13} className="text-blue-600" />
+                                            </div>
+                                            <span className="font-semibold text-gray-900">{ct.nombre || "—"}</span>
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-600 text-[13px]">{ct.cargo || "—"}</td>
+                                        <td className="px-4 py-3">
+                                          {ct.correo ? (
+                                            <a
+                                              href={`mailto:${ct.correo}`}
+                                              className="flex items-center gap-1.5 text-blue-600 hover:underline text-[13px]"
+                                            >
+                                              <Mail size={13} />
+                                              {ct.correo}
+                                            </a>
+                                          ) : (
+                                            <span className="text-gray-400 text-[13px]">—</span>
+                                          )}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          {ct.telefono ? (
+                                            <div className="flex items-center gap-1.5 text-[13px] text-gray-700">
+                                              <Phone size={13} className="text-gray-400 shrink-0" />
+                                              {ct.telefono.split(",").map((n, i) => (
+                                                <span key={i} className={i > 0 ? "text-gray-400" : "font-medium"}>
+                                                  {i > 0 ? "· " : ""}{n.trim()}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-gray-400 text-[13px]">—</span>
+                                          )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                                            ct.activo !== false
+                                              ? "bg-green-100 text-green-700 border-green-200"
+                                              : "bg-gray-100 text-gray-500 border-gray-200"
+                                          }`}>
+                                            {ct.activo !== false ? "Activo" : "Inactivo"}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   ))
                 )}
               </tbody>
@@ -384,7 +563,6 @@ export default function ClientesPage() {
         </div>
       </div>
 
-      {/* 5. RENDERIZA EL MODAL DE FICHA TÉCNICA */}
       <ClienteDetailModal
         isOpen={infoModalOpen}
         onClose={() => setInfoModalOpen(false)}
@@ -395,12 +573,6 @@ export default function ClientesPage() {
         isOpen={portalModalOpen}
         onClose={() => setPortalModalOpen(false)}
         cliente={selectedClientePortal}
-      />
-
-      <ContactosModal
-        isOpen={contactosModalOpen}
-        onClose={() => setContactosModalOpen(false)}
-        cliente={selectedClienteContactos}
       />
 
       <GestionarSedeModal

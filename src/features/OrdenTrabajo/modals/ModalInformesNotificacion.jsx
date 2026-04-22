@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X, FileText, Loader2, CheckCircle2, Package, MapPinned } from "lucide-react";
+import { X, FileText, Loader2, CheckCircle2, Package, MapPinned, Table2 } from "lucide-react";
+import AdjuntosViewer from "../../adjuntos/components/AdjuntosViewer";
 import {
   getNotificacionesByOT,
   abrirPdfNotificacion,
+  abrirPdfCombinadoOT,
 } from "../services/notificacionService";
+import ModalResumenOT from "./ModalResumenOT";
 
 const getRegistroLabel = (n) => {
   const eqOT = n?.equipoOT;
@@ -76,6 +79,7 @@ export default function ModalInformesNotificacion({
 }) {
   const [loading, setLoading] = useState(false);
   const [notificaciones, setNotificaciones] = useState([]);
+  const [showResumen, setShowResumen] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !ordenTrabajoId) return;
@@ -264,6 +268,17 @@ export default function ModalInformesNotificacion({
                       </div>
                     )}
 
+                    {/* Adjuntos de la notificación */}
+                    {Array.isArray(n.adjuntos) && n.adjuntos.length > 0 && (
+                      <div className="mt-3">
+                        <AdjuntosViewer
+                          adjuntos={n.adjuntos}
+                          titulo="Documentos adjuntos"
+                          compact
+                        />
+                      </div>
+                    )}
+
                     <div className="mt-3 flex items-center gap-2 text-xs text-emerald-700 font-semibold">
                       <CheckCircle2 className="w-4 h-4" />
                       Informe disponible para abrir
@@ -275,16 +290,43 @@ export default function ModalInformesNotificacion({
           )}
         </div>
 
-        <div className="px-6 py-4 bg-white border-t border-slate-200 flex justify-end">
+        <div className="px-6 py-4 bg-white border-t border-slate-200 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => abrirPdfCombinadoOT(ordenTrabajoId)}
+            disabled={notificaciones.length === 0}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 text-white font-bold text-sm hover:bg-slate-900 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <FileText className="w-4 h-4" />
+            PDF Completo
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowResumen(true)}
+            disabled={notificaciones.length === 0}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-800 text-white font-bold text-sm hover:bg-blue-900 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Table2 className="w-4 h-4" />
+            Tabla repuestos para cambio
+          </button>
+
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-50"
+            className="ml-auto px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-50"
           >
             Cerrar
           </button>
         </div>
       </div>
+
+      <ModalResumenOT
+        isOpen={showResumen}
+        onClose={() => setShowResumen(false)}
+        ordenTrabajoId={ordenTrabajoId}
+        numeroOT={numeroOT}
+      />
     </div>
   );
 }

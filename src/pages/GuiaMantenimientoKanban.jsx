@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { guiaMantenimientoService } from "../features/GuiaMantenimiento/services/guiaMantenimientoService";
+import GanttGuias from "../features/GuiaMantenimiento/Components/GanttGuias";
 import {
   LayoutGrid,
   Search,
@@ -447,6 +448,7 @@ export default function GuiasMantenimientoKanban() {
   const [guias, setGuias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState("gantt"); // "kanban" | "gantt"
 
   const [q, setQ] = useState("");
   const [fEstado, setFEstado] = useState("TODOS");
@@ -632,17 +634,36 @@ export default function GuiasMantenimientoKanban() {
             </div>
           </div>
 
-          <button
-            onClick={() => cargarGuias(true)}
-            className="
-              flex items-center gap-2 px-4 py-2 rounded-xl
-              bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold
-              border border-slate-200 transition
-            "
-          >
-            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-            Actualizar
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Toggle Kanban / Gantt */}
+            <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200">
+              {[["kanban", "⊞ Kanban"], ["gantt", "📊 Gantt"]].map(([mode, label]) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    viewMode === mode
+                      ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => cargarGuias(true)}
+              className="
+                flex items-center gap-2 px-4 py-2 rounded-xl
+                bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold
+                border border-slate-200 transition
+              "
+            >
+              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+              Actualizar
+            </button>
+          </div>
         </div>
 
         {/* stats */}
@@ -711,8 +732,15 @@ export default function GuiasMantenimientoKanban() {
         </div>
       </div>
 
+      {/* GANTT VIEW */}
+      {viewMode === "gantt" && (
+        <div className="flex-1 overflow-auto p-4">
+          <GanttGuias guias={guiasFiltradas} />
+        </div>
+      )}
+
       {/* KANBAN */}
-      <div className="flex-1 overflow-hidden p-4">
+      {viewMode === "kanban" && <div className="flex-1 overflow-hidden p-4">
         <div className="h-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           {ESTADOS_GUIA.map((estadoKey) => {
             const cfg = ESTADOS_COLUMNA[estadoKey] || ESTADOS_COLUMNA.creado;
@@ -767,7 +795,7 @@ export default function GuiasMantenimientoKanban() {
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {/* MODAL */}
       {guiaSeleccionada && (

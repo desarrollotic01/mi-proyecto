@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import {
   Search, Plus, Edit2, Trash2, RefreshCw, MapPin, Loader2,
-  Building2, Globe, Truck, FileText, Calendar, Tag, Box, Zap, Package
+  Building2, Globe, Truck, FileText, Calendar, Tag, Box, Zap, Package, FileSpreadsheet
 } from "lucide-react";
+import ModalImportMasivo from "../../../components/inputs/ModalImportMasivo";
 
 import UbicacionTecnicaModal from "../Components/UbicacionTecnicaModal";
 import { UbicacionTecnicaService } from "../../mantenimiento/services/ubicacionService";
@@ -28,7 +30,8 @@ export default function UbicacionesTecnicasPage() {
   const [items, setItems] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  
+  const [importOpen, setImportOpen] = useState(false);
+
   // 🆕 Estados para el PDF
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pdfData, setPdfData] = useState(null);
@@ -120,8 +123,43 @@ export default function UbicacionesTecnicasPage() {
              <button onClick={loadAllData} className="p-2 sm:p-2.5 text-slate-400 hover:text-blue-600 transition-colors border border-transparent hover:border-slate-200 rounded-lg bg-slate-50 hover:bg-white shrink-0">
                <RefreshCw size={18} className={loading ? "animate-spin" : ""}/>
              </button>
+             <button
+               onClick={() => {
+                 const data = filtered.map((u) => {
+                   const cli = clientes.find(c => String(c.id) === String(u.clienteId));
+                   const p = paises.find(p => String(p.id) === String(u.paisId));
+                   return {
+                     Código: u.codigo || "",
+                     Nombre: u.nombre || "",
+                     "ID Placa": u.idPlaca || "",
+                     "N° OV": u.numeroOV || "",
+                     Especialidad: u.especialidad || "",
+                     Almacén: u.almacen || "",
+                     "Tipo Propiedad": u.tipoEquipoPropiedad || "",
+                     Cliente: cli?.nombre || cli?.razonSocial || "",
+                     País: p?.nombre || "",
+                     "Fecha Instalación": fmtDate(u.fechaInstalacion),
+                     "Fecha Garantía": fmtDate(u.fechaGarantia),
+                   };
+                 });
+                 const ws = XLSX.utils.json_to_sheet(data);
+                 const wb = XLSX.utils.book_new();
+                 XLSX.utils.book_append_sheet(wb, ws, "Ubicaciones");
+                 XLSX.writeFile(wb, `Ubicaciones_${new Date().toISOString().slice(0,10)}.xlsx`);
+               }}
+               className="bg-indigo-600 text-white px-4 sm:px-5 py-2.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all uppercase tracking-wider flex-1 sm:flex-none"
+             >
+               <FileSpreadsheet size={16} strokeWidth={3} className="shrink-0"/>
+               <span className="hidden sm:inline">EXPORTAR EXCEL</span>
+               <span className="sm:hidden">EXPORTAR</span>
+             </button>
+             <button onClick={() => setImportOpen(true)} className="bg-emerald-600 text-white px-4 sm:px-5 py-2.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition-all uppercase tracking-wider flex-1 sm:flex-none">
+               <FileSpreadsheet size={16} strokeWidth={3} className="shrink-0"/>
+               <span className="hidden sm:inline">IMPORTAR EXCEL</span>
+               <span className="sm:hidden">EXCEL</span>
+             </button>
              <button onClick={() => { setEditing(null); setModalOpen(true); }} className="bg-blue-600 text-white px-4 sm:px-5 py-2.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 hover:bg-blue-700 transition-all uppercase tracking-wider flex-1 sm:flex-none">
-               <Plus size={16} strokeWidth={3} className="shrink-0"/> 
+               <Plus size={16} strokeWidth={3} className="shrink-0"/>
                <span className="hidden sm:inline">NUEVO REGISTRO</span>
                <span className="sm:hidden">NUEVO</span>
              </button>
@@ -145,121 +183,80 @@ export default function UbicacionesTecnicasPage() {
           />
         </div>
 
-        {/* TABLA RESPONSIVA */}
+        {/* TABLA EXCEL-STYLE */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm w-full overflow-hidden">
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left text-[11px] border-collapse min-w-[1024px]">
+            <table className="w-full text-[11px] border-collapse min-w-[1400px]">
               <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-black uppercase tracking-widest text-[9px]">
-                  <th className="px-4 py-4 w-10 text-center">#</th>
-                  <th className="px-4 py-4">Identificación</th>
-                  <th className="px-4 py-4">Datos del Equipo</th>
-                  <th className="px-4 py-4">Cliente / Ubicación</th>
-                  <th className="px-4 py-4">Logística</th>
-                  <th className="px-4 py-4">Comercial / Fechas</th>
-                  <th className="px-4 py-4 text-right pr-6">Acciones</th>
+                <tr className="bg-slate-800 text-white text-[10px] font-bold uppercase tracking-wider">
+                  <th className="px-2 py-2.5 border border-slate-700 text-center w-8">#</th>
+                  <th className="px-3 py-2.5 border border-slate-700">Código</th>
+                  <th className="px-3 py-2.5 border border-slate-700">Placa / ID</th>
+                  <th className="px-3 py-2.5 border border-slate-700">Propiedad</th>
+                  <th className="px-3 py-2.5 border border-slate-700 min-w-[160px]">Nombre</th>
+                  <th className="px-3 py-2.5 border border-slate-700">Especialidad</th>
+                  <th className="px-3 py-2.5 border border-slate-700 min-w-[140px]">Cliente</th>
+                  <th className="px-3 py-2.5 border border-slate-700">Sede</th>
+                  <th className="px-3 py-2.5 border border-slate-700">País</th>
+                  <th className="px-3 py-2.5 border border-slate-700">Almacén</th>
+                  <th className="px-3 py-2.5 border border-slate-700">Operador</th>
+                  <th className="px-3 py-2.5 border border-slate-700">OV</th>
+                  <th className="px-3 py-2.5 border border-slate-700">OC</th>
+                  <th className="px-3 py-2.5 border border-slate-700 whitespace-nowrap">Entrega Real</th>
+                  <th className="px-3 py-2.5 border border-slate-700 whitespace-nowrap">Fin Garantía</th>
+                  <th className="px-3 py-2.5 border border-slate-700 text-center">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((item, idx) => {
-                  const cli = clientes.find(c => String(c.id) === String(item.clienteId));
-                  const pFound = paises.find(p => String(p.id) === String(item.paisId));
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-4 py-5 text-center text-slate-300 font-mono text-[10px] align-top pt-6">{idx + 1}</td>
-
-                      {/* IDENTIFICACIÓN */}
-                      <td className="px-4 py-5 align-top">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="text-[10px]"><span className="font-bold text-slate-400">CÓDIGO:</span> <span className="font-black text-blue-600 text-[11px] ml-1">{val(item.codigo)}</span></div>
-                          <div className="text-[10px]"><span className="font-bold text-slate-400">PLACA:</span> <span className="text-slate-700 font-bold ml-1">{val(item.idPlaca)}</span></div>
-                          <div className="text-[10px]"><span className="font-bold text-slate-400">PROPIEDAD:</span> <span className="text-slate-700 font-bold ml-1 uppercase">{val(item.tipoEquipoPropiedad)}</span></div>
-                        </div>
-                      </td>
-
-                      {/* DATOS DEL EQUIPO */}
-                      <td className="px-4 py-5 align-top max-w-[220px]">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="font-black text-slate-800 uppercase text-[11px] mb-0.5 leading-tight whitespace-normal">{val(item.nombre)}</div>
-                          <div className="text-[10px]"><span className="font-bold text-slate-400">ESPEC:</span> <span className="text-blue-600 font-bold ml-1">{val(item.especialidad)}</span></div>
-                          <div className="text-[10px] mt-0.5 flex">
-                             <span className="font-bold text-slate-400 mr-1">DESC:</span> 
-                             <span className="text-slate-500 italic line-clamp-2 leading-tight flex-1">{val(item.descripcion)}</span>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan="16" className="p-10 text-center text-slate-400 font-bold border border-slate-100">
+                      Sin registros
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((item, idx) => {
+                    const cli = clientes.find(c => String(c.id) === String(item.clienteId));
+                    const pFound = paises.find(p => String(p.id) === String(item.paisId));
+                    return (
+                      <tr key={item.id}
+                        className={`transition-colors hover:bg-blue-50 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
+                        <td className="px-2 py-2 border border-slate-200 text-center text-slate-400 font-mono">{idx + 1}</td>
+                        <td className="px-3 py-2 border border-slate-200 font-black text-blue-700">{val(item.codigo)}</td>
+                        <td className="px-3 py-2 border border-slate-200 font-semibold text-slate-700">{val(item.idPlaca)}</td>
+                        <td className="px-3 py-2 border border-slate-200">
+                          <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold">
+                            {val(item.tipoEquipoPropiedad)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 border border-slate-200 font-bold text-slate-800">{val(item.nombre)}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-blue-600 font-semibold">{val(item.especialidad)}</td>
+                        <td className="px-3 py-2 border border-slate-200 font-semibold text-slate-800">{cli?.razonSocial || cli?.nombre || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-600">{val(item.sede)}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-600">{pFound?.nombre || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-600">{val(item.almacen)}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-600">{val(item.operadorLogistico)}</td>
+                        <td className="px-3 py-2 border border-slate-200 font-mono text-slate-700">{val(item.numeroOV)}</td>
+                        <td className="px-3 py-2 border border-slate-200 font-mono text-slate-700">{val(item.numeroOrdenCliente)}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-700 whitespace-nowrap">{fmtDate(item.fechaEntregaReal)}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-emerald-700 font-bold whitespace-nowrap">{fmtDate(item.finGarantia)}</td>
+                        <td className="px-3 py-2 border border-slate-200">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button onClick={() => handleOpenPDF(item)} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="PDF">
+                              <FileText size={14} />
+                            </button>
+                            <button onClick={() => { setEditing(item); setModalOpen(true); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Editar">
+                              <Edit2 size={14} />
+                            </button>
+                            <button onClick={() => handleDelete(item.id)} disabled={busyId === item.id} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Eliminar">
+                              {busyId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            </button>
                           </div>
-                        </div>
-                      </td>
-
-                      {/* CLIENTE / UBICACIÓN */}
-                      <td className="px-4 py-5 align-top max-w-[220px]">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="font-black text-slate-800 uppercase leading-tight truncate mb-0.5">{cli?.nombre || cli?.razonSocial || "Sin Cliente"}</div>
-                          <div className="text-[10px]"><span className="font-bold text-slate-400">ID_CLI:</span> <span className="text-slate-700 font-bold ml-1">{val(item.id_cliente)}</span></div>
-                          <div className="text-[10px]"><span className="font-bold text-slate-400">SEDE:</span> <span className="text-slate-700 font-bold ml-1">{val(item.sede)}</span></div>
-                          <div className="text-[10px]"><span className="font-bold text-slate-400">PAÍS:</span> <span className="text-slate-700 font-bold ml-1">{pFound?.nombre || "-"}</span></div>
-                        </div>
-                      </td>
-
-                      {/* LOGÍSTICA */}
-                      <td className="px-4 py-5 align-top">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="text-[10px]"><span className="font-bold text-slate-400">ALMACÉN:</span> <span className="font-bold text-slate-700 ml-1">{val(item.almacen)}</span></div>
-                          <div className="text-[10px]"><span className="font-bold text-slate-400">OPERADOR:</span> <span className="font-bold text-slate-700 ml-1">{val(item.operadorLogistico)}</span></div>
-                        </div>
-                      </td>
-
-                      {/* COMERCIAL / FECHAS */}
-                      <td className="px-4 py-5 align-top min-w-[280px]">
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center gap-4">
-                            <div className="text-[10px]"><span className="font-bold text-slate-400">OV:</span> <span className="font-black text-slate-800 ml-1">{val(item.numeroOV)}</span> <span className="text-[9px] text-slate-400 italic ml-1">({fmtDate(item.fechaOV)})</span></div>
-                            <div className="text-[10px]"><span className="font-bold text-slate-400">OC:</span> <span className="font-bold text-slate-700 ml-1">{val(item.numeroOrdenCliente)}</span> <span className="text-[9px] text-slate-400 italic ml-1">({fmtDate(item.fechaOrdenCliente)})</span></div>
-                          </div>
-                          <div className="flex flex-col gap-1 mt-1">
-                             <div className="text-[10px]"><span className="font-bold text-slate-400">ENTREGA:</span> <span className="text-slate-800 font-black text-[11px] ml-1">{fmtDate(item.fechaEntregaReal)}</span> <span className="text-slate-400 text-[9px] italic ml-1">(Prev: {fmtDate(item.fechaEntregaPrevista)})</span></div>
-                             <div className="text-[10px]"><span className="font-bold text-slate-400">GARANTÍA:</span> <span className="text-emerald-600 font-black text-[11px] ml-1">{fmtDate(item.finGarantia)}</span></div>
-                          </div>
-                        </div>
-                      </td>
-
-                    {/* ACCIONES */}
-                      <td className="px-4 py-5 align-middle text-right pr-6">
-                        {/* 🆕 Quité opacity-0 y group-hover:opacity-100 para que SIEMPRE se vean */}
-                        <div className="flex justify-end gap-2">
-                          
-                          {/* BOTÓN DE PDF */}
-                          <button 
-                            onClick={() => handleOpenPDF(item)} 
-                            className="p-2 sm:p-1.5 text-indigo-600 hover:bg-indigo-100 bg-indigo-50 rounded-lg transition-colors border border-indigo-100 shadow-sm"
-                            title="PDF"
-                          >
-                            <FileText size={16}/>
-                          </button>
-                          
-                          {/* BOTÓN EDITAR */}
-                          <button 
-                            onClick={() => { setEditing(item); setModalOpen(true); }} 
-                            className="p-2 sm:p-1.5 text-blue-600 hover:bg-blue-100 bg-blue-50 rounded-lg transition-colors border border-blue-100 shadow-sm" 
-                            title="Editar"
-                          >
-                            <Edit2 size={16}/>
-                          </button>
-                          
-                          {/* BOTÓN ELIMINAR */}
-                          <button 
-                            onClick={() => handleDelete(item.id)} 
-                            disabled={busyId === item.id} 
-                            className="p-2 sm:p-1.5 text-red-600 hover:bg-red-100 bg-red-50 rounded-lg transition-colors border border-red-100 shadow-sm" 
-                            title="Eliminar"
-                          >
-                            {busyId === item.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                          </button>
-                          
-                        </div>
-                      </td>
-
-                    </tr>
-                  );
-                })}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -267,6 +264,12 @@ export default function UbicacionesTecnicasPage() {
       </div>
 
       <UbicacionTecnicaModal isOpen={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={handleSave} initialData={editing} />
+      <ModalImportMasivo
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        entidadInicial="ubicaciones"
+        onSuccess={loadAllData}
+      />
       
       {/* 🆕 MODAL DE PDF RENDERIZADO AL FINAL */}
       <GlobalPDFModal

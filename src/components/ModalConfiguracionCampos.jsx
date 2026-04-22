@@ -2,19 +2,7 @@ import React from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { X, Settings, RotateCcw, Save, GripVertical, Eye, EyeOff } from "lucide-react";
 
-export default function ModalConfiguracionCampos({
-  isOpen,
-  onClose,
-  fields,
-  setFields,
-  order,
-  setOrder,
-  onSave,
-  onReset,
-}) {
-  if (!isOpen) return null;
-
-  const fieldLabels = {
+const DEFAULT_FIELD_LABELS = {
   numeroAviso: "N° Aviso",
   tipoAviso: "Tipo de Aviso",
   cliente: "Cliente",
@@ -43,13 +31,26 @@ export default function ModalConfiguracionCampos({
   documentoFinal: "Documento Final",
 };
 
+export default function ModalConfiguracionCampos({
+  isOpen,
+  onClose,
+  fields,
+  setFields,
+  order,
+  setOrder,
+  onSave,
+  onReset,
+  fieldLabels,
+}) {
+  if (!isOpen) return null;
+
+  const labels = { ...DEFAULT_FIELD_LABELS, ...(fieldLabels || {}) };
+
   const onDragEnd = (result) => {
     if (!result.destination) return;
-
     const newOrder = Array.from(order);
     const [moved] = newOrder.splice(result.source.index, 1);
     newOrder.splice(result.destination.index, 0, moved);
-
     setOrder(newOrder);
   };
 
@@ -58,7 +59,7 @@ export default function ModalConfiguracionCampos({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col">
-        
+
         {/* HEADER */}
         <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-pink-50">
           <div className="flex items-center justify-between">
@@ -67,18 +68,13 @@ export default function ModalConfiguracionCampos({
                 <Settings className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-gray-900">
-                  Configurar Vista
-                </h3>
+                <h3 className="text-2xl font-bold text-gray-900">Configurar Vista</h3>
                 <p className="text-sm text-gray-600 mt-1">
                   {visibleCount} de {order.length} campos visibles
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
               <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
@@ -105,7 +101,7 @@ export default function ModalConfiguracionCampos({
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`space-y-2 ${snapshot.isDraggingOver ? 'bg-purple-50/50 rounded-xl' : ''}`}
+                  className={`space-y-2 ${snapshot.isDraggingOver ? "bg-purple-50/50 rounded-xl" : ""}`}
                 >
                   {order.map((key, i) => (
                     <Draggable key={key} draggableId={key} index={i}>
@@ -116,33 +112,24 @@ export default function ModalConfiguracionCampos({
                           {...provided.dragHandleProps}
                           className={`flex items-center gap-3 p-4 bg-white border-2 rounded-xl transition-all ${
                             snapshot.isDragging
-                              ? 'border-purple-400 shadow-lg scale-105'
-                              : 'border-gray-200 hover:border-purple-300'
+                              ? "border-purple-400 shadow-lg scale-105"
+                              : "border-gray-200 hover:border-purple-300"
                           }`}
                         >
                           <GripVertical className="w-5 h-5 text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0" />
 
                           <label className="flex items-center gap-3 flex-1 cursor-pointer">
-                            <div className="relative">
-                              <input
-                                type="checkbox"
-                                checked={fields[key] === true}
-                                onChange={(e) =>
-                                  setFields({
-                                    ...fields,
-                                    [key]: e.target.checked,
-                                  })
-                                }
-                                className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-500 cursor-pointer"
-                              />
-                            </div>
-
+                            <input
+                              type="checkbox"
+                              checked={fields[key] === true}
+                              onChange={(e) => setFields({ ...fields, [key]: e.target.checked })}
+                              className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                            />
                             <div className="flex-1">
-                              <span className={`font-medium ${fields[key] ? 'text-gray-900' : 'text-gray-400'}`}>
-                                {fieldLabels[key] || key}
+                              <span className={`font-medium ${fields[key] ? "text-gray-900" : "text-gray-400"}`}>
+                                {labels[key] || key}
                               </span>
                             </div>
-
                             {fields[key] ? (
                               <Eye className="w-4 h-4 text-purple-600" />
                             ) : (
@@ -170,7 +157,6 @@ export default function ModalConfiguracionCampos({
               <RotateCcw className="w-4 h-4" />
               Restablecer
             </button>
-
             <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
@@ -178,7 +164,6 @@ export default function ModalConfiguracionCampos({
               >
                 Cancelar
               </button>
-
               <button
                 onClick={onSave}
                 className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all font-medium shadow-lg shadow-purple-500/30 flex items-center gap-2"

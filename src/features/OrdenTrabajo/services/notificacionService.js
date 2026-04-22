@@ -18,6 +18,33 @@ export const finalizarNotificacionService = async (id) => {
 export const getNotificacionesByOT = (ordenTrabajoId) =>
   api.get(`/notificaciones/ot/${ordenTrabajoId}`).then(r => r.data);
 
+export const generarPdfResumenOT = async (ordenTrabajoId, grupos) => {
+  const res = await api.post(
+    `/notificaciones/ot/${ordenTrabajoId}/pdf-resumen`,
+    { grupos },
+    { responseType: "blob" }
+  );
+  const file = new Blob([res.data], { type: "application/pdf" });
+  const fileURL = URL.createObjectURL(file);
+  window.open(fileURL, "_blank", "noopener,noreferrer");
+  setTimeout(() => URL.revokeObjectURL(fileURL), 60_000);
+};
+
+export const abrirPdfCombinadoOT = async (ordenTrabajoId) => {
+  try {
+    const res = await api.get(`/notificaciones/ot/${ordenTrabajoId}/pdf-completo`, {
+      responseType: "blob",
+    });
+    const file = new Blob([res.data], { type: "application/pdf" });
+    const fileURL = URL.createObjectURL(file);
+    window.open(fileURL, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(fileURL), 60_000);
+  } catch (err) {
+    console.error(err);
+    alert(err?.response?.data?.message || err.message || "Error abriendo PDF combinado");
+  }
+};
+
 export const abrirPdfNotificacion = async (id) => {
   try {
     const res = await api.get(`/notificaciones/${id}/pdf`, {

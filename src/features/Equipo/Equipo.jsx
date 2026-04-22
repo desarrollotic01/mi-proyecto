@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
+import * as XLSX from "xlsx";
 import {
   Search, Plus, AlertCircle, Loader2, Filter, ChevronDown,
   RefreshCw, List, Box, ShoppingCart, Building2, Wrench,
-  Package, CreditCard, Truck, Shield, Globe, Eye, Edit2, Trash2, CheckCircle, FileText
+  Package, CreditCard, Truck, Shield, Globe, Eye, Edit2, Trash2, CheckCircle, FileText, FileSpreadsheet
 } from "lucide-react";
+import ModalImportMasivo from "../../components/inputs/ModalImportMasivo";
 
 import { equipoService } from "../mantenimiento/services/equipoService";
 import { clienteService } from "../mantenimiento/services/clienteService";
@@ -89,6 +91,7 @@ function EquiposPageContent() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -220,6 +223,38 @@ function EquiposPageContent() {
           
           {/* ✅ Botón de agregar ocupa todo el ancho en móvil */}
           <div className="flex items-center gap-3 w-full lg:w-auto">
+            <button
+              onClick={() => {
+                const data = filteredEquipos.map(e => {
+                  const cli = clientes.find(c => String(c.id) === String(e.clienteId));
+                  return {
+                    Nombre: e.nombre || "",
+                    Código: e.codigo || "",
+                    "Tipo Equipo": e.tipoEquipo || "",
+                    "Tipo Propiedad": e.tipoEquipoPropiedad || "",
+                    Estado: e.status || "",
+                    Marca: e.marca || "",
+                    Modelo: e.modelo || "",
+                    Serie: e.serie || "",
+                    Cliente: cli?.nombre || cli?.razonSocial || "",
+                    Almacén: e.almacen || "",
+                    "Fecha Instalación": e.fechaInstalacion ? new Date(e.fechaInstalacion).toLocaleDateString("es-PE") : "",
+                  };
+                });
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Equipos");
+                XLSX.writeFile(wb, `Equipos_${new Date().toISOString().slice(0,10)}.xlsx`);
+              }}
+              className="px-5 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-indigo-500/30 font-black text-sm active:scale-95"
+            >
+              <FileSpreadsheet size={18} strokeWidth={2.5} />
+              <span className="hidden sm:inline">Exportar Excel</span>
+            </button>
+            <button onClick={() => setImportOpen(true)} className="px-5 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-500/30 font-black text-sm active:scale-95">
+              <FileSpreadsheet size={18} strokeWidth={2.5} />
+              <span className="hidden sm:inline">Importar Excel</span>
+            </button>
             <button onClick={() => { setEditing(null); setModalOpen(true); }} className="w-full lg:w-auto px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-500/30 font-black text-sm active:scale-95">
               <Plus size={18} strokeWidth={3} /> Agregar Equipo
             </button>
@@ -312,79 +347,81 @@ function EquiposPageContent() {
 
         {/* CONTENIDO: KANBAN O TABLA */}
         {viewMode === "lista" ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto animate-in fade-in duration-300">
-            <table className="w-full text-left border-collapse min-w-[1100px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                <tr>
-                  <th className="p-4 w-[15%]">Identificación</th>
-                  <th className="p-4 w-[20%]">Nombre</th>
-                  <th className="p-4 w-[20%]">Cliente</th>
-                  <th className="p-4 w-[15%]">Orden / Fechas</th>
-                  <th className="p-4 w-[15%]">Clasificación / Estado</th>
-                  <th className="p-4 w-[15%] text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredEquipos.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="p-10 text-center text-slate-400 font-bold">
-                      <Box className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                      No hay equipos.
-                    </td>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-300">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full border-collapse text-[11px] min-w-[1200px]">
+                <thead>
+                  <tr className="bg-slate-800 text-white text-[10px] font-bold uppercase tracking-wider">
+                    <th className="px-3 py-2.5 border border-slate-700 text-center w-8">#</th>
+                    <th className="px-3 py-2.5 border border-slate-700">Código</th>
+                    <th className="px-3 py-2.5 border border-slate-700">Serie</th>
+                    <th className="px-3 py-2.5 border border-slate-700">Placa</th>
+                    <th className="px-3 py-2.5 border border-slate-700 min-w-[160px]">Nombre</th>
+                    <th className="px-3 py-2.5 border border-slate-700">Marca</th>
+                    <th className="px-3 py-2.5 border border-slate-700">Modelo</th>
+                    <th className="px-3 py-2.5 border border-slate-700 min-w-[140px]">Cliente</th>
+                    <th className="px-3 py-2.5 border border-slate-700">Sede</th>
+                    <th className="px-3 py-2.5 border border-slate-700">País</th>
+                    <th className="px-3 py-2.5 border border-slate-700">OV</th>
+                    <th className="px-3 py-2.5 border border-slate-700">Entrega</th>
+                    <th className="px-3 py-2.5 border border-slate-700">Propiedad</th>
+                    <th className="px-3 py-2.5 border border-slate-700">Estado</th>
+                    <th className="px-3 py-2.5 border border-slate-700 text-center">Acciones</th>
                   </tr>
-                ) : (
-                  filteredEquipos.map(equipo => (
-                    <tr key={equipo?.id || Math.random()} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 align-top">
-                        <div className="flex flex-col gap-1.5">
-                          <span className="px-2.5 py-1 bg-blue-50 text-blue-700 font-black text-xs rounded-lg border border-blue-100 w-max">
-                            {equipo?.codigo || "S/C"}
-                          </span>
-                          <div className="text-[11px] mt-1"><span className="font-black text-slate-400 uppercase">Serie: </span><span className="font-bold text-slate-700">{equipo?.serie || "N/A"}</span></div>
-                          <div className="text-[11px]"><span className="font-black text-slate-400 uppercase">Placa: </span><span className="font-bold text-slate-700">{equipo?.idPlaca || "N/A"}</span></div>
-                        </div>
-                      </td>
-                      <td className="p-4 align-top">
-                        <p className="font-black text-slate-800 text-sm mb-1.5">{equipo?.nombre || "Sin Nombre"}</p>
-                        <div className="grid grid-cols-1 gap-1 text-[11px]">
-                          <p><span className="font-black text-slate-400 uppercase">Marca:</span> <span className="font-bold text-slate-600">{equipo?.marca || "-"}</span></p>
-                          <p><span className="font-black text-slate-400 uppercase">Modelo:</span> <span className="font-bold text-slate-600">{equipo?.modelo || "-"}</span></p>
-                        </div>
-                      </td>
-                      <td className="p-4 align-top">
-                        <p className="font-bold text-slate-800 text-sm mb-1.5 line-clamp-1">{equipo?.cliente?.razonSocial || "Sin Cliente"}</p>
-                        <div className="grid grid-cols-1 gap-1 text-[11px]">
-                          <p><span className="font-black text-slate-400 uppercase">Sede:</span> <span className="font-bold text-slate-600">{equipo?.sede || "-"}</span></p>
-                          <p><span className="font-black text-slate-400 uppercase">País:</span> <span className="font-bold text-slate-600">{equipo?.pais?.nombre || "-"}</span></p>
-                        </div>
-                      </td>
-                      <td className="p-4 align-top">
-                        <div className="grid grid-cols-1 gap-1.5 text-[11px]">
-                          <p className="flex items-center gap-1"><span className="font-black text-slate-400 uppercase">OV:</span><span className="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">{equipo?.numeroOV || "-"}</span></p>
-                          <p><span className="font-black text-slate-400 uppercase">Entrega:</span> <span className="font-bold text-slate-600">{formatDate(equipo?.fechaEntregaPrevista)}</span></p>
-                        </div>
-                      </td>
-                      <td className="p-4 align-top">
-                        <div className="flex flex-col gap-2 items-start">
-                          <span className="px-2 py-1 rounded bg-blue-50 text-blue-700 font-black text-[9px] uppercase border border-blue-100/50 flex items-center gap-1"><Globe size={12} /> {equipo?.tipoEquipoPropiedad || "-"}</span>
-                          <span className={`px-2 py-1 rounded text-[9px] font-black uppercase border flex items-center gap-1 ${equipo?.status === "Almacen" ? "bg-indigo-50 text-indigo-700 border-indigo-100" : "bg-emerald-50 text-emerald-700 border-emerald-100"}`}><Package size={12} /> {equipo?.status || "-"}</span>
-                        </div>
-                      </td>
-                      {/* ✅ Botones de acción envueltos en flex-wrap con más espacio para celulares */}
-                      <td className="p-4 align-middle">
-                        <div className="flex flex-wrap items-center justify-end sm:justify-center gap-2">
-                          <button onClick={() => handleOpenPDF(equipo)} className="p-2 text-slate-500 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg border border-transparent hover:border-indigo-100 transition-all" title="Generar PDF"><FileText size={16} strokeWidth={2.5} /></button>
-                          <button onClick={() => { setEquipoParaPlan(equipo); setPlanModalOpen(true); }} className="p-2 text-slate-500 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg border border-transparent hover:border-emerald-100 transition-all" title="Plan"><Wrench size={16} strokeWidth={2.5} /></button>
-                          <button onClick={() => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} className="p-2 text-slate-500 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 rounded-lg border border-transparent hover:border-blue-100 transition-all" title="Detalle"><Eye size={16} strokeWidth={2.5} /></button>
-                          <button onClick={() => { setEditing(equipo); setModalOpen(true); }} className="p-2 text-slate-500 bg-slate-50 hover:bg-amber-50 hover:text-amber-600 rounded-lg border border-transparent hover:border-amber-100 transition-all" title="Editar"><Edit2 size={16} strokeWidth={2.5} /></button>
-                          <button onClick={() => handleDelete(equipo?.id)} className="p-2 text-slate-500 bg-slate-50 hover:bg-red-50 hover:text-red-600 rounded-lg border border-transparent hover:border-red-100 transition-all" title="Eliminar"><Trash2 size={16} strokeWidth={2.5} /></button>
-                        </div>
+                </thead>
+                <tbody>
+                  {filteredEquipos.length === 0 ? (
+                    <tr>
+                      <td colSpan="15" className="p-10 text-center text-slate-400 font-bold border border-slate-100">
+                        <Box className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        No hay equipos.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredEquipos.map((equipo, idx) => (
+                      <tr key={equipo?.id || idx}
+                        className={`transition-colors hover:bg-blue-50 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
+                        <td className="px-3 py-2 border border-slate-200 text-center text-slate-400 font-mono">{idx + 1}</td>
+                        <td className="px-3 py-2 border border-slate-200 font-black text-blue-700">{equipo?.codigo || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-700 font-semibold font-mono">{equipo?.serie || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-700 font-semibold">{equipo?.idPlaca || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 font-bold text-slate-800">{equipo?.nombre || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-600">{equipo?.marca || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-600">{equipo?.modelo || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 font-semibold text-slate-800">{equipo?.cliente?.razonSocial || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-600">{equipo?.sede || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-600">{equipo?.pais?.nombre || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 font-mono text-slate-700">{equipo?.numeroOV || "—"}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-slate-600 whitespace-nowrap">{formatDate(equipo?.fechaEntregaPrevista)}</td>
+                        <td className="px-3 py-2 border border-slate-200">
+                          <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold">
+                            {equipo?.tipoEquipoPropiedad || "—"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 border border-slate-200">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            equipo?.status === "Almacen"
+                              ? "bg-indigo-50 text-indigo-700 border-indigo-100"
+                              : "bg-emerald-50 text-emerald-700 border-emerald-100"
+                          }`}>
+                            {equipo?.status || "—"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 border border-slate-200">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button onClick={() => handleOpenPDF(equipo)} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="PDF"><FileText size={14} /></button>
+                            <button onClick={() => { setEquipoParaPlan(equipo); setPlanModalOpen(true); }} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="Plan"><Wrench size={14} /></button>
+                            <button onClick={() => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Detalle"><Eye size={14} /></button>
+                            <button onClick={() => { setEditing(equipo); setModalOpen(true); }} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Editar"><Edit2 size={14} /></button>
+                            <button onClick={() => handleDelete(equipo?.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Eliminar"><Trash2 size={14} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           <div className="flex w-full gap-3 pb-4 h-[calc(100dvh-130px)] lg:h-[calc(100vh-160px)] overflow-x-auto lg:overflow-hidden px-2 lg:px-1 snap-x snap-mandatory lg:snap-none items-start">
@@ -412,6 +449,12 @@ function EquiposPageContent() {
         {pdfData && <UbicacionPDF data={pdfData} />}
       </GlobalPDFModal>
       {planModalOpen && <ModalCrearPlan onClose={() => { setPlanModalOpen(false); setEquipoParaPlan(null); }} onCreated={handlePlanCreated} equipoPreseleccionado={equipoParaPlan} />}
+      <ModalImportMasivo
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        entidadInicial="equipos"
+        onSuccess={loadData}
+      />
     </div>
   );
 }

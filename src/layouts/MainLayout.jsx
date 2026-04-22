@@ -1,14 +1,14 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../auth/context/AuthContext";
-import { Menu, X, LogOut } from "lucide-react"; // Importamos iconos para el responsive
+import { Menu, X, LogOut, ShieldCheck } from "lucide-react";
 
 const pages = [
   { name: "Avisos", path: "/Avisos" },
   { name: "Orden de Trabajo", path: "/orden-trabajo" },
   { name: "Planes de Mantenimiento", path: "/planes-mantenimiento" },
   { name: "Guia de Mantenimiento", path: "/guiaMantenimiento" },
-  { name: "Alertas", path: "/GuiasKanban" }
+  { name: "Alertas", path: "/alertas-guia" }
 ];
 
 const catalogos = [
@@ -16,13 +16,14 @@ const catalogos = [
   { name: "Ubicaciones Técnicas", path: "/ubicaciones-tecnicas" },
   { name: "Clientes", path: "/clientes" },
   { name: "Trabajadores", path: "/trabajadores" },
-  { name: "Items", path: "/items" }
+  { name: "Items", path: "/items" },
+  { name: "Solicitudes", path: "/solicitudes" }
 ];
 
 export default function MainLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermiso } = useAuth();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado para el menú móvil
@@ -116,6 +117,27 @@ export default function MainLayout({ children }) {
               })}
             </div>
           </div>
+
+          {/* ADMINISTRACIÓN — solo para all_access */}
+          {hasPermiso("all_access") && (
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2 mb-3">
+                Administración
+              </p>
+              <Link
+                to="/admin"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all ${
+                  location.pathname === "/admin"
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <ShieldCheck size={15} />
+                Panel Admin
+              </Link>
+            </div>
+          )}
         </nav>
       </aside>
 

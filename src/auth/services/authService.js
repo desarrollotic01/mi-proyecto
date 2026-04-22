@@ -1,21 +1,22 @@
-import axios from "axios";
+import api from "../../services/api";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-export const loginRequest = async (alias, password) => {
-  const res = await axios.post(`${API_URL}/auth/login`, {
-    alias,
-    password,
-  });
-  console.log("RESPUESTA LOGIN:", res.data);
+// Login → POST /login/signin
+export const loginRequest = async (usuario, contraseña) => {
+  const res = await api.post("/login/signin", { usuario, contraseña });
   return res.data;
 };
 
-export const meRequest = async (token) => {
-  const res = await axios.get(`${API_URL}/auth/me`, {
-    headers: {
-      Authorization: `Bearer ${token}`, 
-    },
-  });
+// Mi usuario (el interceptor ya agrega el token) → GET /usuario/me
+export const meRequest = async () => {
+  const res = await api.get("/usuario/me");
   return res.data;
+};
+
+// Logout → GET /login/logout
+export const logoutRequest = async () => {
+  try {
+    await api.get("/login/logout");
+  } catch (_) {
+    // Si falla igual limpiamos local
+  }
 };

@@ -63,13 +63,17 @@ export default function ModalSeleccionEquiposOT({
     setCargando(true);
     getEquiposDisponiblesPorAviso(aviso.id)
       .then(data => {
-        const equipos = data.map(rel => ({
-          id: rel.equipo.id,
-          nombre: rel.equipo.nombre || rel.equipo.codigo,
-          tipo: rel.equipo.tipo,
-          codigo: rel.equipo.codigo,
-          relacionId: rel.id
-        }));
+       // En ModalSeleccionEquiposOT.jsx, dentro del useEffect de carga:
+const equipos = data.map(rel => ({
+  id: rel.equipo?.id || rel.ubicacionTecnica?.id || rel.id,
+  nombre: rel.equipo?.nombre || rel.equipo?.codigo || rel.ubicacionTecnica?.nombre || rel.ubicacionTecnica?.codigo,
+  tipo: rel.equipo ? "EQUIPO" : "UBICACION_TECNICA",
+  codigo: rel.equipo?.codigo || rel.ubicacionTecnica?.codigo,
+  relacionId: rel.id,
+  // ← AGREGAR ESTOS DOS:
+  equipoId: rel.equipo?.id || null,
+  ubicacionTecnicaId: rel.ubicacionTecnica?.id || rel.ubicacion?.id || null,
+}));
         setEquiposDisponibles(equipos);
       })
       .finally(() => setCargando(false));
@@ -118,7 +122,7 @@ export default function ModalSeleccionEquiposOT({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[60] p-4">
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-200">
           
           {/* HEADER */}
@@ -348,7 +352,7 @@ export default function ModalSeleccionEquiposOT({
 
       {/* MODAL DE CONFIRMACIÓN */}
       {mostrarConfirmacionSalida && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border-2 border-amber-300">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-3 bg-amber-100 rounded-xl">

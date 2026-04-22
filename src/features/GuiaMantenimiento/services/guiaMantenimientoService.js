@@ -6,7 +6,21 @@ export const guiaMantenimientoService = {
   createGuia,
   ejecutarProgramacion,
   cancelarProgramacion,
+  dispararAlertas,
+  marcarVencidas,
 };
+
+function dispararAlertas() {
+  return api
+    .post("/guia-mantenimiento/programaciones/jobs/crear-avisos-alerta")
+    .then((res) => res.data);
+}
+
+function marcarVencidas() {
+  return api
+    .post("/guia-mantenimiento/programaciones/jobs/marcar-vencidas")
+    .then((res) => res.data);
+}
 
 // =======================
 // GET ALL

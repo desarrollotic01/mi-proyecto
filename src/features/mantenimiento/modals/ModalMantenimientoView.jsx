@@ -1,821 +1,547 @@
 import { useEffect, useState } from "react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import AdjuntosViewer from "../../adjuntos/components/AdjuntosViewer";
 import { getTratamientoByAviso } from "../services/tratamientoService";
+import { ESTADOS_AV } from "../config/camposMantenimiento";
 
-export default function ModalMantenimientoView({
-  isOpen,
-  onClose,
-  wizardStep,
-  setWizardStep,
-  data,
-  cambiarEstado,
-  abrirTratamiento,
-}) {
-  const [tratamiento, setTratamiento] = useState(null);
-  const [loadingTratamiento, setLoadingTratamiento] = useState(false);
+/* ─────────────────────────────────────────────
+   Helpers
+───────────────────────────────────────────── */
+const fmt = (d) => {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return "—";
+  return dt.toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" });
+};
 
-  useEffect(() => {
-    if (!isOpen || !data?.id) return;
+const fmtDt = (d) => {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return "—";
+  return dt.toLocaleString("es-PE", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+};
 
-    let active = true;
+const str = (v) => (v && typeof v === "object" ? v.razonSocial || v.nombre || v.nombreApellido || "" : v || "");
 
-    const cargarTratamiento = async () => {
-      try {
-        setLoadingTratamiento(true);
-        const resp = await getTratamientoByAviso(data.id);
-        if (!active) return;
-        setTratamiento(resp || null);
-      } catch (error) {
-        if (!active) return;
-        setTratamiento(null);
-      } finally {
-        if (active) setLoadingTratamiento(false);
-      }
-    };
-
-    cargarTratamiento();
-
-    return () => {
-      active = false;
-    };
-  }, [isOpen, data?.id]);
-
-  if (!isOpen || !data) return null;
-
-  const estadoActual = data._estadoReal || data.estadoAviso || data.estado || "";
-
-  const ViewField = ({ label, value, fullWidth = false }) => (
-    <div className={`flex flex-col gap-1 ${fullWidth ? "col-span-full" : ""}`}>
-      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-        {label}
-      </label>
-      <div className="p-3 border border-slate-200 rounded-lg bg-white text-sm text-slate-800 min-h-[42px] flex items-center">
-        {value || <span className="text-slate-400">Sin información</span>}
-      </div>
-    </div>
-  );
-
-  const Badge = ({ children, variant = "default" }) => {
-    const variants = {
-      default: "bg-slate-100 text-slate-700 border border-slate-200",
-      success: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-      warning: "bg-amber-50 text-amber-700 border border-amber-200",
-      info: "bg-blue-50 text-blue-700 border border-blue-200",
-      danger: "bg-rose-50 text-rose-700 border border-rose-200",
-      purple: "bg-violet-50 text-violet-700 border border-violet-200",
-      indigo: "bg-indigo-50 text-indigo-700 border border-indigo-200",
-    };
-
-    return (
-      <span
-        className={`px-3 py-1 rounded-full text-xs font-semibold ${variants[variant]}`}
-      >
-        {children}
-      </span>
-    );
-  };
-
-  const getPrioridadVariant = (prioridad) => {
-    switch (prioridad?.toLowerCase()) {
-      case "alta":
-        return "danger";
-      case "media":
-        return "warning";
-      case "baja":
-        return "info";
-      default:
-        return "default";
-    }
-  };
-
-  const getEstadoVariant = (estado) => {
-    switch (estado?.toLowerCase()) {
-      case "tratado":
-        return "success";
-      case "con ot":
-        return "info";
-      case "pendiente":
-        return "warning";
-      case "creado":
-        return "default";
-      case "rechazado":
-        return "danger";
-      case "finalizado":
-        return "success";
-      default:
-        return "default";
-    }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "—";
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return "—";
-    return date.toLocaleDateString("es-PE", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  const formatDateTime = (dateString) => {
-    if (!dateString) return "—";
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return "—";
-    return date.toLocaleString("es-PE", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const getTargetNombre = (te) => {
-    return (
-      te?.equipo?.nombre ||
-      te?.equipo?.descripcion ||
-      te?.ubicacionTecnica?.nombre ||
-      te?.ubicacionTecnica?.descripcion ||
-      "Sin objetivo"
-    );
-  };
-
-  const getTargetCodigo = (te) => {
-    return (
-      te?.equipo?.codigo ||
-      te?.equipo?.tag ||
-      te?.ubicacionTecnica?.codigo ||
-      "—"
-    );
-  };
-
-  const getObjetivoSolicitud = (sol) => {
-    if (!sol) return "—";
-
-    if (sol.esGeneral) return "General";
-    if (sol.equipo?.nombre) {
-      return `${sol.equipo.nombre}${sol.equipo.codigo ? ` · ${sol.equipo.codigo}` : ""}`;
-    }
-    if (sol.ubicacionTecnica?.nombre) {
-      return `${sol.ubicacionTecnica.nombre}${
-        sol.ubicacionTecnica.codigo ? ` · ${sol.ubicacionTecnica.codigo}` : ""
-      }`;
-    }
-    if (sol.equipo_id) return `Equipo asociado`;
-    if (sol.ubicacion_tecnica_id) return `Ubicación técnica asociada`;
-
-    return "—";
-  };
-
-  const handleCambiarEstado = async (nuevoEstado) => {
-    try {
-      await cambiarEstado?.(data, nuevoEstado);
-      onClose?.();
-    } catch (error) {
-      console.error("Error al cambiar estado:", error);
-    }
-  };
-
-  const handleAbrirTratamiento = () => {
-    try {
-      abrirTratamiento?.(data);
-      onClose?.();
-    } catch (error) {
-      console.error("Error al abrir tratamiento:", error);
-    }
-  };
-
-  const renderActionButtons = () => {
-    if (!data) return null;
-
-    if (estadoActual === "CREADO") {
-      return (
-        <div className="flex gap-2 flex-wrap justify-end">
-          <button
-            onClick={handleAbrirTratamiento}
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold transition-colors"
-          >
-            Tratar
-          </button>
-
-          <button
-            onClick={() => handleCambiarEstado("RECHAZADO")}
-            className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-semibold transition-colors"
-          >
-            Rechazar
-          </button>
-        </div>
-      );
-    }
-
-    if (estadoActual === "TRATADO") {
-      return (
-        <div className="flex gap-2 flex-wrap justify-end">
-          <button
-            onClick={() => handleCambiarEstado("CON_OT")}
-            className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold transition-colors"
-          >
-            Generar OT
-          </button>
-        </div>
-      );
-    }
-
-    if (estadoActual === "CON_OT") {
-      return (
-        <div className="flex gap-2 flex-wrap justify-end">
-          <button
-            onClick={() => handleCambiarEstado("FINALIZADO")}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors"
-          >
-            Finalizar
-          </button>
-
-          <button
-            onClick={() => handleCambiarEstado("FINALIZADO_SIN_FACTURACION")}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold transition-colors"
-          >
-            Sin Facturación
-          </button>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
-  const solicitudesCompra = tratamiento?.solicitudesCompra || [];
-  const solicitudesAlmacen = tratamiento?.solicitudesAlmacen || [];
-  const equiposTratamiento = tratamiento?.equipos || [];
-
+/* ─────────────────────────────────────────────
+   Small atoms
+───────────────────────────────────────────── */
+function Field({ label, value, wide = false }) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-[98vw] max-w-[120rem] h-[96vh] flex flex-col overflow-hidden border border-slate-200">
-        <div className="px-5 py-3 border-b bg-slate-900">
-          <div className="flex justify-between items-start gap-4 flex-wrap">
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-1">
-                Aviso de Mantenimiento
-              </h2>
-              <p className="text-slate-300 text-sm">
-                {data.numeroAviso || "Sin número de aviso"}
-              </p>
-            </div>
-
-            <div className="flex flex-col items-end gap-3">
-              <div className="flex gap-2 flex-wrap justify-end">
-                <Badge variant={getPrioridadVariant(data.prioridad)}>
-                  {data.prioridad || "Sin prioridad"}
-                </Badge>
-                <Badge variant={getEstadoVariant(estadoActual)}>
-                  {estadoActual || "Sin estado"}
-                </Badge>
-              </div>
-
-              {renderActionButtons()}
-            </div>
-          </div>
-
-          <div className="flex gap-6 mt-6 border-b border-slate-700 pb-2">
-            {[
-              { num: 1, label: "Información General" },
-              { num: 2, label: "Cliente y Contacto" },
-              { num: 3, label: "Equipos y Tratamiento" },
-            ].map((step) => (
-              <button
-                key={step.num}
-                className={`pb-2 font-semibold text-sm transition-all ${
-                  wizardStep === step.num
-                    ? "text-white border-b-2 border-white"
-                    : "text-slate-400 hover:text-white"
-                }`}
-                onClick={() => setWizardStep(step.num)}
-              >
-                {step.label}
-              </button>
-            ))}
-          </div>
-
-          <p className="text-slate-300 font-medium mt-3 text-sm">
-            Paso {wizardStep} de 3
-          </p>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
-          {wizardStep === 1 && (
-            <div className="space-y-6">
-              <Section title="Datos del Aviso">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <ViewField label="N° Orden de Venta" value={data.ordenVenta} />
-                  <ViewField label="Centro de Costo" value={data.centroCosto} />
-                  <ViewField label="Número de Aviso" value={data.numeroAviso} />
-                  <ViewField label="Tipo de Aviso" value={data.tipoAviso} />
-                  <ViewField
-                    label="Tipo de Mantenimiento"
-                    value={data.tipoMantenimiento}
-                  />
-                  <ViewField label="Producto" value={data.producto} />
-                  <ViewField label="Prioridad" value={data.prioridad} />
-                  <ViewField label="Estado del Aviso" value={estadoActual} />
-                  <ViewField
-                    label="Fecha de Atención"
-                    value={formatDate(data.fechaAtencion)}
-                  />
-                </div>
-              </Section>
-
-              <Section title="Descripción">
-                <div className="grid grid-cols-1 gap-4">
-                  <ViewField
-                    label="Descripción Resumida"
-                    value={data.descripcionResumida}
-                    fullWidth
-                  />
-                  <ViewField
-                    label="Descripción Detallada"
-                    value={data.descripcion}
-                    fullWidth
-                  />
-                </div>
-              </Section>
-
-              <Section title="Ubicación">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField
-                    label="Ubicación Técnica"
-                    value={data.ubicacionTecnica}
-                  />
-                  <ViewField
-                    label="Dirección de Atención"
-                    value={data.direccionAtencion}
-                  />
-                </div>
-              </Section>
-            </div>
-          )}
-
-          {wizardStep === 2 && (
-            <div className="space-y-6">
-              <Section title="Datos del Cliente">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <ViewField label="ID Cliente" value={data.cliente} />
-                  <ViewField
-                    label="N° Orden Cliente"
-                    value={data.ordenCliente}
-                  />
-                  <ViewField label="Sede" value={data.sede} />
-                  <ViewField label="Almacén" value={data.almacen} />
-                </div>
-              </Section>
-
-              <Section title="Información de Contacto">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <ViewField
-                    label="Nombre del Contacto"
-                    value={data.nombreContacto}
-                  />
-                  <ViewField
-                    label="Correo Electrónico"
-                    value={data.correoContacto}
-                  />
-                  <ViewField
-                    label="Número de Teléfono"
-                    value={data.numeroContacto}
-                  />
-                </div>
-              </Section>
-
-              <Section title="Información del Solicitante">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField
-                    label="Solicitante"
-                    value={data.solicitante?.nombreApellido}
-                  />
-                  <ViewField
-                    label="Usuario"
-                    value={data.solicitante?.alias}
-                  />
-                </div>
-              </Section>
-            </div>
-          )}
-
-          {wizardStep === 3 && (
-            <div className="space-y-6">
-              <Section title="Asignación">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField
-                    label="Supervisor Asignado"
-                    value={data.supervisorAsignado}
-                  />
-                  <ViewField
-                    label="Creado Por"
-                    value={data.creador?.nombreApellido}
-                  />
-                </div>
-              </Section>
-
-              <Section
-                title="Detalle del Tratamiento"
-                right={
-                  loadingTratamiento ? (
-                    <Badge variant="default">Cargando...</Badge>
-                  ) : tratamiento ? (
-                    <Badge variant="success">
-                      {tratamiento.estado || "Registrado"}
-                    </Badge>
-                  ) : (
-                    <Badge variant="warning">Sin tratamiento</Badge>
-                  )
-                }
-              >
-                {tratamiento ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <ViewField label="Estado" value={tratamiento.estado} />
-                    <ViewField
-                      label="Fecha creación"
-                      value={formatDateTime(tratamiento.createdAt)}
-                    />
-                    <ViewField
-                      label="Última actualización"
-                      value={formatDateTime(tratamiento.updatedAt)}
-                    />
-                  </div>
-                ) : (
-                  <EmptyState text="No hay tratamiento registrado para este aviso." />
-                )}
-              </Section>
-
-              <Section
-                title="Solicitudes de Compra"
-                right={
-                  <Badge variant="info">{solicitudesCompra.length} registros</Badge>
-                }
-              >
-                {solicitudesCompra.length > 0 ? (
-                  <div className="space-y-4">
-                    {solicitudesCompra.map((sol, index) => (
-                      <SolicitudCard
-                        key={sol.id || index}
-                        titulo={`Solicitud de Compra #${index + 1}`}
-                        subtitulo={sol.esGeneral ? "General" : "Individual"}
-                        estado={sol.estado}
-                        fields={[
-                          ["Required Date", formatDate(sol.requiredDate)],
-                          ["Department", sol.department],
-                          ["Requester", sol.requester],
-                          ["Comentarios", sol.comments],
-                          ["Objetivo", getObjetivoSolicitud(sol)],
-                        ]}
-                        lineas={sol.lineas || []}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState text="No hay solicitudes de compra registradas." />
-                )}
-              </Section>
-
-              <Section
-                title="Solicitudes de Almacén"
-                right={
-                  <Badge variant="purple">
-                    {solicitudesAlmacen.length} registros
-                  </Badge>
-                }
-              >
-                {solicitudesAlmacen.length > 0 ? (
-                  <div className="space-y-4">
-                    {solicitudesAlmacen.map((sol, index) => (
-                      <SolicitudCard
-                        key={sol.id || index}
-                        titulo={`Solicitud de Almacén #${index + 1}`}
-                        subtitulo={sol.esGeneral ? "General" : "Individual"}
-                        estado={sol.estado}
-                        fields={[
-                          ["Required Date", formatDate(sol.requiredDate)],
-                          ["Department", sol.department],
-                          ["Requester", sol.requester],
-                          ["Comentarios", sol.comments],
-                          ["Objetivo", getObjetivoSolicitud(sol)],
-                        ]}
-                        lineas={sol.lineas || []}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState text="No hay solicitudes de almacén registradas." />
-                )}
-              </Section>
-
-              <Section
-                title="Objetivos y Actividades del Tratamiento"
-                right={
-                  <Badge variant="indigo">
-                    {equiposTratamiento.length} objetivos
-                  </Badge>
-                }
-              >
-                {equiposTratamiento.length > 0 ? (
-                  <div className="space-y-5">
-                    {equiposTratamiento.map((te, index) => (
-                      <div
-                        key={te.id || index}
-                        className="border border-slate-200 rounded-xl bg-white"
-                      >
-                        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3 flex-wrap">
-                          <div>
-                            <p className="font-semibold text-slate-900">
-                              {getTargetNombre(te)}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              Código: {getTargetCodigo(te)}
-                            </p>
-                          </div>
-
-                          <div className="flex gap-2 flex-wrap">
-                            {te.planMantenimiento ? (
-                              <Badge variant="success">
-                                Plan:{" "}
-                                {te.planMantenimiento.codigoPlan ||
-                                  te.planMantenimiento.nombre}
-                              </Badge>
-                            ) : (
-                              <Badge variant="default">Sin plan</Badge>
-                            )}
-                            <Badge variant="default">
-                              {(te.actividades || []).length} actividades
-                            </Badge>
-                          </div>
-                        </div>
-
-                        <div className="p-4 space-y-4">
-                          {(te.actividades || []).length > 0 ? (
-                            te.actividades.map((act, i) => (
-                              <div
-                                key={act.id || i}
-                                className="border border-slate-200 rounded-lg p-4 bg-slate-50"
-                              >
-                                <div className="flex items-start justify-between gap-3 flex-wrap">
-                                  <div>
-                                    <p className="font-semibold text-slate-800">
-                                      {act.tarea || "Sin tarea"}
-                                    </p>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                      {[act.sistema, act.subsistema, act.componente]
-                                        .filter(Boolean)
-                                        .join(" / ") || "Sin clasificación"}
-                                    </p>
-                                  </div>
-
-                                  <div className="flex gap-2 flex-wrap">
-                                    <Badge variant="default">
-                                      {act.origen || "—"}
-                                    </Badge>
-                                    <Badge variant="info">
-                                      {act.estado || "—"}
-                                    </Badge>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-                                  <MiniField
-                                    label="Tipo trabajo"
-                                    value={act.tipoTrabajo}
-                                  />
-                                  <MiniField
-                                    label="Rol técnico"
-                                    value={act.rolTecnico}
-                                  />
-                                  <MiniField
-                                    label="Cantidad técnicos"
-                                    value={act.cantidadTecnicos}
-                                  />
-                                  <MiniField
-                                    label="Duración"
-                                    value={`${act.duracionEstimadaValor || 0} ${
-                                      act.unidadDuracion || "min"
-                                    }`}
-                                  />
-                                </div>
-
-                                {act.descripcion && (
-                                  <div className="mt-3">
-                                    <p className="text-xs font-semibold text-slate-500 uppercase mb-1">
-                                      Descripción
-                                    </p>
-                                    <p className="text-sm text-slate-700">
-                                      {act.descripcion}
-                                    </p>
-                                  </div>
-                                )}
-
-                                {act.observaciones && (
-                                  <div className="mt-3">
-                                    <p className="text-xs font-semibold text-slate-500 uppercase mb-1">
-                                      Observaciones
-                                    </p>
-                                    <p className="text-sm text-slate-700">
-                                      {act.observaciones}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            ))
-                          ) : (
-                            <EmptyState
-                              text="No hay actividades registradas para este objetivo."
-                              small
-                            />
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState text="No hay objetivos ni actividades en el tratamiento." />
-                )}
-              </Section>
-
-              <Section title="Información de Auditoría">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ViewField
-                    label="Fecha de Creación"
-                    value={formatDateTime(data.createdAt)}
-                  />
-                  <ViewField
-                    label="Última Actualización"
-                    value={formatDateTime(data.updatedAt)}
-                  />
-                </div>
-              </Section>
-            </div>
-          )}
-        </div>
-
-        <div className="p-4 border-t bg-white flex justify-between items-center">
-          <button
-            className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-semibold transition-colors"
-            onClick={() => {
-              if (wizardStep === 1) onClose();
-              else setWizardStep((prev) => prev - 1);
-            }}
-          >
-            {wizardStep === 1 ? "Cerrar" : "Anterior"}
-          </button>
-
-          {wizardStep < 3 ? (
-            <button
-              className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold transition-colors"
-              onClick={() => setWizardStep((prev) => prev + 1)}
-            >
-              Siguiente
-            </button>
-          ) : (
-            <button
-              className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold transition-colors"
-              onClick={onClose}
-            >
-              Finalizar
-            </button>
-          )}
-        </div>
-      </div>
+    <div className={wide ? "col-span-full" : ""}>
+      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-sm text-slate-800 font-medium min-h-[20px]">{value || <span className="text-slate-300 font-normal">—</span>}</p>
     </div>
   );
 }
 
-function Section({ title, right, children }) {
+function SectionBlock({ title, children }) {
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-        <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-        {right}
-      </div>
+    <div>
+      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 pb-2 border-b border-slate-100">
+        {title}
+      </p>
       {children}
     </div>
   );
 }
 
-function EmptyState({ text, small = false }) {
+function StatusPill({ label, color = "slate" }) {
+  const map = {
+    slate:  "bg-slate-100 text-slate-700 border-slate-200",
+    yellow: "bg-amber-50 text-amber-700 border-amber-200",
+    blue:   "bg-blue-50 text-blue-700 border-blue-200",
+    green:  "bg-emerald-50 text-emerald-700 border-emerald-200",
+    red:    "bg-rose-50 text-rose-700 border-rose-200",
+    purple: "bg-violet-50 text-violet-700 border-violet-200",
+    indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  };
   return (
-    <div
-      className={`text-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 ${
-        small ? "py-6 px-4" : "py-10 px-6"
-      }`}
-    >
-      <p className="text-sm">{text}</p>
-    </div>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${map[color] || map.slate}`}>
+      {label}
+    </span>
   );
 }
 
-function MiniField({ label, value }) {
-  return (
-    <div className="border border-slate-200 rounded-lg bg-white p-3">
-      <p className="text-[11px] font-semibold text-slate-500 uppercase mb-1">
-        {label}
-      </p>
-      <p className="text-sm text-slate-800">{value || "—"}</p>
-    </div>
-  );
-}
+const prioColor = (p) =>
+  ({ Alta: "red", Media: "yellow", Baja: "blue" })[p] || "slate";
 
-function SolicitudCard({ titulo, subtitulo, estado, fields = [], lineas = [] }) {
-  return (
-    <div className="border border-slate-200 rounded-xl bg-white">
-      <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <p className="font-semibold text-slate-900">{titulo}</p>
-          <p className="text-xs text-slate-500">{subtitulo}</p>
-        </div>
-        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-          {estado || "Sin estado"}
-        </span>
+const estadoBadgeStyle = (e) =>
+  ESTADOS_AV[e]?.badge || "bg-slate-100 text-slate-700 border-slate-200";
+
+/* ─────────────────────────────────────────────
+   TABS config
+───────────────────────────────────────────── */
+const TABS = [
+  { id: 1, label: "Información general" },
+  { id: 2, label: "Cliente y contacto" },
+  { id: 3, label: "Tratamiento" },
+  { id: 4, label: "Documentos" },
+];
+
+/* ─────────────────────────────────────────────
+   MAIN COMPONENT
+───────────────────────────────────────────── */
+export default function ModalMantenimientoView({
+  isOpen, onClose, wizardStep, setWizardStep,
+  data, cambiarEstado, abrirTratamiento,
+}) {
+  const [tratamiento, setTratamiento] = useState(null);
+  const [loadingTrat, setLoadingTrat] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !data?.id) return;
+    let alive = true;
+    setLoadingTrat(true);
+    getTratamientoByAviso(data.id)
+      .then((r) => { if (alive) setTratamiento(r || null); })
+      .catch(() => { if (alive) setTratamiento(null); })
+      .finally(() => { if (alive) setLoadingTrat(false); });
+    return () => { alive = false; };
+  }, [isOpen, data?.id]);
+
+  if (!isOpen || !data) return null;
+
+  const estadoKey = data._estadoReal || data.estado || "";
+
+  const handleEstado = async (next) => {
+    await cambiarEstado?.(data, next);
+    onClose?.();
+  };
+
+  /* ── Action buttons ── */
+  const renderActions = () => {
+    if (estadoKey === "CREADO") return (
+      <div className="flex gap-2">
+        <button onClick={() => { abrirTratamiento?.(data); onClose?.(); }}
+          className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-lg transition-colors">
+          Tratar
+        </button>
+        <button onClick={() => handleEstado("RECHAZADO")}
+          className="px-4 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-sm font-semibold rounded-lg transition-colors">
+          Rechazar
+        </button>
       </div>
+    );
+    if (estadoKey === "TRATADO") return (
+      <div className="flex gap-2">
+        <button onClick={() => handleEstado("CON_OT")}
+          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-lg transition-colors">
+          Generar OT
+        </button>
+        <button onClick={() => handleEstado("RECHAZADO")}
+          className="px-4 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-sm font-semibold rounded-lg transition-colors">
+          Rechazar
+        </button>
+      </div>
+    );
+    if (estadoKey === "CON_OT") return (
+      <div className="flex gap-2">
+        <button onClick={() => handleEstado("FINALIZADO")}
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors">
+          Finalizar
+        </button>
+        <button onClick={() => handleEstado("FINALIZADO_SIN_FACTURACION")}
+          className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-semibold rounded-lg transition-colors">
+          Sin facturación
+        </button>
+      </div>
+    );
+    return null;
+  };
 
-      <div className="p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {fields.map(([label, value], idx) => (
-            <MiniField key={idx} label={label} value={value} />
+  const solicitudesCompra  = tratamiento?.solicitudesCompra  || [];
+  const solicitudesAlmacen = tratamiento?.solicitudesAlmacen || [];
+  const equiposTrat        = tratamiento?.equipos            || [];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+
+        {/* ── HEADER ── */}
+        <div className="px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-base font-bold text-slate-900">
+                Aviso {data.numeroAviso ? `#${data.numeroAviso}` : ""}
+              </h2>
+              {estadoKey && (
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${estadoBadgeStyle(estadoKey)}`}>
+                  {ESTADOS_AV[estadoKey]?.label || estadoKey}
+                </span>
+              )}
+              {data.prioridad && (
+                <StatusPill label={data.prioridad} color={prioColor(data.prioridad)} />
+              )}
+            </div>
+            {data.descripcionResumida && (
+              <p className="text-sm text-slate-500 mt-1 truncate">{data.descripcionResumida}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {renderActions()}
+            <button onClick={onClose}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* ── TABS ── */}
+        <div className="flex gap-1 px-6 pt-3 border-b border-slate-200">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setWizardStep(t.id)}
+              className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors -mb-px border-b-2 ${
+                wizardStep === t.id
+                  ? "text-slate-900 border-slate-900"
+                  : "text-slate-400 border-transparent hover:text-slate-600"
+              }`}
+            >
+              {t.label}
+            </button>
           ))}
         </div>
 
-        <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase mb-2">
-            Líneas
-          </p>
+        {/* ── CONTENT ── */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-white">
 
-          {lineas.length > 0 ? (
-            <div className="overflow-x-auto border border-slate-200 rounded-lg">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100">
+          {/* ======= TAB 1: INFO GENERAL ======= */}
+          {wizardStep === 1 && (
+            <>
+              <SectionBlock title="Datos del aviso">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
+                  <Field label="N° Aviso"            value={data.numeroAviso} />
+                  <Field label="Tipo de aviso"       value={data.tipoAviso} />
+                  <Field label="Tipo de mantenimiento" value={data.tipoMantenimiento} />
+                  <Field label="Prioridad"           value={data.prioridad} />
+                  <Field label="Estado"              value={ESTADOS_AV[estadoKey]?.label || estadoKey} />
+                  <Field label="Fecha de atención"   value={fmt(data.fechaAtencion)} />
+                  <Field label="N° Orden de venta"   value={data.ordenVenta} />
+                  <Field label="Centro de costo"     value={data.centroCosto} />
+                  <Field label="Producto"            value={data.producto} />
+                </div>
+              </SectionBlock>
+
+              <SectionBlock title="Descripción">
+                <div className="space-y-5">
+                  <Field label="Resumen"  value={data.descripcionResumida} wide />
+                  <Field label="Detalle"  value={data.descripcion}         wide />
+                </div>
+              </SectionBlock>
+
+              <SectionBlock title="Ubicación">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                  <Field label="Ubicación técnica"   value={str(data.ubicacionTecnica)} />
+                  <Field label="Dirección de atención" value={data.direccionAtencion} />
+                </div>
+              </SectionBlock>
+            </>
+          )}
+
+          {/* ======= TAB 2: CLIENTE Y CONTACTO ======= */}
+          {wizardStep === 2 && (
+            <>
+              <SectionBlock title="Cliente">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
+                  <Field label="Cliente"          value={str(data.cliente)} />
+                  <Field label="N° Orden cliente" value={data.ordenCliente} />
+                  <Field label="Sede"             value={str(data.sede)} />
+                  <Field label="Almacén"          value={str(data.almacen)} />
+                </div>
+              </SectionBlock>
+
+              <SectionBlock title="Contacto">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
+                  <Field label="Nombre"   value={data.nombreContacto} />
+                  <Field label="Correo"   value={data.correoContacto} />
+                  <Field label="Teléfono" value={data.numeroContacto} />
+                </div>
+              </SectionBlock>
+
+              <SectionBlock title="Solicitante">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                  <Field label="Nombre"    value={str(data.solicitante)} />
+                  <Field label="Supervisor" value={str(data.supervisorAsignado)} />
+                </div>
+              </SectionBlock>
+            </>
+          )}
+
+          {/* ======= TAB 3: TRATAMIENTO ======= */}
+          {wizardStep === 3 && (
+            <>
+              <SectionBlock title="Tratamiento">
+                {loadingTrat ? (
+                  <p className="text-sm text-slate-400">Cargando...</p>
+                ) : tratamiento ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
+                    <Field label="Estado"              value={tratamiento.estado} />
+                    <Field label="Creado"              value={fmtDt(tratamiento.createdAt)} />
+                    <Field label="Última actualización" value={fmtDt(tratamiento.updatedAt)} />
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 py-4 text-center border border-dashed border-slate-200 rounded-lg">
+                    Sin tratamiento registrado
+                  </p>
+                )}
+              </SectionBlock>
+
+              {/* Solicitudes de compra */}
+              <SectionBlock title={`Solicitudes de compra (${solicitudesCompra.length})`}>
+                {solicitudesCompra.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-4 text-center border border-dashed border-slate-200 rounded-lg">
+                    Sin solicitudes de compra
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {solicitudesCompra.map((sol, i) => (
+                      <SolicitudRow key={sol.id || i} index={i + 1} sol={sol} tipo="Compra" fmt={fmt} />
+                    ))}
+                  </div>
+                )}
+              </SectionBlock>
+
+              {/* Solicitudes de almacén */}
+              <SectionBlock title={`Solicitudes de almacén (${solicitudesAlmacen.length})`}>
+                {solicitudesAlmacen.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-4 text-center border border-dashed border-slate-200 rounded-lg">
+                    Sin solicitudes de almacén
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {solicitudesAlmacen.map((sol, i) => (
+                      <SolicitudRow key={sol.id || i} index={i + 1} sol={sol} tipo="Almacén" fmt={fmt} />
+                    ))}
+                  </div>
+                )}
+              </SectionBlock>
+
+              {/* Objetivos */}
+              <SectionBlock title={`Objetivos y actividades (${equiposTrat.length})`}>
+                {equiposTrat.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-4 text-center border border-dashed border-slate-200 rounded-lg">
+                    Sin objetivos registrados
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {equiposTrat.map((te, i) => (
+                      <ObjetivoBlock key={te.id || i} te={te} />
+                    ))}
+                  </div>
+                )}
+              </SectionBlock>
+
+              {/* Auditoría */}
+              <SectionBlock title="Auditoría">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                  <Field label="Creado por"          value={str(data.creador)} />
+                  <Field label="Supervisor asignado" value={str(data.supervisorAsignado)} />
+                  <Field label="Fecha de creación"   value={fmtDt(data.createdAt)} />
+                  <Field label="Última modificación" value={fmtDt(data.updatedAt)} />
+                </div>
+              </SectionBlock>
+            </>
+          )}
+
+          {/* ======= TAB 4: DOCUMENTOS ======= */}
+          {wizardStep === 4 && (
+            <>
+              {/* Documentos adjuntos */}
+              <SectionBlock title="Documentos adjuntos">
+                <AdjuntosViewer
+                  adjuntos={Array.isArray(data.documentos) ? data.documentos : []}
+                  titulo=""
+                  emptyMessage="No se adjuntaron documentos al crear este aviso."
+                />
+              </SectionBlock>
+
+              {/* Documento final */}
+              {data.documentoFinal && (
+                <SectionBlock title="Documento final">
+                  <AdjuntosViewer
+                    adjuntos={[{
+                      nombre: data.documentoFinal.split("/").pop(),
+                      url: data.documentoFinal,
+                      tipo: data.documentoFinal.split(".").pop(),
+                      categoria: "DOCUMENTO FINAL",
+                    }]}
+                    titulo=""
+                  />
+                </SectionBlock>
+              )}
+
+              {!Array.isArray(data.documentos) || (data.documentos.length === 0 && !data.documentoFinal) ? null : null}
+            </>
+          )}
+        </div>
+
+        {/* ── FOOTER ── */}
+        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+          <button
+            onClick={() => wizardStep === 1 ? onClose() : setWizardStep((p) => p - 1)}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            {wizardStep === 1 ? "Cerrar" : "Anterior"}
+          </button>
+
+          <span className="text-xs text-slate-400">
+            Paso {wizardStep} de {TABS.length}
+          </span>
+
+          {wizardStep < TABS.length ? (
+            <button
+              onClick={() => setWizardStep((p) => p + 1)}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              Siguiente <ChevronRight className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              Cerrar <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   SolicitudRow
+───────────────────────────────────────────── */
+function SolicitudRow({ index, sol, tipo, fmt }) {
+  const [open, setOpen] = useState(false);
+  const lineas = sol.lineas || [];
+
+  const objetivo = (() => {
+    if (sol.esGeneral) return "General";
+    if (sol.equipo?.nombre) return sol.equipo.nombre;
+    if (sol.ubicacionTecnica?.nombre) return sol.ubicacionTecnica.nombre;
+    return "—";
+  })();
+
+  return (
+    <div className="border border-slate-200 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-slate-800">
+            {tipo} #{index}
+            {sol.numeroSolicitud && <span className="text-slate-400 font-normal ml-2">· {sol.numeroSolicitud}</span>}
+          </span>
+          <span className="text-xs text-slate-500">{objetivo}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+            {lineas.length} ítem{lineas.length !== 1 ? "s" : ""}
+          </span>
+          {sol.estado && (
+            <span className="text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+              {sol.estado}
+            </span>
+          )}
+          <span className="text-slate-400 text-xs">{open ? "▲" : "▼"}</span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-3 pt-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 mb-4 text-xs">
+            {sol.requiredDate && <div><p className="text-slate-400 font-semibold uppercase">Fecha requerida</p><p className="text-slate-700">{fmt(sol.requiredDate)}</p></div>}
+            {sol.requester    && <div><p className="text-slate-400 font-semibold uppercase">Solicitante</p><p className="text-slate-700">{sol.requester}</p></div>}
+            {sol.department   && <div><p className="text-slate-400 font-semibold uppercase">Departamento</p><p className="text-slate-700">{sol.department}</p></div>}
+            {sol.comments     && <div className="col-span-full"><p className="text-slate-400 font-semibold uppercase">Comentarios</p><p className="text-slate-700">{sol.comments}</p></div>}
+          </div>
+
+          {lineas.length > 0 && (
+            <div className="overflow-x-auto border border-slate-100 rounded-lg">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
-                      ItemCode
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
-                      Descripción
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
-                      Cantidad
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
-                      Warehouse
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
-                      Costing
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
-                      Project
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
-                      Rubro SAP
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">
-                      Paquete
-                    </th>
+                    {["Código", "Descripción", "Cant.", "Almacén", "C. Costo", "Proyecto"].map((h) => (
+                      <th key={h} className="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {lineas.map((linea, idx) => (
-                    <tr
-                      key={linea.id || idx}
-                      className="border-t border-slate-200"
-                    >
-                      <td className="px-3 py-2 text-slate-800">
-                        {linea.itemCode || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-slate-800">
-                        {linea.description || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-slate-800">
-                        {linea.quantity || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-slate-800">
-                        {linea.warehouseCode || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-slate-800">
-                        {linea.costingCode || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-slate-800">
-                        {linea.projectCode || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-slate-800">
-                        {linea.rubroSapCode || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-slate-800">
-                        {linea.paqueteTrabajo || "—"}
-                      </td>
+                <tbody className="divide-y divide-slate-100">
+                  {lineas.map((l, i) => (
+                    <tr key={l.id || i} className="hover:bg-slate-50">
+                      <td className="px-3 py-2 font-mono font-semibold text-slate-700">{l.itemCode || "—"}</td>
+                      <td className="px-3 py-2 text-slate-600 max-w-[220px] truncate">{l.description || "—"}</td>
+                      <td className="px-3 py-2 text-center font-semibold text-slate-700">{l.quantity ?? "—"}</td>
+                      <td className="px-3 py-2 text-slate-500">{l.warehouseCode || "—"}</td>
+                      <td className="px-3 py-2 text-slate-500">{l.costingCode || "—"}</td>
+                      <td className="px-3 py-2 text-slate-500">{l.projectCode || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <EmptyState text="No hay líneas registradas." small />
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   ObjetivoBlock
+───────────────────────────────────────────── */
+function ObjetivoBlock({ te }) {
+  const nombre = te?.equipo?.nombre || te?.ubicacionTecnica?.nombre || "Sin objetivo";
+  const codigo = te?.equipo?.codigo || te?.equipo?.tag || te?.ubicacionTecnica?.codigo || "";
+  const actividades = te.actividades || [];
+
+  return (
+    <div className="border border-slate-200 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">{nombre}</p>
+          {codigo && <p className="text-xs text-slate-400">{codigo}</p>}
+        </div>
+        <span className="text-xs font-medium text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">
+          {actividades.length} actividad{actividades.length !== 1 ? "es" : ""}
+        </span>
       </div>
+
+      {actividades.length > 0 && (
+        <div className="divide-y divide-slate-100">
+          {actividades.map((act, i) => (
+            <div key={act.id || i} className="px-4 py-3">
+              <div className="flex items-start justify-between gap-3 flex-wrap mb-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">{act.tarea || "Sin tarea"}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {[act.sistema, act.subsistema, act.componente].filter(Boolean).join(" / ") || "Sin clasificación"}
+                  </p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  {act.estado && <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">{act.estado}</span>}
+                  {act.origen && <span className="text-xs text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">{act.origen}</span>}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div><p className="text-slate-400 font-semibold uppercase">Tipo trabajo</p><p className="text-slate-700">{act.tipoTrabajo || "—"}</p></div>
+                <div><p className="text-slate-400 font-semibold uppercase">Rol técnico</p><p className="text-slate-700">{act.rolTecnico || "—"}</p></div>
+                <div><p className="text-slate-400 font-semibold uppercase">Técnicos</p><p className="text-slate-700">{act.cantidadTecnicos ?? "—"}</p></div>
+                <div><p className="text-slate-400 font-semibold uppercase">Duración</p><p className="text-slate-700">{act.duracionEstimadaValor ? `${act.duracionEstimadaValor} ${act.unidadDuracion || "min"}` : "—"}</p></div>
+              </div>
+              {act.descripcion && <p className="text-xs text-slate-600 mt-2">{act.descripcion}</p>}
+              {act.observaciones && <p className="text-xs text-slate-500 mt-1 italic">{act.observaciones}</p>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

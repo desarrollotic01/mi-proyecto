@@ -5,7 +5,6 @@ import {
   Trash2,
   Package,
   Calendar,
-  Mail,
   CheckCircle,
   MapPinned,
   ClipboardList,
@@ -13,7 +12,7 @@ import {
 } from "lucide-react";
 
 import { itemService } from "../../features/PlanMantenimiento/services/itemService";
-import { rubroService } from "../../features/PlanMantenimiento/services/rubroService";
+import { sapCatalogosService } from "../../features/PlanMantenimiento/services/sapCatalogosService";
 
 /* ══════════════════════════════════════════
    HELPERS
@@ -24,31 +23,27 @@ const ensureId = () =>
     ? crypto.randomUUID()
     : `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
-const emptyLinea = () => ({
+const emptyLinea = (defaultProjectCode = "") => ({
   id: ensureId(),
   itemId: "",
   itemCode: "",
   description: "",
   quantity: 1,
-  warehouseCode: "",
+  warehouseCode: "01",
   costCenter: "",
-  projectCode: "",
-  rubro: "",
-  rubroSapCode: "",
-  paqueteTrabajo: "",
+  projectCode: defaultProjectCode,
+  rubroId: null,
+  paqueteTrabajoId: null,
 });
 
+// Cabecera mínima — solo requiredDate
 const emptyForm = () => ({
-  department: "",
-  requester: "",
-  email: "",
   requiredDate: "",
-  comments: "",
   lineas: [emptyLinea()],
 });
 
-const normalizeLinea = (l = {}) => ({
-  ...emptyLinea(),
+const normalizeLinea = (l = {}, defaultProjectCode = "") => ({
+  ...emptyLinea(defaultProjectCode),
   ...l,
   id: l.id || ensureId(),
   itemId: l.itemId || "",
@@ -58,53 +53,50 @@ const normalizeLinea = (l = {}) => ({
     Number.isFinite(Number(l.quantity)) && Number(l.quantity) > 0
       ? Number(l.quantity)
       : 1,
-  warehouseCode: l.warehouseCode || "",
+  warehouseCode: l.warehouseCode || "01",
   costCenter: l.costCenter || l.costingCode || "",
-  projectCode: l.projectCode || "",
-  rubro: l.rubro || "",
-  rubroSapCode: l.rubroSapCode || "",
-  paqueteTrabajo: l.paqueteTrabajo || "",
+  projectCode: l.projectCode || defaultProjectCode,
+  rubroId: l.rubroId || null,
+  paqueteTrabajoId: l.paqueteTrabajoId || null,
 });
 
 const normalizeForm = (form) => {
   const f = form || emptyForm();
   const lineas = Array.isArray(f.lineas) ? f.lineas : [];
-
-  const normalizedLineas =
-    lineas.length > 0 ? lineas.map(normalizeLinea) : [emptyLinea()];
-
   return {
     ...emptyForm(),
-    ...f,
-    department: f.department || "",
-    requester: f.requester || f.email || "",
-    email: f.email || f.requester || "",
     requiredDate: f.requiredDate ? String(f.requiredDate).slice(0, 10) : "",
-    comments: f.comments || "",
-    lineas: normalizedLineas,
+    lineas: lineas.length > 0 ? lineas.map(normalizeLinea) : [emptyLinea()],
   };
 };
 
 const isSolicitudVacia = (s) => {
   if (!s) return true;
-
-  const hasHeader = Boolean(
-    s.department?.trim() ||
-      s.email?.trim() ||
-      s.requiredDate ||
-      s.comments?.trim()
-  );
-
+  const hasDate = Boolean(s.requiredDate);
   const hasLineas =
     Array.isArray(s.lineas) &&
-    s.lineas.some((l) => {
-      const hasBasics =
-        (l.itemCode?.trim() || l.description?.trim()) && Number(l.quantity) > 0;
-      return hasBasics;
-    });
-
-  return !(hasHeader || hasLineas);
+    s.lineas.some(
+      (l) =>
+        (l.itemCode?.trim() || l.description?.trim()) && Number(l.quantity) > 0
+    );
+  return !(hasDate || hasLineas);
 };
+
+// Payload que espera el backend — solo requiredDate + lineas
+const buildPayloadSolicitud = (form) => ({
+  requiredDate: form.requiredDate || "",
+  lineas: (form.lineas || []).map((l) => ({
+    itemId: l.itemId || null,
+    itemCode: l.itemCode || "",
+    description: l.description || "",
+    quantity: Number(l.quantity) || 1,
+    warehouseCode: l.warehouseCode || "01",
+    costingCode: l.costCenter || "",
+    projectCode: l.projectCode || "",
+    rubroId: l.rubroId || null,
+    paqueteTrabajoId: l.paqueteTrabajoId || null,
+  })),
+});
 
 const getTargetTypeLabel = (type) =>
   type === "UBICACION_TECNICA" ? "Ubicación técnica" : "Equipo";
@@ -118,7 +110,9 @@ function FormSolicitudAlmacen({
   onChange,
   items = [],
   rubros = [],
+  paquetes = [],
   loadingCatalogos = false,
+  defaultProjectCode = "",
 }) {
   const set = (field, value) => onChange({ ...data, [field]: value });
 
@@ -128,7 +122,7 @@ function FormSolicitudAlmacen({
       data.lineas.map((l) => (l.id === id ? { ...l, [field]: value } : l))
     );
 
-  const addLinea = () => set("lineas", [...data.lineas, emptyLinea()]);
+  const addLinea = () => set("lineas", [...data.lineas, emptyLinea(defaultProjectCode)]);
 
   const removeLinea = (id) =>
     set(
@@ -146,14 +140,7 @@ function FormSolicitudAlmacen({
         "lineas",
         data.lineas.map((l) =>
           l.id === lineaId
-            ? {
-                ...l,
-                itemId: "",
-                itemCode: "",
-                description: "",
-                rubroSapCode: "",
-                rubro: "",
-              }
+            ? { ...l, itemId: "", itemCode: "", description: "", rubroId: null }
             : l
         )
       );
@@ -164,36 +151,12 @@ function FormSolicitudAlmacen({
       "lineas",
       data.lineas.map((l) => {
         if (l.id !== lineaId) return l;
-
         return {
           ...l,
           itemId: itemSeleccionado.id || "",
           itemCode: itemSeleccionado.sapCode || "",
           description: itemSeleccionado.nombre || "",
-          rubroSapCode: itemSeleccionado.rubroSapCode ?? "",
-          rubro:
-            itemSeleccionado.rubro?.nombre ||
-            itemSeleccionado.rubroNombre ||
-            "",
-        };
-      })
-    );
-  };
-
-  const handleSelectRubro = (lineaId, selectedSapCode) => {
-    const rubroSeleccionado = rubros.find(
-      (r) => String(r.sapCode) === String(selectedSapCode)
-    );
-
-    set(
-      "lineas",
-      data.lineas.map((l) => {
-        if (l.id !== lineaId) return l;
-
-        return {
-          ...l,
-          rubroSapCode: rubroSeleccionado?.sapCode ?? "",
-          rubro: rubroSeleccionado?.nombre || "",
+          rubroId: itemSeleccionado.rubroId ?? null,
         };
       })
     );
@@ -201,34 +164,8 @@ function FormSolicitudAlmacen({
 
   return (
     <div className="space-y-5">
+      {/* Cabecera — solo fecha */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">
-            Departamento <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="text"
-            placeholder="Ej: Almacén"
-            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-            value={data.department ?? ""}
-            onChange={(e) => set("department", e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">
-            <Mail className="inline w-3.5 h-3.5 mr-1" />
-            Email solicitante <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="email"
-            placeholder="correo@empresa.com"
-            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-            value={data.email ?? ""}
-            onChange={(e) => set("email", e.target.value)}
-          />
-        </div>
-
         <div>
           <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">
             <Calendar className="inline w-3.5 h-3.5 mr-1" />
@@ -241,21 +178,9 @@ function FormSolicitudAlmacen({
             onChange={(e) => set("requiredDate", e.target.value)}
           />
         </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">
-            Comentarios
-          </label>
-          <input
-            type="text"
-            placeholder="Notas adicionales..."
-            className="w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-            value={data.comments ?? ""}
-            onChange={(e) => set("comments", e.target.value)}
-          />
-        </div>
       </div>
 
+      {/* Artículos */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
@@ -267,159 +192,151 @@ function FormSolicitudAlmacen({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {data.lineas.map((l, idx) => (
             <div
               key={l.id}
-              className="grid grid-cols-12 gap-2 items-end bg-red-50/40 border border-red-100 rounded-xl p-3"
+              className="space-y-2 bg-red-50/40 border border-red-100 rounded-xl p-3"
             >
-              <div className="col-span-3">
-                <p className="text-xs text-gray-500 mb-1">Ítem *</p>
-                <select
-                  className="w-full px-2 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300 bg-white"
-                  value={l.itemId ?? ""}
-                  onChange={(e) => handleSelectItem(l.id, e.target.value)}
-                  disabled={loadingCatalogos}
-                >
-                  <option value="">
-                    {loadingCatalogos
-                      ? "Cargando items..."
-                      : "Seleccione un ítem"}
-                  </option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.sapCode} - {item.nombre}
+              {/* Fila 1 */}
+              <div className="grid grid-cols-12 gap-2 items-end">
+                <div className="col-span-4">
+                  <p className="text-xs text-gray-500 mb-1">Ítem *</p>
+                  <select
+                    className="w-full px-2 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300 bg-white"
+                    value={l.itemId ?? ""}
+                    onChange={(e) => handleSelectItem(l.id, e.target.value)}
+                    disabled={loadingCatalogos}
+                  >
+                    <option value="">
+                      {loadingCatalogos ? "Cargando items..." : "Seleccione un ítem"}
                     </option>
-                  ))}
-                </select>
+                    {items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.sapCode} - {item.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 mb-1">Código *</p>
+                  <input
+                    type="text"
+                    className="w-full px-2 py-1.5 border rounded-lg text-sm bg-gray-100 focus:outline-none"
+                    value={l.itemCode ?? ""}
+                    readOnly
+                  />
+                </div>
+
+                <div className="col-span-3">
+                  <p className="text-xs text-gray-500 mb-1">Descripción *</p>
+                  <input
+                    type="text"
+                    placeholder="Descripción"
+                    className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
+                    value={l.description ?? ""}
+                    onChange={(e) => updateLinea(l.id, "description", e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <p className="text-xs text-gray-500 mb-1">Cant.</p>
+                  <input
+                    type="number"
+                    min="1"
+                    className="w-full px-2 py-1.5 border rounded-lg text-sm text-center font-semibold focus:outline-none focus:ring-1 focus:ring-red-300"
+                    value={l.quantity ?? 1}
+                    onChange={(e) => updateLinea(l.id, "quantity", Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 mb-1">Almacén</p>
+                  <input
+                    type="text"
+                    placeholder="01"
+                    className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
+                    value={l.warehouseCode ?? ""}
+                    onChange={(e) => updateLinea(l.id, "warehouseCode", e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 mb-1">Código *</p>
-                <input
-                  type="text"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm bg-gray-100 focus:outline-none"
-                  value={l.itemCode ?? ""}
-                  readOnly
-                />
+              {/* Fila 2 */}
+              <div className="grid grid-cols-12 gap-2 items-end">
+                <div className="col-span-3">
+                  <p className="text-xs text-gray-500 mb-1">Centro de costo</p>
+                  <input
+                    type="text"
+                    placeholder="CC-001"
+                    className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
+                    value={l.costCenter ?? ""}
+                    onChange={(e) => updateLinea(l.id, "costCenter", e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-3">
+                  <p className="text-xs text-gray-500 mb-1">Proyecto</p>
+                  <input
+                    type="text"
+                    placeholder="Opcional"
+                    className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
+                    value={l.projectCode ?? ""}
+                    onChange={(e) => updateLinea(l.id, "projectCode", e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-3">
+                  <p className="text-xs text-gray-500 mb-1">Rubro</p>
+                  <select
+                    className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300 bg-white"
+                    value={l.rubroId != null ? String(l.rubroId) : ""}
+                    onChange={(e) => updateLinea(l.id, "rubroId", e.target.value || null)}
+                  >
+                    <option value="">Seleccione rubro</option>
+                    {rubros.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.codigo} - {r.descripcion}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-span-3">
+                  <p className="text-xs text-gray-500 mb-1">Paquete trabajo</p>
+                  <select
+                    className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300 bg-white"
+                    value={l.paqueteTrabajoId != null ? String(l.paqueteTrabajoId) : ""}
+                    onChange={(e) => updateLinea(l.id, "paqueteTrabajoId", e.target.value || null)}
+                  >
+                    <option value="">Seleccione paquete</option>
+                    {paquetes.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.codigo} - {p.descripcion}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className="col-span-3">
-                <p className="text-xs text-gray-500 mb-1">Descripción *</p>
-                <input
-                  type="text"
-                  placeholder="Descripción"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
-                  value={l.description ?? ""}
-                  onChange={(e) =>
-                    updateLinea(l.id, "description", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="col-span-1">
-                <p className="text-xs text-gray-500 mb-1">Cant.</p>
-                <input
-                  type="number"
-                  min="1"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm text-center font-semibold focus:outline-none focus:ring-1 focus:ring-red-300"
-                  value={l.quantity ?? 1}
-                  onChange={(e) =>
-                    updateLinea(l.id, "quantity", Number(e.target.value))
-                  }
-                />
-              </div>
-
-              <div className="col-span-1">
-                <p className="text-xs text-gray-500 mb-1">Almacén</p>
-                <input
-                  type="text"
-                  placeholder="01"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
-                  value={l.warehouseCode ?? ""}
-                  onChange={(e) =>
-                    updateLinea(l.id, "warehouseCode", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 mb-1">Centro de costo</p>
-                <input
-                  type="text"
-                  placeholder="CC-001"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
-                  value={l.costCenter ?? ""}
-                  onChange={(e) =>
-                    updateLinea(l.id, "costCenter", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 mb-1">Proyecto</p>
-                <input
-                  type="text"
-                  placeholder="Opcional"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
-                  value={l.projectCode ?? ""}
-                  onChange={(e) =>
-                    updateLinea(l.id, "projectCode", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 mb-1">Rubro</p>
-                <select
-                  className="w-full px-2 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300 bg-white"
-                  value={l.rubroSapCode ?? ""}
-                  onChange={(e) => handleSelectRubro(l.id, e.target.value)}
-                  disabled={loadingCatalogos}
-                >
-                  <option value="">
-                    {loadingCatalogos
-                      ? "Cargando rubros..."
-                      : "Seleccione rubro"}
-                  </option>
-                  {rubros.map((rubro) => (
-                    <option key={rubro.id} value={rubro.sapCode}>
-                      {rubro.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="col-span-1">
-                <p className="text-xs text-gray-500 mb-1">Paquete</p>
-                <input
-                  type="text"
-                  placeholder="PT-001"
-                  className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
-                  value={l.paqueteTrabajo ?? ""}
-                  onChange={(e) =>
-                    updateLinea(l.id, "paqueteTrabajo", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="col-span-12 flex justify-end gap-2">
+              {/* Botones */}
+              <div className="flex justify-end gap-2">
                 {data.lineas.length > 1 && (
                   <button
                     type="button"
                     onClick={() => removeLinea(l.id)}
-                    className="px-3 py-2 bg-red-50 border border-red-200 text-red-600 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-1"
+                    className="px-3 py-2 bg-red-50 border border-red-200 text-red-600 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Eliminar
                   </button>
                 )}
-
                 {idx === data.lineas.length - 1 && (
                   <button
                     type="button"
                     onClick={addLinea}
-                    className="px-3 py-2 bg-red-100 border border-red-200 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center justify-center gap-1"
+                    className="px-3 py-2 bg-red-100 border border-red-200 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Agregar línea
@@ -448,13 +365,15 @@ export default function ModalSolicitudAlmacen({
   equiposInfo = [],
   initialValue = null,
   contextoOt = null,
-  soloContextoOt = false,
+  ordenVenta = "",
+  centroCosto = "",
 }) {
   const [tab, setTab] = useState("general");
   const [general, setGeneral] = useState(emptyForm());
   const [porTarget, setPorTarget] = useState({});
   const [items, setItems] = useState([]);
   const [rubros, setRubros] = useState([]);
+  const [paquetes, setPaquetes] = useState([]);
   const [loadingCatalogos, setLoadingCatalogos] = useState(false);
 
   const normalizedTargets = useMemo(() => {
@@ -474,10 +393,11 @@ export default function ModalSolicitudAlmacen({
       }));
     }
 
+    
+
     const fallbackEquipos = (equiposRelacion || []).map((rel) => {
       const equipoId = String(rel.equipoId);
       const eq = (equiposInfo || []).find((e) => String(e.id) === equipoId);
-
       return {
         id: equipoId,
         type: "EQUIPO",
@@ -495,7 +415,6 @@ export default function ModalSolicitudAlmacen({
           rel?.ubicacion?.id ||
           rel?.ubicacionTecnica?.id
       );
-
       return {
         id,
         type: "UBICACION_TECNICA",
@@ -505,10 +424,7 @@ export default function ModalSolicitudAlmacen({
           rel?.ubicacionTecnica?.codigo ||
           rel?.ubicacion?.codigo ||
           `Ubicación técnica ${id}`,
-        tag:
-          rel?.ubicacionTecnica?.codigo ||
-          rel?.ubicacion?.codigo ||
-          id,
+        tag: rel?.ubicacionTecnica?.codigo || rel?.ubicacion?.codigo || id,
         equipoId: null,
         ubicacionTecnicaId: id,
       };
@@ -517,65 +433,126 @@ export default function ModalSolicitudAlmacen({
     return [...fallbackEquipos, ...fallbackUbicaciones];
   }, [contextoOt, targets, equiposRelacion, ubicacionesRelacion, equiposInfo]);
 
-  const targetsKey = useMemo(() => {
-    return normalizedTargets.map((t) => `${t.type}-${t.id}`).join("|");
-  }, [normalizedTargets]);
 
+  const targetsKey = useMemo(
+    () => normalizedTargets.map((t) => `${t.type}-${t.id}`).join("|"),
+    [normalizedTargets]
+  );
+
+  /* Catálogos */
   useEffect(() => {
-    const cargarCatalogos = async () => {
+    if (!isOpen) return;
+    (async () => {
       try {
         setLoadingCatalogos(true);
-
-        const [itemsData, rubrosData] = await Promise.all([
+        const [itemsData, rubrosData, paquetesData] = await Promise.all([
           itemService.getAll(),
-          rubroService.getAll(),
+          sapCatalogosService.getRubros(),
+          sapCatalogosService.getPaquetes(),
         ]);
-
-        setItems(Array.isArray(itemsData) ? itemsData : []);
-        setRubros(Array.isArray(rubrosData) ? rubrosData : []);
+        setItems(itemsData || []);
+        setRubros(rubrosData || []);
+        setPaquetes(paquetesData || []);
       } catch (error) {
-        console.error("Error cargando catálogos de solicitud de almacén:", error);
-        setItems([]);
-        setRubros([]);
+        console.error("Error cargando catálogos:", error);
       } finally {
         setLoadingCatalogos(false);
       }
-    };
-
-    if (isOpen) {
-      cargarCatalogos();
-    }
+    })();
   }, [isOpen]);
 
+  /* Inicializar formularios */
   useEffect(() => {
     if (!isOpen) return;
 
-    const generalInicial = initialValue?.solicitudGeneral
-      ? normalizeForm(initialValue.solicitudGeneral)
-      : normalizeForm(emptyForm());
+    // Inyecta ordenVenta→projectCode y centroCosto→costCenter en líneas que no tengan valor
+    const injectDefaults = (form) => {
+      return {
+        ...form,
+        lineas: (form.lineas || []).map((l) => ({
+          ...l,
+          projectCode: l.projectCode || ordenVenta || "",
+          costCenter: l.costCenter || centroCosto || "",
+        })),
+      };
+    };
+
+    setGeneral(
+      injectDefaults(
+        initialValue?.solicitudGeneral
+          ? normalizeForm(initialValue.solicitudGeneral)
+          : normalizeForm(emptyForm())
+      )
+    );
 
     const nextPorTarget = {};
     for (const target of normalizedTargets) {
       const key = String(target.id);
-      const fromInitial = initialValue?.solicitudesPorEquipo?.[key];
-      nextPorTarget[key] = normalizeForm(fromInitial || emptyForm());
+      nextPorTarget[key] = injectDefaults(
+        normalizeForm(initialValue?.solicitudesPorEquipo?.[key] || emptyForm())
+      );
     }
-
-    setGeneral(generalInicial);
     setPorTarget(nextPorTarget);
     setTab("general");
-  }, [isOpen, initialValue, targetsKey]);
+  }, [isOpen, initialValue, targetsKey, ordenVenta, centroCosto]);
 
-  const updateTargetForm = (targetId, form) => {
+  // Resolve rubroSapCode → rubroId and paqueteTrabajo code → paqueteTrabajoId
+  // once catalog data is loaded (plan items carry codes; lineas need UUIDs)
+  useEffect(() => {
+    if (!isOpen || (rubros.length === 0 && paquetes.length === 0)) return;
+
+    const resolveLineas = (lineas) => {
+      let changed = false;
+      const result = (lineas || []).map((l) => {
+        const resolvedRubroId =
+          l.rubroId ||
+          (l.rubroSapCode
+            ? rubros.find((r) => String(r.codigo) === String(l.rubroSapCode))?.id ?? null
+            : null);
+        const resolvedPaqueteId =
+          l.paqueteTrabajoId ||
+          (l.paqueteTrabajo
+            ? paquetes.find((p) => p.codigo === l.paqueteTrabajo)?.id ?? null
+            : null);
+        if (resolvedRubroId === l.rubroId && resolvedPaqueteId === l.paqueteTrabajoId) return l;
+        changed = true;
+        return { ...l, rubroId: resolvedRubroId, paqueteTrabajoId: resolvedPaqueteId };
+      });
+      return changed ? result : lineas;
+    };
+
+    setGeneral((prev) => {
+      const resolved = resolveLineas(prev.lineas);
+      return resolved === prev.lineas ? prev : { ...prev, lineas: resolved };
+    });
+
+    setPorTarget((prev) => {
+      let changed = false;
+      const next = {};
+      for (const [key, form] of Object.entries(prev)) {
+        const resolved = resolveLineas(form.lineas);
+        if (resolved !== form.lineas) {
+          changed = true;
+          next[key] = { ...form, lineas: resolved };
+        } else {
+          next[key] = form;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [isOpen, rubros, paquetes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const updateTargetForm = (targetId, form) =>
     setPorTarget((prev) => ({ ...prev, [targetId]: form }));
-  };
 
-  const solicitudesNoVaciasCount = useMemo(() => {
-    return normalizedTargets.reduce((acc, target) => {
-      const f = porTarget[String(target.id)];
-      return acc + (!isSolicitudVacia(f) ? 1 : 0);
-    }, 0);
-  }, [normalizedTargets, porTarget]);
+  const solicitudesNoVaciasCount = useMemo(
+    () =>
+      normalizedTargets.reduce(
+        (acc, t) => acc + (!isSolicitudVacia(porTarget[String(t.id)]) ? 1 : 0),
+        0
+      ),
+    [normalizedTargets, porTarget]
+  );
 
   const handleConfirm = () => {
     const solicitudesPorEquipo = {};
@@ -583,36 +560,19 @@ export default function ModalSolicitudAlmacen({
     normalizedTargets.forEach((target) => {
       const key = String(target.id);
       const f = porTarget[key];
-
       if (!isSolicitudVacia(f)) {
         solicitudesPorEquipo[key] = {
-          ...f,
-          lineas: (f.lineas || []).map((linea) => ({
-            ...linea,
-            costingCode: linea.costCenter || "",
-          })),
-          targetMeta: {
-            id: target.id,
-            type: target.type,
-            nombre: target.nombre,
-            tag: target.tag,
-            equipo_id: target.equipoId || null,
-            ubicacion_tecnica_id: target.ubicacionTecnicaId || null,
-          },
+          ...buildPayloadSolicitud(f),
+          equipo_id: target.equipoId || null,
+          ubicacion_tecnica_id: target.ubicacionTecnicaId || null,
         };
       }
     });
 
     onConfirm({
-      contextoOt,
-      solicitudGeneral: {
-        ...general,
-        esGeneral: true,
-        lineas: (general.lineas || []).map((linea) => ({
-          ...linea,
-          costingCode: linea.costCenter || "",
-        })),
-      },
+      solicitudGeneral: isSolicitudVacia(general)
+        ? null
+        : { ...buildPayloadSolicitud(general), esGeneral: true },
       solicitudesPorEquipo,
     });
   };
@@ -623,17 +583,24 @@ export default function ModalSolicitudAlmacen({
       : porTarget[String(tab)] || normalizeForm(emptyForm());
 
   const currentSetFn =
-    tab === "general" ? setGeneral : (form) => updateTargetForm(String(tab), form);
+    tab === "general"
+      ? setGeneral
+      : (form) => updateTargetForm(String(tab), form);
 
-  const currentTarget = normalizedTargets.find((t) => String(t.id) === String(tab));
+  const currentTarget = normalizedTargets.find(
+    (t) => String(t.id) === String(tab)
+  );
   const currentTargetHasData =
     tab !== "general" ? !isSolicitudVacia(porTarget[String(tab)]) : false;
 
   if (!isOpen) return null;
+  
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
       <div className="bg-white w-full max-w-6xl rounded-2xl flex flex-col max-h-[92vh] shadow-2xl">
+
+        {/* Header */}
         <div className="p-6 border-b bg-gradient-to-r from-red-50 to-rose-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-red-600 rounded-xl">
@@ -644,15 +611,12 @@ export default function ModalSolicitudAlmacen({
                 Solicitudes de Almacén
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                {soloContextoOt
-                  ? "General + objetivos de esta orden de trabajo"
-                  : `General opcional · ${solicitudesNoVaciasCount} objetivo${
-                      solicitudesNoVaciasCount !== 1 ? "s" : ""
-                    } con solicitud individual`}
+                General opcional ·{" "}
+                {solicitudesNoVaciasCount} objetivo
+                {solicitudesNoVaciasCount !== 1 ? "s" : ""} con solicitud individual
               </p>
             </div>
           </div>
-
           <button
             type="button"
             onClick={onClose}
@@ -663,6 +627,7 @@ export default function ModalSolicitudAlmacen({
         </div>
 
         <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar */}
           <div className="w-64 border-r bg-red-50/40 flex flex-col shrink-0">
             <div className="p-3 space-y-1 flex-1 overflow-y-auto">
               <button
@@ -714,18 +679,12 @@ export default function ModalSolicitudAlmacen({
                     ) : (
                       <Package className="w-4 h-4 shrink-0" />
                     )}
-
                     <div className="flex-1 min-w-0">
                       <p className="truncate font-medium text-xs">{target.nombre}</p>
-                      <p
-                        className={`text-xs truncate ${
-                          isActive ? "text-rose-200" : "text-gray-400"
-                        }`}
-                      >
+                      <p className={`text-xs truncate ${isActive ? "text-rose-200" : "text-gray-400"}`}>
                         {getTargetTypeLabel(target.type)} · {target.tag}
                       </p>
                     </div>
-
                     {filled ? (
                       <CheckCircle className="w-4 h-4 shrink-0 opacity-70" />
                     ) : (
@@ -736,25 +695,18 @@ export default function ModalSolicitudAlmacen({
               })}
             </div>
 
+            {/* Resumen */}
             <div className="p-3 border-t bg-white">
               <div className="text-xs text-gray-500 space-y-1">
                 <div className="flex justify-between">
                   <span>General</span>
-                  <span
-                    className={`font-semibold ${
-                      !isSolicitudVacia(general) ? "text-red-600" : "text-gray-400"
-                    }`}
-                  >
+                  <span className={`font-semibold ${!isSolicitudVacia(general) ? "text-red-600" : "text-gray-400"}`}>
                     {!isSolicitudVacia(general) ? "Con datos" : "Vacía"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Individuales</span>
-                  <span
-                    className={`font-semibold ${
-                      solicitudesNoVaciasCount > 0 ? "text-rose-600" : "text-gray-400"
-                    }`}
-                  >
+                  <span className={`font-semibold ${solicitudesNoVaciasCount > 0 ? "text-rose-600" : "text-gray-400"}`}>
                     {solicitudesNoVaciasCount}
                   </span>
                 </div>
@@ -762,23 +714,16 @@ export default function ModalSolicitudAlmacen({
             </div>
           </div>
 
+          {/* Área principal */}
           <div className="flex-1 overflow-y-auto">
-            <div
-              className={`px-6 py-4 border-b flex items-center justify-between shrink-0 ${
-                tab === "general" ? "bg-red-50" : "bg-rose-50"
-              }`}
-            >
+            <div className={`px-6 py-4 border-b flex items-center justify-between shrink-0 ${tab === "general" ? "bg-red-50" : "bg-rose-50"}`}>
               <div className="flex items-center gap-2 min-w-0">
                 {tab === "general" ? (
                   <>
                     <Warehouse className="w-5 h-5 text-red-600" />
                     <div>
-                      <p className="font-semibold text-gray-800">
-                        Solicitud General de Almacén
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Aplicada a todo el tratamiento
-                      </p>
+                      <p className="font-semibold text-gray-800">Solicitud General de Almacén</p>
+                      <p className="text-xs text-gray-500">Aplicada a todo el tratamiento</p>
                     </div>
                   </>
                 ) : (
@@ -788,7 +733,6 @@ export default function ModalSolicitudAlmacen({
                     ) : (
                       <Package className="w-5 h-5 text-rose-600" />
                     )}
-
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-800 truncate">
                         {currentTarget?.nombre || tab}
@@ -797,7 +741,6 @@ export default function ModalSolicitudAlmacen({
                         {getTargetTypeLabel(currentTarget?.type)} · {currentTarget?.tag}
                       </p>
                     </div>
-
                     {currentTargetHasData && (
                       <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-semibold border bg-red-100 border-red-300 text-red-700">
                         Con datos
@@ -824,24 +767,22 @@ export default function ModalSolicitudAlmacen({
                 onChange={currentSetFn}
                 items={items}
                 rubros={rubros}
+                paquetes={paquetes}
                 loadingCatalogos={loadingCatalogos}
+                defaultProjectCode={ordenVenta}
               />
             </div>
           </div>
         </div>
 
+        {/* Footer */}
         <div className="p-5 border-t bg-gray-50 flex items-center justify-between shrink-0">
           <div className="text-sm text-gray-500 flex items-center gap-4">
-            <span>
-              <span className="text-red-400">*</span> Campos obligatorios
-            </span>
-
+            <span><span className="text-red-400">*</span> Campos obligatorios</span>
             {solicitudesNoVaciasCount > 0 && (
               <span className="flex items-center gap-1 text-rose-600 font-medium">
                 <ClipboardList className="w-4 h-4" />
-                {solicitudesNoVaciasCount} solicitud
-                {solicitudesNoVaciasCount !== 1 ? "es" : ""} individual
-                {solicitudesNoVaciasCount !== 1 ? "es" : ""}
+                {solicitudesNoVaciasCount} solicitud{solicitudesNoVaciasCount !== 1 ? "es" : ""} individual{solicitudesNoVaciasCount !== 1 ? "es" : ""}
               </span>
             )}
           </div>

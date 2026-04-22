@@ -15,6 +15,9 @@ import MaintenanceGuides from "./features/GuiaMantenimiento/GuiaMantenimiento";
 import GuiasKanban from "./pages/GuiaMantenimientoKanban";
 import ListaLink from "./features/Equipo/ListaLink";
 import ItemsPage from "./pages/itemPage";
+import AdminPage from "./features/Admin/pages/AdminPage";
+import SolicitudesPage from "./features/Solicitudes/pages/SolicitudesPage";
+import AlertasGuiaPage from "./pages/AlertasGuia";
 
 function AppLayout() {
   return (
@@ -48,7 +51,10 @@ export default function App() {
         <Route path="trabajadores" element={<TrabajadoresPage />} />
         <Route path="guiaMantenimiento" element={<MaintenanceGuides />} />
         <Route path="GuiasKanban" element={<GuiasKanban />} />
+        <Route path="alertas-guia" element={<AlertasGuiaPage />} />
         <Route path="items" element={<ItemsPage />} />
+        <Route path="solicitudes" element={<SolicitudesPage />} />
+        <Route path="admin" element={<AdminPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/login" />} />
