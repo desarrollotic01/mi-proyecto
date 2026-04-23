@@ -96,6 +96,8 @@ export const mkActOT = (base = {}, opts = {}) => {
     tipoTrabajo:
       base.tipoTrabajo || (opts.esCorrectivo ? "REPARACION" : "REVISION"),
 
+    tipo: base.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
+
     rolTecnico: ROLES_TECNICOS.some((r) => r.value === base.rolTecnico)
       ? base.rolTecnico
       : "tecnico_mecanico",
@@ -129,6 +131,7 @@ export const normalizeActOTForPayload = (a) => {
     descripcion: a.descripcion?.trim() || null,
 
     tipoTrabajo: a.tipoTrabajo || "REVISION",
+    tipo: a.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
     rolTecnico: ROLES_TECNICOS.some((r) => r.value === a.rolTecnico)
       ? a.rolTecnico
       : "tecnico_mecanico",

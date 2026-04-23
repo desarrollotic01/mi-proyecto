@@ -76,7 +76,7 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
       setLoadingPlanes(true);
       try {
         const data = await planMantenimientoService.getPlanes();
-        setPlanes(Array.isArray(data) ? data.filter(p => p.activo !== false) : []);
+        setPlanes(Array.isArray(data) ? data.filter(p => p.activo !== false && p.contextoObjetivo === "EQUIPO") : []);
       } catch (e) {
         console.error("Error cargando planes", e);
         setPlanes([]);

@@ -231,7 +231,8 @@ function buildOTPayload({
           tarea: act.tarea || "",
           descripcion: act.descripcion || null,
           tipoTrabajo: act.tipoTrabajo || null,
-          rolTecnico: act.rolTecnico || null,
+          tipo: act.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
+          rolTecnico: act.tipo === "EXTERNO" ? null : (act.rolTecnico || null),
           cantidadTecnicos: act.cantidadTecnicos ?? 1,
           duracionEstimadaValor:
             act.duracionEstimadaValor === "" ? null : act.duracionEstimadaValor,

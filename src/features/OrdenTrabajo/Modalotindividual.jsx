@@ -73,6 +73,7 @@ const mkActOT = (base = {}, opts = {}) => {
     tarea: base.tarea || "",
     descripcion: base.descripcion || "",
     tipoTrabajo: base.tipoTrabajo || "REVISION",
+    tipo: base.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
     rolTecnico: base.rolTecnico || "",
     cantidadTecnicos: Number(base.cantidadTecnicos) || 1,
     duracionEstimadaValor: Number(durVal) || 0,
@@ -97,7 +98,8 @@ const normalizeActOTForPayload = (a) => {
     tarea: a.tarea?.trim() || null,
     descripcion: a.descripcion?.trim() || null,
     tipoTrabajo: a.tipoTrabajo || "REVISION",
-    rolTecnico: a.rolTecnico || null,
+    tipo: a.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
+    rolTecnico: a.tipo === "EXTERNO" ? null : (a.rolTecnico || null),
     cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
     duracionEstimadaValor: valor,
     unidadDuracion: unidad,
@@ -564,12 +566,15 @@ const targetsParaModal = useMemo(() => {
     const desc = targetEsUbicacion ? formData.descripcionUbicacion : formData.descripcionEquipo;
     if (!desc.trim()) newErrors.descripcionTarget = "La descripción del trabajo es obligatoria";
     if (esPreventivo && !formData.planMantenimientoId) newErrors.plan = "Debe seleccionar un plan";
-    if (!formData.trabajadoresAsignados?.length) newErrors.trabajadores = "Debe asignar al menos un trabajador";
-    if (!formData.encargadoId) newErrors.encargado = "Debe seleccionar un encargado";
+    const acts = formData.actividadesOT || [];
+    const todasExternas = acts.length > 0 && acts.every((a) => a.tipo === "EXTERNO");
+    if (!todasExternas) {
+      if (!formData.trabajadoresAsignados?.length) newErrors.trabajadores = "Debe asignar al menos un trabajador";
+      if (!formData.encargadoId) newErrors.encargado = "Debe seleccionar un encargado";
+    }
     if (!formData.fechaInicioProgramada) newErrors.fechaInicioProgramada = "Fecha de inicio requerida";
     if (!formData.fechaFinProgramada) newErrors.fechaFinProgramada = "Fecha de fin requerida";
 
-    const acts = formData.actividadesOT || [];
     if (esCorrectivo) {
       if (!acts.length) newErrors.acts = "Debes agregar al menos 1 actividad";
       else if (acts.some((a) => !a.tarea?.trim())) newErrors.acts = "Hay actividades sin tarea";
@@ -1116,7 +1121,15 @@ const targetsParaModal = useMemo(() => {
                         </div>
 
                         {/* Trabajadores */}
-                        <FormField label="Trabajadores *" error={errors.trabajadores}>
+                        <FormField
+                          label={`Trabajadores${
+                            (formData.actividadesOT || []).length > 0 &&
+                            (formData.actividadesOT || []).every((a) => a.tipo === "EXTERNO")
+                              ? " (opcional — actividades externas)"
+                              : " *"
+                          }`}
+                          error={errors.trabajadores}
+                        >
                           <div className={`rounded-xl border-2 p-3 bg-slate-50 ${errors.trabajadores ? "border-red-400" : "border-slate-200"}`}>
                             {cargandoTrabajadores ? (
                               <p className="text-xs text-slate-400 text-center py-2">Cargando...</p>
@@ -1148,7 +1161,15 @@ const targetsParaModal = useMemo(() => {
                         </FormField>
 
                         {/* Encargado */}
-                        <FormField label="Encargado *" error={errors.encargado}>
+                        <FormField
+                          label={`Encargado${
+                            (formData.actividadesOT || []).length > 0 &&
+                            (formData.actividadesOT || []).every((a) => a.tipo === "EXTERNO")
+                              ? " (opcional — actividades externas)"
+                              : " *"
+                          }`}
+                          error={errors.encargado}
+                        >
                           <select
                             value={formData.encargadoId || ""}
                             onChange={(e) => setFormData((prev) => ({ ...prev, encargadoId: e.target.value }))}

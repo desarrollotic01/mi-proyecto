@@ -15,7 +15,7 @@ const TIPOS_TRABAJO_PREVENTIVO = [
 ];
 
 // ─── Constantes de columnas ───────────────────────────────────────────────────
-const GRID = "28px 1fr 1fr 1fr 1.5fr 1.1fr 1.1fr 58px 58px 62px 58px 58px 32px";
+const GRID = "28px 1fr 1fr 1fr 1.5fr 1.1fr 72px 1.1fr 58px 58px 62px 58px 58px 32px";
 
 // ─── Estilos reutilizables ────────────────────────────────────────────────────
 const cellStyle = {
@@ -54,13 +54,18 @@ function ExcelInput({ value, onChange, type = "text", placeholder, min }) {
   );
 }
 
-function ExcelSelect({ value, onChange, children }) {
+function ExcelSelect({ value, onChange, children, disabled }) {
   return (
     <select
       value={value ?? ""}
       onChange={onChange}
-      style={{ ...inputStyle, cursor: "pointer" }}
-      onFocus={(e) => (e.target.style.background = "var(--color-background-info)")}
+      disabled={disabled}
+      style={{
+        ...inputStyle,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.45 : 1,
+      }}
+      onFocus={(e) => !disabled && (e.target.style.background = "var(--color-background-info)")}
       onBlur={(e) => (e.target.style.background = "transparent")}
     >
       {children}
@@ -118,7 +123,7 @@ function DescButton({ filled, onClick }) {
 export function OTActividadesPreventivasHeader() {
   const cols = [
     "#", "Sistema", "Subsistema", "Componente", "Tarea",
-    "Tipo trabajo", "Rol técnico", "Tec.", "Dur.", "Unidad",
+    "Tipo trabajo", "Tipo", "Rol técnico", "Tec.", "Dur.", "Unidad",
     "Desc.", "Obs.", "",
   ];
   return (
@@ -241,11 +246,23 @@ export default function OTActividadPreventivaItem({
         </ExcelSelect>
       </div>
 
+      {/* Tipo (Interno / Externo) */}
+      <div style={cellStyle}>
+        <ExcelSelect
+          value={act.tipo ?? "INTERNO"}
+          onChange={(e) => onChange("tipo", e.target.value)}
+        >
+          <option value="INTERNO">Interno</option>
+          <option value="EXTERNO">Externo</option>
+        </ExcelSelect>
+      </div>
+
       {/* Rol técnico */}
       <div style={cellStyle}>
         <ExcelSelect
           value={act.rolTecnico ?? "tecnico_mecanico"}
           onChange={(e) => onChange("rolTecnico", e.target.value)}
+          disabled={act.tipo === "EXTERNO"}
         >
           {ROLES_TECNICOS.map((r) => (
             <option key={r.value} value={r.value}>

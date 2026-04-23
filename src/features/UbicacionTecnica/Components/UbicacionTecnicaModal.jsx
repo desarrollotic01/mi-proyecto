@@ -151,7 +151,7 @@ const planesRaw = initialData.planes || initialData.planesMantenimiento || initi
         setPaises(Array.isArray(p) ? p : []);
         setClientes(Array.isArray(c) ? c : []);
         const planesData = Array.isArray(pl) ? pl : (pl?.data || []);
-        setPlanesDisponibles(planesData.filter(plan => plan.activo !== false));
+        setPlanesDisponibles(planesData.filter(plan => plan.activo !== false && plan.contextoObjetivo === "UBICACION_TECNICA"));
       } catch (err) {
         setError("Error de conexión al cargar catálogos.");
       } finally {

@@ -1883,6 +1883,18 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                                     </span>
                                   )}
 
+                                  {actividad.tipo && (
+                                    <span
+                                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                        actividad.tipo === "EXTERNO"
+                                          ? "bg-orange-100 text-orange-700"
+                                          : "bg-sky-100 text-sky-700"
+                                      }`}
+                                    >
+                                      {actividad.tipo === "EXTERNO" ? "Externo" : "Interno"}
+                                    </span>
+                                  )}
+
                                   {esDePlan ? (
                                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">
                                       Del plan

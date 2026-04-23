@@ -45,7 +45,7 @@ const FRECUENCIAS = [
 const DEFAULT_ACTIVIDAD = () => ({
   uid: uid(),
   sistema: "", subsistema: "", componente: "", tarea: "",
-  tipoTrabajo: "REVISION", rolTecnico: "tecnico_mecanico",
+  tipoTrabajo: "REVISION", tipo: "INTERNO", rolTecnico: "tecnico_mecanico",
   duracionValor: 30, unidadDuracion: "min", cantidadTecnicos: 1,
   items: [], adjuntos: [],
 });
@@ -241,6 +241,7 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
         sistema: a.sistema || "", subsistema: a.subsistema || "",
         componente: a.componente || "", tarea: a.tarea || "",
         tipoTrabajo: a.tipoTrabajo || "REVISION",
+        tipo: a.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
         rolTecnico: a.rolTecnico || "tecnico_mecanico",
         duracionValor: a.duracionValor || 30,
         unidadDuracion: a.unidadDuracion || "min",
@@ -251,7 +252,7 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
           description: it.description || "",
           quantity: it.quantity || 1,
           warehouseCode: it.warehouseCode || "01",
-          rubroSapCode: it.rubroSapCode || "",
+          rubroSapCode: it.rubroSapCode != null ? String(it.rubroSapCode) : "",
           paqueteTrabajo: it.paqueteTrabajo || "",
           observacion: it.observacion || "",
         })),
@@ -422,7 +423,8 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
           componente:       normalize(a.componente),
           tarea:            a.tarea?.trim(),
           tipoTrabajo:      a.tipoTrabajo,
-          rolTecnico:       a.rolTecnico,
+          tipo:             a.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
+          rolTecnico:       a.tipo === "EXTERNO" ? null : a.rolTecnico,
           duracionValor:    Number(a.duracionValor),
           unidadDuracion:   a.unidadDuracion,
           cantidadTecnicos: Number(a.cantidadTecnicos),
@@ -490,11 +492,13 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
 
         {/* Rubro */}
         <Field label="Rubro">
-          <SelectField value={it.rubroSapCode || ""}
-            onChange={(e) => onUpdate({ rubroSapCode: e.target.value })}>
+          <SelectField
+            value={it.rubroSapCode != null && it.rubroSapCode !== "" ? String(it.rubroSapCode) : ""}
+            onChange={(e) => onUpdate({ rubroSapCode: e.target.value })}
+          >
             <option value="">{loadingCatalogos ? "Cargando..." : "Seleccione rubro"}</option>
             {rubros.map((r) => (
-              <option key={r.codigo} value={r.codigo}>
+              <option key={String(r.codigo)} value={String(r.codigo)}>
                 {r.codigo} — {r.descripcion}
               </option>
             ))}
@@ -780,6 +784,18 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
                                   ))}
                                 </SelectField>
                               </Field>
+                              <Field label="Tipo">
+                                <SelectField
+                                  value={act.tipo || "INTERNO"}
+                                  onChange={(e) => updateActividad(act.uid, {
+                                    tipo: e.target.value,
+                                    rolTecnico: e.target.value === "EXTERNO" ? null : (act.rolTecnico || "tecnico_mecanico"),
+                                  })}
+                                >
+                                  <option value="INTERNO">Interno</option>
+                                  <option value="EXTERNO">Externo</option>
+                                </SelectField>
+                              </Field>
                               <Field label="Duración">
                                 <div className="flex gap-2">
                                   <Input type="number" min="0.1" step="0.1"
@@ -796,13 +812,22 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
                                   </SelectField>
                                 </div>
                               </Field>
-                              <Field label="Rol técnico" required>
-                                <SelectField value={act.rolTecnico}
-                                  onChange={(e) => updateActividad(act.uid, { rolTecnico: e.target.value })}>
-                                  <option value="tecnico_mecanico">Técnico Mecánico</option>
-                                  <option value="tecnico_electrico">Técnico Eléctrico</option>
-                                  <option value="supervisor">Supervisor</option>
-                                  <option value="operario_de_mantenimiento">Operario de Mantenimiento</option>
+                              <Field label={`Rol técnico${act.tipo === "EXTERNO" ? " (N/A — Externo)" : " *"}`}>
+                                <SelectField
+                                  value={act.tipo === "EXTERNO" ? "" : (act.rolTecnico || "tecnico_mecanico")}
+                                  onChange={(e) => updateActividad(act.uid, { rolTecnico: e.target.value })}
+                                  className={act.tipo === "EXTERNO" ? "opacity-50 pointer-events-none bg-slate-100" : ""}
+                                  disabled={act.tipo === "EXTERNO"}
+                                >
+                                  {act.tipo === "EXTERNO"
+                                    ? <option value="">— No aplica (Externo) —</option>
+                                    : <>
+                                        <option value="tecnico_mecanico">Técnico Mecánico</option>
+                                        <option value="tecnico_electrico">Técnico Eléctrico</option>
+                                        <option value="supervisor">Supervisor</option>
+                                        <option value="operario_de_mantenimiento">Operario de Mantenimiento</option>
+                                      </>
+                                  }
                                 </SelectField>
                               </Field>
                               <Field label="Cantidad de técnicos">

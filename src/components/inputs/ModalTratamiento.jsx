@@ -73,6 +73,7 @@ const ACTIVIDAD_VACIA = {
   componente: "",
   tarea: "",
   descripcion: "",
+  tipo: "INTERNO",
   tipoTrabajo: "REPARACION",
   rolTecnico: "tecnico_mecanico",
   cantidadTecnicos: 1,
@@ -150,6 +151,7 @@ const createPreventivaExtra = () => ({
   componente: "",
   tarea: "",
   descripcion: "",
+  tipo: "INTERNO",
   tipoTrabajo: "REVISION",
   rolTecnico: "tecnico_mecanico",
   duracionEstimadaValor: 0,
@@ -162,8 +164,8 @@ const createPreventivaExtra = () => ({
 /* ══════════════════════════════════════════════
    GRID COLUMNS — definido una sola vez
 ══════════════════════════════════════════════ */
-const GRID_COLS = "1fr 1fr 1fr 1.5fr 1fr 1fr 0.7fr 0.7fr 0.7fr 88px 88px 40px";
-const GRID_COLS_INSTALACION = "1fr 1fr 1fr 1.5fr 1fr 0.7fr 0.7fr 0.7fr 88px 88px 40px";
+const GRID_COLS = "1fr 1fr 1fr 1.5fr 1fr 70px 1fr 0.7fr 0.7fr 0.7fr 88px 88px 40px";
+const GRID_COLS_INSTALACION = "1fr 1fr 1fr 1.5fr 70px 1fr 0.7fr 0.7fr 0.7fr 88px 88px 40px";
 
 /* ══════════════════════════════════════════════
    COMPONENTE PRINCIPAL
@@ -424,6 +426,7 @@ setSolicitudesAlmacen({
             componente: a.componente || "",
             tarea: a.tarea || "",
             descripcion: a.descripcion || "",
+            tipo: a.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
             tipoTrabajo: a.tipoTrabajo || "REPARACION",
             rolTecnico: a.rolTecnico || "tecnico_mecanico",
             duracionEstimadaValor: durationToEditableValue(
@@ -443,6 +446,7 @@ setSolicitudesAlmacen({
           componente: a.componente || "",
           tarea: a.tarea || "",
           descripcion: a.descripcion || "",
+          tipo: a.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
           tipoTrabajo: a.tipoTrabajo || "REPARACION",
           rolTecnico: a.rolTecnico || "tecnico_mecanico",
           cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
@@ -674,6 +678,7 @@ useEffect(() => {
           componente: a.componente || "",
           tarea: a.tarea || "",
           descripcion: a.descripcion || "",
+          tipo: a.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
           tipoTrabajo: a.tipoTrabajo || "REVISION",
           rolTecnico: a.rolTecnico || "tecnico_mecanico",
           duracionEstimadaValor: durationToEditableValue(valor),
@@ -711,7 +716,7 @@ useEffect(() => {
       const esPlan = !!actual.planMantenimientoActividadId;
       if (
         esPlan &&
-        !["cantidadTecnicos", "duracionEstimadaValor", "unidadDuracion", "observaciones"].includes(campo)
+        !["cantidadTecnicos", "duracionEstimadaValor", "unidadDuracion", "observaciones", "tipo"].includes(campo)
       ) {
         return prev;
       }
@@ -886,8 +891,9 @@ useEffect(() => {
           componente: a.componente || null,
           tarea: a.tarea || null,
           descripcion: a.descripcion || null,
+          tipo: a.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
           tipoTrabajo: targetId === "__general__" ? null : (a.tipoTrabajo || "REPARACION"),
-          rolTecnico: a.rolTecnico || null,
+          rolTecnico: a.tipo === "EXTERNO" ? null : (a.rolTecnico || null),
           cantidadTecnicos: Number(a.cantidadTecnicos) || 1,
           duracionEstimadaValor: valor,
           unidadDuracion: unidad,
@@ -909,8 +915,9 @@ useEffect(() => {
         componente: a.componente || null,
         tarea: a.tarea || null,
         descripcion: a.descripcion || null,
+        tipo: a.tipo === "EXTERNO" ? "EXTERNO" : "INTERNO",
         tipoTrabajo: a.tipoTrabajo || "REVISION",
-        rolTecnico: a.rolTecnico || null,
+        rolTecnico: a.tipo === "EXTERNO" ? null : (a.rolTecnico || null),
         duracionEstimadaValor: Number(a.duracionEstimadaValor) || 0,
         unidadDuracion: a.unidadDuracion || "min",
         duracionEstimadaMin: toMinutes(a.duracionEstimadaValor, a.unidadDuracion) || 0,
@@ -1516,6 +1523,7 @@ function ActividadesCorrectivasHeader() {
       <span>Componente <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
       <span>Tarea <span className="text-rose-400">*</span></span>
       <span>Tipo trabajo</span>
+      <span>Tipo</span>
       <span>Rol técnico</span>
       <span>Técnicos</span>
       <span>Duración</span>
@@ -1538,6 +1546,7 @@ function ActividadesPreventivasHeader() {
       <span>Componente <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
       <span>Tarea <span className="text-rose-400">*</span></span>
       <span>Tipo trabajo</span>
+      <span>Tipo</span>
       <span>Rol técnico</span>
       <span>Técnicos</span>
       <span>Duración</span>
@@ -1576,7 +1585,18 @@ function ActividadCorrectivaRow({ idx, act, onChange, onDelete, onOpenObservacio
         ))}
       </select>
 
-      <select value={act.rolTecnico ?? "tecnico_mecanico"} onChange={(e) => onChange("rolTecnico", e.target.value)} className={inputCls}>
+      <select value={act.tipo ?? "INTERNO"} onChange={(e) => onChange("tipo", e.target.value)} className={inputCls}>
+        <option value="INTERNO">Interno</option>
+        <option value="EXTERNO">Externo</option>
+      </select>
+
+      <select
+        value={act.rolTecnico ?? "tecnico_mecanico"}
+        onChange={(e) => onChange("rolTecnico", e.target.value)}
+        disabled={act.tipo === "EXTERNO"}
+        className={inputCls}
+        style={{ opacity: act.tipo === "EXTERNO" ? 0.45 : 1, cursor: act.tipo === "EXTERNO" ? "not-allowed" : "pointer" }}
+      >
         {ROLES_TECNICOS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
       </select>
 
@@ -1640,6 +1660,7 @@ function ActividadesInstalacionHeader() {
       <span>Subsistema <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
       <span>Componente <span className={HEADER_OPTIONAL_STYLE}>(opc.)</span></span>
       <span>Tarea <span className="text-rose-400">*</span></span>
+      <span>Tipo</span>
       <span>Rol técnico</span>
       <span>Técnicos</span>
       <span>Duración</span>
@@ -1668,7 +1689,18 @@ function ActividadInstalacionRow({ idx, act, onChange, onDelete, onOpenObservaci
       <input placeholder="Componente" value={act.componente ?? ""} onChange={(e) => onChange("componente", e.target.value)} className={inputCls} />
       <input placeholder="Tarea *"    value={act.tarea      ?? ""} onChange={(e) => onChange("tarea",      e.target.value)} className={inputCls} />
 
-      <select value={act.rolTecnico ?? "tecnico_mecanico"} onChange={(e) => onChange("rolTecnico", e.target.value)} className={inputCls}>
+      <select value={act.tipo ?? "INTERNO"} onChange={(e) => onChange("tipo", e.target.value)} className={inputCls}>
+        <option value="INTERNO">Interno</option>
+        <option value="EXTERNO">Externo</option>
+      </select>
+
+      <select
+        value={act.rolTecnico ?? "tecnico_mecanico"}
+        onChange={(e) => onChange("rolTecnico", e.target.value)}
+        disabled={act.tipo === "EXTERNO"}
+        className={inputCls}
+        style={{ opacity: act.tipo === "EXTERNO" ? 0.45 : 1, cursor: act.tipo === "EXTERNO" ? "not-allowed" : "pointer" }}
+      >
         {ROLES_TECNICOS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
       </select>
 
@@ -1755,7 +1787,18 @@ function ActividadPreventivaRow({ act, idx, onChange, onDelete, onOpenObservacio
         {TIPOS_TRABAJO_PREVENTIVO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
       </select>
 
-      <select value={act.rolTecnico ?? "tecnico_mecanico"} disabled={!puedeEditar("rolTecnico")} onChange={(e) => onChange("rolTecnico", e.target.value)} className={inputCls("rolTecnico")}>
+      <select value={act.tipo ?? "INTERNO"} onChange={(e) => onChange("tipo", e.target.value)} className={inputCls("tipo")}>
+        <option value="INTERNO">Interno</option>
+        <option value="EXTERNO">Externo</option>
+      </select>
+
+      <select
+        value={act.rolTecnico ?? "tecnico_mecanico"}
+        disabled={!puedeEditar("rolTecnico") || act.tipo === "EXTERNO"}
+        onChange={(e) => onChange("rolTecnico", e.target.value)}
+        className={inputCls("rolTecnico")}
+        style={{ opacity: act.tipo === "EXTERNO" ? 0.45 : 1, cursor: (!puedeEditar("rolTecnico") || act.tipo === "EXTERNO") ? "not-allowed" : "pointer" }}
+      >
         {ROLES_TECNICOS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
       </select>
 
