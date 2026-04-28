@@ -270,6 +270,7 @@ function ModalElegirEquipo({
 
 const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) => {
   const esVenta = tipoAviso === "venta";
+  const esInstalacion = tipoAviso === "instalacion";
   const [ordenTrabajo, setOrdenTrabajo] = useState(null);
   const [loadingOrden, setLoadingOrden] = useState(false);
 
@@ -305,9 +306,12 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
   const [filtroRol, setFiltroRol] = useState("");
   const [busquedaNombre, setBusquedaNombre] = useState("");
 
+  const [supervisorNombre, setSupervisorNombre] = useState("");
+  const [supervisorId, setSupervisorId] = useState("");
+
   const [correctivos, setCorrectivos] = useState([]);
   const [gruposAntesDespues, setGruposAntesDespues] = useState([
-    { id: 1, descripcion: "", fotosAntes: [], fotosDespues: [] },
+    { id: 1, descripcion: "", fotosAntes: [], fotosDespues: [], mostrarAntes: true, mostrarDespues: true },
   ]);
 
   const [acta, setActa] = useState(null);
@@ -340,6 +344,14 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
       } else {
         setEquipoSeleccionado(null);
       }
+
+      // Cargar supervisor de la OT
+      const supNombre =
+        data?.supervisor?.nombre ||
+        data?.supervisorNombre ||
+        (data?.supervisorId ? `ID: ${data.supervisorId}` : "");
+      setSupervisorNombre(supNombre);
+      setSupervisorId(data?.supervisorId ? String(data.supervisorId) : "");
     } catch (error) {
       console.error("Error al cargar orden de trabajo:", error);
       setOrdenTrabajo(null);
@@ -394,9 +406,10 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
 
     setCorrectivos([]);
     setTecnicosSeleccionados([]);
+    setSupervisorId("");
     setFiltroRol("");
     setBusquedaNombre("");
-    setGruposAntesDespues([{ id: Date.now(), descripcion: "", fotosAntes: [], fotosDespues: [] }]);
+    setGruposAntesDespues([{ id: Date.now(), descripcion: "", fotosAntes: [], fotosDespues: [], mostrarAntes: !esVenta, mostrarDespues: true }]);
     setActa(null);
     setInforme(null);
     setChecklistAdjunto(null);
@@ -423,7 +436,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
 
   useEffect(() => {
     if (!isOpen) return;
-    if (!esVenta) setOpenSelectEquipo(true);
+    if (!esVenta && !esInstalacion) setOpenSelectEquipo(true);
   }, [isOpen, esVenta]);
 
   /* =========================================================
@@ -485,6 +498,9 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
   const esUbicacion = !!equipoSeleccionado?.ubicacionTecnicaId;
 
   const yaExisteNotiEquipo = !!notiActual;
+
+  // Para venta no se requiere equipo seleccionado; el formulario siempre es editable
+  const puedeEditar = esVenta ? !yaExisteNotiEquipo : !!equipoSeleccionado && !yaExisteNotiEquipo;
 
   const progresoEquipos = useMemo(() => {
     const total = equiposOT.length;
@@ -704,8 +720,10 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
     gruposAntesDespues.forEach((g, i) => {
       const antes = Array.from(g.fotosAntes || []);
       const despues = Array.from(g.fotosDespues || []);
-      if (antes.length) tareas.push({ files: antes, categoria: "ANTES", grupo: i, descripcion: g.descripcion || "" });
-      if (despues.length) tareas.push({ files: despues, categoria: "DESPUES", grupo: i, descripcion: g.descripcion || "" });
+      if (antes.length && !esVenta && g.mostrarAntes !== false)
+        tareas.push({ files: antes, categoria: "ANTES", grupo: i, descripcion: g.descripcion || "" });
+      if (despues.length && g.mostrarDespues !== false)
+        tareas.push({ files: despues, categoria: "DESPUES", grupo: i, descripcion: g.descripcion || "" });
     });
 
     correctivos.forEach((c, i) => {
@@ -743,7 +761,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
 
   const handleSubmit = async () => {
     try {
-      if (!equipoSeleccionado?.id) {
+      if (!esVenta && !equipoSeleccionado?.id) {
         alert("⚠️ Debes seleccionar un equipo o ubicación técnica");
         setOpenSelectEquipo(true);
         return;
@@ -801,7 +819,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
         ...form,
         resumenCorrectivos,
         ordenTrabajoId: ordenTrabajo?.id,
-        ordenTrabajoEquipoId: equipoSeleccionado.id,
+        ordenTrabajoEquipoId: equipoSeleccionado?.id || null,
         precargarPlanes: planesFiltrados.length === 0,
         planes: planesFiltrados.map((p) => ({
           ordenTrabajoActividadId: p.ordenTrabajoActividadId,
@@ -818,15 +836,18 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
         horometro: form.horometro ? Number(form.horometro) : null,
         numeroMisiones: form.numeroMisiones ? Number(form.numeroMisiones) : null,
         tecnicos: tecnicosSeleccionados.map((t) => t.id),
+        supervisorId: supervisorId || null,
         adjuntos,
       });
 
       await cargarNotificacionesOT();
 
-      alert("✅ Notificación creada. Elige el siguiente registro.");
+      alert("✅ Notificación creada.");
       resetForm();
-      setEquipoSeleccionado(null);
-      setOpenSelectEquipo(true);
+      if (!esVenta) {
+        setEquipoSeleccionado(null);
+        setOpenSelectEquipo(true);
+      }
     } catch (error) {
       console.error(error);
       const msg =
@@ -856,6 +877,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
         estado: "CERRADO",
         fechaFinReal: ventaForm.fechaCompletado || new Date().toISOString(),
         observaciones: ventaForm.observaciones || null,
+        supervisorId: supervisorId || null,
       });
       alert("✅ Actividad de venta confirmada. OT cerrada.");
       onClose();
@@ -932,7 +954,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
 
   const tabs = [
     { id: "general", label: "General", icon: "📋" },
-    {
+    ...(!esVenta ? [{
       id: "checklist",
       label: "Checklist",
       icon: "☑️",
@@ -943,7 +965,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
               done: checklistDone,
             }
           : null,
-    },
+    }] : []),
     {
       id: "correctivos",
       label: "Correctivos",
@@ -972,100 +994,6 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
   }, [listaTrabajadores, filtroRol, busquedaNombre, tecnicosSeleccionados]);
 
   if (!isOpen) return null;
-
-  /* ----------------------------------------------------------------
-     VENTA: UI simplificada — solo confirmar actividad
-  ---------------------------------------------------------------- */
-  if (esVenta && equiposOT.length === 0) {
-    return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-t-3xl flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>🛒</span> Confirmar Actividad de Venta
-              </h2>
-              <p className="text-orange-100 text-sm mt-1">
-                OT #{ordenTrabajo?.numeroOT || ordenTrabajoId}
-              </p>
-            </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-all">
-              <X className="w-5 h-5 text-white" />
-            </button>
-          </div>
-
-          {/* Body */}
-          <div className="p-6 space-y-5">
-            {/* Checkbox actividad */}
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={ventaForm.actividadCompletada}
-                onChange={(e) => setVentaForm(p => ({ ...p, actividadCompletada: e.target.checked }))}
-                className="mt-1 w-5 h-5 rounded border-2 border-orange-400 accent-orange-500 cursor-pointer"
-              />
-              <div>
-                <p className="font-bold text-slate-800 group-hover:text-orange-600 transition-colors">
-                  Actividad completada
-                </p>
-                <p className="text-sm text-slate-500">Marca esto para confirmar que la actividad de venta fue realizada</p>
-              </div>
-            </label>
-
-            {/* Fecha */}
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Fecha de cierre
-              </label>
-              <input
-                type="datetime-local"
-                value={ventaForm.fechaCompletado}
-                onChange={(e) => setVentaForm(p => ({ ...p, fechaCompletado: e.target.value }))}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 transition-all"
-              />
-            </div>
-
-            {/* Observaciones */}
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Observaciones <span className="text-slate-400 font-normal">(opcional)</span>
-              </label>
-              <textarea
-                value={ventaForm.observaciones}
-                onChange={(e) => setVentaForm(p => ({ ...p, observaciones: e.target.value }))}
-                rows={3}
-                placeholder="Notas adicionales sobre la actividad de venta..."
-                className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 transition-all resize-none"
-              />
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 pb-6 flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl font-bold text-slate-700 hover:bg-slate-50 transition-all"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSubmitVenta}
-              disabled={ventaLoading || !ventaForm.actividadCompletada}
-              className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-            >
-              {ventaLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4" />
-              )}
-              Confirmar y Cerrar OT
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -1096,31 +1024,35 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                     OT #{ordenTrabajo?.numeroOT || ordenTrabajo?.id}
                   </p>
 
-                  <span className="text-amber-100 text-sm">•</span>
+                  {!esVenta && (
+                    <>
+                      <span className="text-amber-100 text-sm">•</span>
 
-                  <p className="text-amber-100 text-sm">
-                    Progreso:{" "}
-                    <span className="font-bold">
-                      {progresoEquipos.hechas}/{progresoEquipos.total}
-                    </span>{" "}
-                    (faltan {progresoEquipos.faltan})
-                  </p>
+                      <p className="text-amber-100 text-sm">
+                        Progreso:{" "}
+                        <span className="font-bold">
+                          {progresoEquipos.hechas}/{progresoEquipos.total}
+                        </span>{" "}
+                        (faltan {progresoEquipos.faltan})
+                      </p>
 
-                  <span className="text-amber-100 text-sm">•</span>
+                      <span className="text-amber-100 text-sm">•</span>
 
-                  <p className="text-amber-100 text-sm truncate">
-                    Registro:{" "}
-                    <span className="font-bold">{labelEquipoSeleccionado}</span>
-                  </p>
+                      <p className="text-amber-100 text-sm truncate">
+                        Registro:{" "}
+                        <span className="font-bold">{labelEquipoSeleccionado}</span>
+                      </p>
 
-                  <button
-                    type="button"
-                    onClick={() => setOpenSelectEquipo(true)}
-                    className="ml-2 text-xs font-bold px-3 py-1 rounded-full bg-white/20 text-white hover:bg-white/30"
-                    disabled={loadingOrden || loadingNotis}
-                  >
-                    Elegir / Cambiar
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => setOpenSelectEquipo(true)}
+                        className="ml-2 text-xs font-bold px-3 py-1 rounded-full bg-white/20 text-white hover:bg-white/30"
+                        disabled={loadingOrden || loadingNotis}
+                      >
+                        Elegir / Cambiar
+                      </button>
+                    </>
+                  )}
 
                   {yaExisteNotiEquipo && (
                     <button
@@ -1263,7 +1195,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
             {/* GENERAL */}
             {activeTab === "general" && (
               <div className="space-y-6">
-                {!equipoSeleccionado && (
+                {!esVenta && !equipoSeleccionado && (
                   <div className="text-center py-10 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300">
                     <div className="text-5xl mb-3">🖥️</div>
                     <p className="text-sm text-slate-600 mb-2">
@@ -1280,13 +1212,36 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                   </div>
                 )}
 
+                {/* SUPERVISOR */}
+                <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl p-4 border border-slate-200 flex items-center gap-3">
+                  <span className="text-lg">👤</span>
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Supervisor</p>
+                    <select
+                      value={supervisorId}
+                      onChange={(e) => setSupervisorId(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">— Seleccionar supervisor —</option>
+                      {listaTrabajadores
+                        .filter((t) => (t.rol || "").toLowerCase().includes("supervisor"))
+                        .map((t) => (
+                          <option key={t.id} value={String(t.id)}>
+                            {t.nombre} {t.apellido || ""}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
                 {/* FECHAS */}
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl p-5 border border-blue-200">
                   <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <span className="text-xl">📅</span> Fechas del Mantenimiento
+                    <span className="text-xl">📅</span>{" "}
+                    {esInstalacion ? "Fechas de la Instalación" : esVenta ? "Fechas de la Entrega" : "Fechas del Mantenimiento"}
                   </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className={`grid grid-cols-1 gap-3 ${esInstalacion || esVenta ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-1.5">
                         Inicio <span className="text-red-500">*</span>
@@ -1296,7 +1251,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                         name="fechaInicio"
                         value={form.fechaInicio}
                         onChange={handleChange}
-                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                        disabled={!puedeEditar}
                         className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all disabled:bg-slate-100"
                         required
                       />
@@ -1311,25 +1266,27 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                         name="fechaFin"
                         value={form.fechaFin}
                         onChange={handleChange}
-                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                        disabled={!puedeEditar}
                         className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all disabled:bg-slate-100"
                         required
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                        Último Preventivo
-                      </label>
-                      <input
-                        type="date"
-                        name="fechaUltimoMantenimientoPreventivo"
-                        value={form.fechaUltimoMantenimientoPreventivo}
-                        onChange={handleChange}
-                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                        className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all disabled:bg-slate-100"
-                      />
-                    </div>
+                    {!esInstalacion && !esVenta && (
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Último Preventivo
+                        </label>
+                        <input
+                          type="date"
+                          name="fechaUltimoMantenimientoPreventivo"
+                          value={form.fechaUltimoMantenimientoPreventivo}
+                          onChange={handleChange}
+                          disabled={!puedeEditar}
+                          className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all disabled:bg-slate-100"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1380,7 +1337,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
 
                           <button
                             type="button"
-                            disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                            disabled={!puedeEditar}
                             onClick={() => eliminarTecnico(tecnico.id)}
                             className="text-red-600 hover:text-red-800 hover:bg-red-100 rounded-lg p-2 transition-all disabled:opacity-50 disabled:hover:bg-transparent"
                           >
@@ -1412,7 +1369,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                             </label>
                             <select
                               value={filtroRol}
-                              disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                              disabled={!puedeEditar}
                               onChange={(e) => setFiltroRol(e.target.value)}
                               className="w-full px-3 py-2 text-xs border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-slate-100"
                             >
@@ -1438,7 +1395,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                               type="text"
                               placeholder="Escribe el nombre..."
                               value={busquedaNombre}
-                              disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                              disabled={!puedeEditar}
                               onChange={(e) => setBusquedaNombre(e.target.value)}
                               className="w-full px-3 py-2 text-xs border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-slate-100"
                             />
@@ -1513,8 +1470,8 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                 </div>
 
                 {/* DATOS OPERATIVOS */}
-                {/* Datos Operativos — solo para Equipos, no para Ubicaciones Técnicas */}
-                {!esUbicacion && (
+                {/* Datos Operativos — solo para Equipos, no para Ubicaciones Técnicas, Instalaciones ni Ventas */}
+                {!esUbicacion && !esInstalacion && !esVenta && (
                   <div className="bg-gradient-to-br from-green-50 to-green-100/50 rounded-2xl p-5 border border-green-200">
                     <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
                       <span className="text-xl">⚙️</span> Datos Operativos
@@ -1532,7 +1489,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                           name="horometro"
                           value={form.horometro}
                           onChange={handleChange}
-                          disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                          disabled={!puedeEditar}
                           className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-slate-100"
                         />
                       </div>
@@ -1547,7 +1504,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                           name="numeroMisiones"
                           value={form.numeroMisiones}
                           onChange={handleChange}
-                          disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                          disabled={!puedeEditar}
                           className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-slate-100"
                         />
                       </div>
@@ -1573,9 +1530,11 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                 )}
 
                 {/* ESTADO */}
+                {!esInstalacion && !esVenta && (
                 <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 rounded-2xl p-5 border border-orange-200">
                   <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <span className="text-xl">🔧</span> Estado General del Registro{" "}
+                    <span className="text-xl">🔧</span>{" "}
+                    Estado General del Registro{" "}
                     <span className="text-red-500">*</span>
                   </h3>
 
@@ -1583,7 +1542,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                     name="estadoGeneralEquipo"
                     value={form.estadoGeneralEquipo}
                     onChange={handleChange}
-                    disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                    disabled={!puedeEditar}
                     className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all font-semibold disabled:bg-slate-100"
                     required
                   >
@@ -1594,6 +1553,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                     </option>
                   </select>
                 </div>
+                )}
 
                 {/* DESCRIPCIONES */}
                 <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl p-5 border border-slate-200">
@@ -1610,8 +1570,8 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                       },
                       {
                         name: "descripcionMantenimiento",
-                        label: "Descripción del Mantenimiento",
-                        placeholder: "Mantenimiento realizado...",
+                        label: esInstalacion ? "Descripción de la Instalación" : esVenta ? "Descripción de la Entrega" : "Descripción del Mantenimiento",
+                        placeholder: esInstalacion ? "Instalación realizada..." : esVenta ? "Entrega realizada..." : "Mantenimiento realizado...",
                       },
                       {
                         name: "observaciones",
@@ -1634,7 +1594,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                           value={form[field.name]}
                           onChange={handleChange}
                           rows="2"
-                          disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                          disabled={!puedeEditar}
                           placeholder={field.placeholder}
                           className="w-full px-3 py-2 text-sm border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent resize-none transition-all disabled:bg-slate-100"
                         />
@@ -1647,15 +1607,16 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                 <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 rounded-2xl p-5 border border-indigo-200">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                      <span className="text-xl">📸</span> Fotos del Mantenimiento
+                      <span className="text-xl">📸</span>{" "}
+                      {esInstalacion ? "Fotos de la Instalación" : esVenta ? "Fotos de la Entrega" : "Fotos del Mantenimiento"}
                     </h3>
                     <button
                       type="button"
-                      disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                      disabled={!puedeEditar}
                       onClick={() =>
                         setGruposAntesDespues((prev) => [
                           ...prev,
-                          { id: Date.now(), descripcion: "", fotosAntes: [], fotosDespues: [] },
+                          { id: Date.now(), descripcion: "", fotosAntes: [], fotosDespues: [], mostrarAntes: !esVenta, mostrarDespues: true },
                         ])
                       }
                       className="px-3 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1665,87 +1626,141 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                   </div>
 
                   <div className="space-y-4">
-                    {gruposAntesDespues.map((grupo, i) => (
-                      <div
-                        key={grupo.id}
-                        className="border border-indigo-200 rounded-xl p-4 bg-white"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-bold text-indigo-700">
-                            Grupo {i + 1}
-                          </span>
-                          {gruposAntesDespues.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setGruposAntesDespues((prev) =>
-                                  prev.filter((g) => g.id !== grupo.id)
-                                )
-                              }
-                              className="text-xs text-red-500 hover:text-red-700 font-semibold"
-                            >
-                              Eliminar
-                            </button>
-                          )}
-                        </div>
+                    {gruposAntesDespues.map((grupo, i) => {
+                      const toggleGrupo = (field, value) =>
+                        setGruposAntesDespues((prev) =>
+                          prev.map((g) => g.id === grupo.id ? { ...g, [field]: value } : g)
+                        );
 
-                        <div className="mb-3">
-                          <label className="block text-xs font-semibold text-slate-600 mb-1">
-                            Descripción del grupo
-                          </label>
-                          <input
-                            type="text"
-                            value={grupo.descripcion}
-                            disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                            onChange={(e) =>
-                              setGruposAntesDespues((prev) =>
-                                prev.map((g) =>
-                                  g.id === grupo.id
-                                    ? { ...g, descripcion: e.target.value }
-                                    : g
-                                )
-                              )
-                            }
-                            placeholder="Ej: Lubricación de motor principal..."
-                            className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-transparent disabled:bg-slate-100"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {[
-                            { label: "Fotos Antes", field: "fotosAntes" },
-                            { label: "Fotos Después", field: "fotosDespues" },
-                          ].map(({ label, field }) => (
-                            <div key={field}>
-                              <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                                {label}
-                              </label>
-                              <input
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                disabled={!equipoSeleccionado || yaExisteNotiEquipo}
-                                onChange={(e) =>
-                                  setGruposAntesDespues((prev) =>
-                                    prev.map((g) =>
-                                      g.id === grupo.id
-                                        ? { ...g, [field]: e.target.files }
-                                        : g
+                      return (
+                        <div
+                          key={grupo.id}
+                          className="border border-indigo-200 rounded-xl p-4 bg-white"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-bold text-indigo-700">
+                              Grupo {i + 1}
+                            </span>
+                            <div className="flex items-center gap-3">
+                              {/* Toggles antes/después — oculto para venta (siempre solo después) */}
+                              {!esVenta && (
+                                <div className="flex items-center gap-2 text-xs">
+                                  <label className="flex items-center gap-1 cursor-pointer select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={grupo.mostrarAntes !== false}
+                                      onChange={(e) => toggleGrupo("mostrarAntes", e.target.checked)}
+                                      className="accent-indigo-600"
+                                    />
+                                    Antes
+                                  </label>
+                                  <label className="flex items-center gap-1 cursor-pointer select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={grupo.mostrarDespues !== false}
+                                      onChange={(e) => toggleGrupo("mostrarDespues", e.target.checked)}
+                                      className="accent-indigo-600"
+                                    />
+                                    Después
+                                  </label>
+                                </div>
+                              )}
+                              {gruposAntesDespues.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setGruposAntesDespues((prev) =>
+                                      prev.filter((g) => g.id !== grupo.id)
                                     )
-                                  )
-                                }
-                                className="w-full text-sm px-3 py-2 border-2 border-dashed border-indigo-300 rounded-lg hover:border-indigo-400 cursor-pointer bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
-                              />
-                              {grupo[field]?.length > 0 && (
-                                <p className="text-xs text-emerald-600 font-semibold mt-1.5">
-                                  ✓ {grupo[field].length} archivo(s)
-                                </p>
+                                  }
+                                  className="text-xs text-red-500 hover:text-red-700 font-semibold"
+                                >
+                                  Eliminar
+                                </button>
                               )}
                             </div>
-                          ))}
+                          </div>
+
+                          <div className="mb-3">
+                            <label className="block text-xs font-semibold text-slate-600 mb-1">
+                              Descripción del grupo
+                            </label>
+                            <input
+                              type="text"
+                              value={grupo.descripcion}
+                              disabled={!puedeEditar}
+                              onChange={(e) =>
+                                setGruposAntesDespues((prev) =>
+                                  prev.map((g) =>
+                                    g.id === grupo.id
+                                      ? { ...g, descripcion: e.target.value }
+                                      : g
+                                  )
+                                )
+                              }
+                              placeholder="Ej: Motor principal..."
+                              className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-transparent disabled:bg-slate-100"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {(!esVenta && grupo.mostrarAntes !== false) && (
+                              <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                                  Fotos Antes
+                                </label>
+                                <input
+                                  type="file"
+                                  multiple
+                                  accept="image/*"
+                                  disabled={!puedeEditar}
+                                  onChange={(e) =>
+                                    setGruposAntesDespues((prev) =>
+                                      prev.map((g) =>
+                                        g.id === grupo.id ? { ...g, fotosAntes: e.target.files } : g
+                                      )
+                                    )
+                                  }
+                                  className="w-full text-sm px-3 py-2 border-2 border-dashed border-indigo-300 rounded-lg hover:border-indigo-400 cursor-pointer bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                />
+                                {grupo.fotosAntes?.length > 0 && (
+                                  <p className="text-xs text-emerald-600 font-semibold mt-1.5">
+                                    ✓ {grupo.fotosAntes.length} archivo(s)
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {(grupo.mostrarDespues !== false) && (
+                              <div className={(!esVenta && grupo.mostrarAntes === false) ? "md:col-span-2" : ""}>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                                  {esVenta ? "Foto de Entrega" : "Fotos Después"}
+                                </label>
+                                <input
+                                  type="file"
+                                  multiple={!esVenta}
+                                  accept="image/*"
+                                  disabled={!puedeEditar}
+                                  onChange={(e) =>
+                                    setGruposAntesDespues((prev) =>
+                                      prev.map((g) =>
+                                        g.id === grupo.id ? { ...g, fotosDespues: e.target.files } : g
+                                      )
+                                    )
+                                  }
+                                  className="w-full text-sm px-3 py-2 border-2 border-dashed border-indigo-300 rounded-lg hover:border-indigo-400 cursor-pointer bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                />
+                                {grupo.fotosDespues?.length > 0 && (
+                                  <p className="text-xs text-emerald-600 font-semibold mt-1.5">
+                                    ✓ {grupo.fotosDespues.length} archivo(s)
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1949,7 +1964,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                                   <button
                                     key={estadoKey}
                                     type="button"
-                                    disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                    disabled={!puedeEditar}
                                     onClick={() =>
                                       handleActividadEstado(actividad, estadoKey)
                                     }
@@ -1961,7 +1976,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                                           : `bg-white text-slate-600 border-slate-300 ${config.hover}`
                                       }
                                       ${
-                                        !equipoSeleccionado || yaExisteNotiEquipo
+                                        !puedeEditar
                                           ? "opacity-60 cursor-not-allowed"
                                           : ""
                                       }
@@ -1984,7 +1999,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                                     <textarea
                                       placeholder="Comentarios adicionales..."
                                       value={registrado?.comentario || ""}
-                                      disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                      disabled={!puedeEditar}
                                       onChange={(e) =>
                                         handleActividadComentario(
                                           actividad,
@@ -2002,7 +2017,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                                     </label>
                                     <select
                                       value={registrado?.trabajadorId || ""}
-                                      disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                      disabled={!puedeEditar}
                                       onChange={(e) =>
                                         handleActividadTrabajador(
                                           actividad,
@@ -2035,7 +2050,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                                     </label>
                                     <textarea
                                       value={registrado?.observaciones || ""}
-                                      disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                      disabled={!puedeEditar}
                                       onChange={(e) =>
                                         handleActividadObservaciones(
                                           actividad,
@@ -2062,7 +2077,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                                         value={
                                           registrado?.duracionPlan ?? ""
                                         }
-                                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                        disabled={!puedeEditar}
                                         onChange={(e) =>
                                           handleActividadDuracion(
                                             actividad,
@@ -2081,7 +2096,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                                         value={
                                           registrado?.unidadDuracionPlan || "min"
                                         }
-                                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                        disabled={!puedeEditar}
                                         onChange={(e) =>
                                           handleActividadUnidad(
                                             actividad,
@@ -2104,7 +2119,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                                       <input
                                         type="datetime-local"
                                         value={registrado?.fechaInicioPlan || ""}
-                                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                        disabled={!puedeEditar}
                                         onChange={(e) =>
                                           handleActividadFechaInicio(
                                             actividad,
@@ -2122,7 +2137,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                                       <input
                                         type="datetime-local"
                                         value={registrado?.fechaFinPlan || ""}
-                                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                                        disabled={!puedeEditar}
                                         onChange={(e) =>
                                           handleActividadFechaFin(
                                             actividad,
@@ -2173,7 +2188,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
 
                   <button
                     type="button"
-                    disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                    disabled={!puedeEditar}
                     onClick={agregarCorrectivo}
                     className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-bold hover:from-blue-600 hover:to-blue-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -2200,7 +2215,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                       >
                         <button
                           type="button"
-                          disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                          disabled={!puedeEditar}
                           onClick={() => eliminarCorrectivo(correctivo.id)}
                           className="absolute top-3 right-3 text-red-600 hover:text-red-800 hover:bg-red-200 rounded-lg p-1.5 transition-all disabled:opacity-50 disabled:hover:bg-transparent"
                         >
@@ -2218,7 +2233,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                             </label>
                             <textarea
                               value={correctivo.comentario}
-                              disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                              disabled={!puedeEditar}
                               onChange={(e) =>
                                 actualizarComentarioCorrectivo(
                                   correctivo.id,
@@ -2239,7 +2254,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                               type="file"
                               multiple
                               accept="image/*"
-                              disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                              disabled={!puedeEditar}
                               onChange={(e) =>
                                 actualizarFotosCorrectivo(
                                   correctivo.id,
@@ -2270,6 +2285,28 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                   <span className="text-xl">📎</span> Documentos Adjuntos
                 </h3>
 
+                {/* Guía de entrega — solo para venta */}
+                {esVenta && (
+                  <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 rounded-xl p-4 border-2 border-orange-300">
+                    <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
+                      <span className="text-lg">📋</span>
+                      Guía de Entrega
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      disabled={!puedeEditar}
+                      onChange={(e) => setChecklistAdjunto(e.target.files[0])}
+                      className="w-full text-sm px-3 py-2 border-2 border-dashed border-orange-400 rounded-lg hover:border-orange-500 cursor-pointer bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
+                    />
+                    {checklistAdjunto && (
+                      <p className="text-xs text-orange-700 font-bold mt-2 bg-orange-200 px-3 py-1.5 rounded-lg">
+                        ✓ {checklistAdjunto.name}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-xl p-4 border-2 border-emerald-300">
                   <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
                     <span className="text-lg">📄</span>
@@ -2279,7 +2316,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                   <input
                     type="file"
                     accept=".pdf,.doc,.docx"
-                    disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                    disabled={!puedeEditar}
                     onChange={(e) => setActa(e.target.files[0])}
                     className="w-full text-sm px-3 py-2 border-2 border-dashed border-emerald-400 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all hover:border-emerald-500 cursor-pointer bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
                   />
@@ -2299,12 +2336,12 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                       setter: setInforme,
                       accept: ".pdf,.doc,.docx",
                     },
-                    {
+                    ...(!esVenta ? [{
                       label: "📄 Checklist",
                       state: checklistAdjunto,
                       setter: setChecklistAdjunto,
                       accept: ".pdf,.doc,.docx,.xlsx,.xls",
-                    },
+                    }] : []),
                     {
                       label: "📎 Archivo Adicional",
                       state: archivoExtra,
@@ -2323,7 +2360,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                       <input
                         type="file"
                         accept={accept}
-                        disabled={!equipoSeleccionado || yaExisteNotiEquipo}
+                        disabled={!puedeEditar}
                         onChange={(e) => setter(e.target.files[0])}
                         className="w-full text-xs disabled:opacity-60"
                       />
@@ -2372,7 +2409,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={loading || !equipoSeleccionado || yaExisteNotiEquipo}
+                  disabled={loading || !puedeEditar}
                   className="px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 hover:from-amber-600 hover:via-amber-700 hover:to-orange-600 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 inline-flex items-center gap-2"
                   title={
                     !equipoSeleccionado

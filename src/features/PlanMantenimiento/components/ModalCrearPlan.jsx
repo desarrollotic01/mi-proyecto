@@ -133,13 +133,17 @@ function ItemSelector({ itemCode, description, onClick }) {
 /* ================================================================
    COMPONENTE PRINCIPAL
 ================================================================ */
-export default function ModalCrearPlan({ onClose, onCreated, equipoPreseleccionado }) {
+export default function ModalCrearPlan({ onClose, onCreated, equipoPreseleccionado, initialPlan }) {
+  const esEdicion = !!initialPlan;
+
   const [equipos, setEquipos]         = useState([]);
   const [guardando, setGuardando]     = useState(false);
   const [expandedByUid, setExpanded]  = useState({});
 
-  const [itemsPlan, setItemsPlan]         = useState([DEFAULT_ITEM()]);
-  const [adjuntosPlan, setAdjuntosPlan]   = useState([]);
+  const [itemsPlan, setItemsPlan]         = useState(() =>
+    initialPlan?.items?.length ? initialPlan.items.map((it) => ({ ...DEFAULT_ITEM(), ...it, uid: uid() })) : [DEFAULT_ITEM()]
+  );
+  const [adjuntosPlan, setAdjuntosPlan]   = useState(() => initialPlan?.adjuntos || []);
 
   /* ── Catálogos ── */
   const [rubros,    setRubros]    = useState([]);
@@ -151,22 +155,34 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
   const [itemModal, setItemModal] = useState({ open: false, target: null });
 
   const [form, setForm] = useState({
-    codigoPlan: "",
-    contextoObjetivo: "EQUIPO",
-    ubicacionId: "",
-    familiaId:    equipoPreseleccionado?.familia?.id || "",
-    tipoEquipo:   equipoPreseleccionado?.tipoEquipo  || "",
-    modeloEquipo: equipoPreseleccionado?.modelo      || "",
-    equipoId:     equipoPreseleccionado?.id          || "",
-    nombre: equipoPreseleccionado
+    codigoPlan:       initialPlan?.codigoPlan       || "",
+    contextoObjetivo: initialPlan?.contextoObjetivo || "EQUIPO",
+    ubicacionId:      initialPlan?.ubicacionTecnicaObjetivoId ?? "",
+    familiaId:        initialPlan?.familiaId        ?? (equipoPreseleccionado?.familia?.id ?? ""),
+    tipoEquipo:       initialPlan?.tipoEquipo       || equipoPreseleccionado?.tipoEquipo  || "",
+    modeloEquipo:     initialPlan?.modeloEquipo     || equipoPreseleccionado?.modelo      || "",
+    equipoId:         initialPlan?.equipoObjetivoId ?? (equipoPreseleccionado?.id ?? ""),
+    nombre:           initialPlan?.nombre           || (equipoPreseleccionado
       ? `Plan de Mantenimiento - ${equipoPreseleccionado.nombre || equipoPreseleccionado.codigo}`
-      : "",
-    tipo: "PREVENTIVO",
-    frecuencia: "MENSUAL",
-    frecuenciaHoras: "",
+      : ""),
+    tipo:             initialPlan?.tipo             || "PREVENTIVO",
+    frecuencia:       initialPlan?.frecuencia       || "MENSUAL",
+    frecuenciaHoras:  initialPlan?.frecuenciaHoras  ?? "",
   });
 
-  const [actividades, setActividades] = useState([]);
+  const [actividades, setActividades] = useState(() =>
+    initialPlan?.actividades?.length
+      ? initialPlan.actividades.map((a) => ({
+          ...DEFAULT_ACTIVIDAD(),
+          ...a,
+          uid: uid(),
+          duracionValor: a.duracionEstimadaValor ?? a.duracionValor ?? a.duracionMinutos ?? 30,
+          unidadDuracion: a.unidadDuracion || "min",
+          items: (a.items || []).map((it) => ({ ...DEFAULT_ITEM(), ...it, uid: uid() })),
+          adjuntos: a.adjuntos || [],
+        }))
+      : []
+  );
 
   /* ── Carga de equipos ── */
   useEffect(() => {
@@ -432,7 +448,11 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
           adjuntos: a.adjuntos || [],
         })),
       };
-      await planMantenimientoService.createPlan(payload);
+      if (esEdicion) {
+        await planMantenimientoService.updatePlan(initialPlan.id, payload);
+      } else {
+        await planMantenimientoService.createPlan(payload);
+      }
       onCreated?.();
       onClose?.();
     } catch (error) {
@@ -544,7 +564,7 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
                 <Wrench size={20} className="text-white" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-xl font-semibold text-slate-900">Crear Plan de Mantenimiento</h2>
+                <h2 className="text-xl font-semibold text-slate-900">{esEdicion ? "Editar Plan de Mantenimiento" : "Crear Plan de Mantenimiento"}</h2>
                 <p className="text-sm text-slate-500 truncate">
                   {equipoPreseleccionado
                     ? `Equipo: ${equipoPreseleccionado.codigo} - ${equipoPreseleccionado.nombre || ""}`
@@ -830,8 +850,10 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
                                   }
                                 </SelectField>
                               </Field>
-                              <Field label="Cantidad de técnicos">
+                              <Field label={`Cantidad de técnicos${act.tipo === "EXTERNO" ? " (N/A — Externo)" : ""}`}>
                                 <Input type="number" min="1" value={act.cantidadTecnicos}
+                                  disabled={act.tipo === "EXTERNO"}
+                                  className={act.tipo === "EXTERNO" ? "opacity-50 pointer-events-none bg-slate-100" : ""}
                                   onChange={(e) => updateActividad(act.uid, { cantidadTecnicos: Number(e.target.value) })} />
                               </Field>
                             </div>
@@ -907,7 +929,7 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
               className="px-5 py-2.5 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-60 inline-flex items-center gap-2">
               {guardando
                 ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Guardando...</>
-                : <><Save size={16} />Guardar plan</>}
+                : <><Save size={16} />{esEdicion ? "Guardar cambios" : "Guardar plan"}</>}
             </button>
           </div>
         </div>

@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Download,
   Eye,
+  Pencil,
   Search,
   Wrench,
   BadgeCheck,
@@ -22,6 +23,7 @@ import {
 export default function PlanesMantenimientoExcel({
   planes = [],
   onVer,
+  onEditar,
   title = "Vista Detallada (Excel)",
 }) {
   const [expanded, setExpanded] = useState(() => new Set()); // planId
@@ -430,13 +432,22 @@ export default function PlanesMantenimientoExcel({
                     <td className="p-3 text-slate-600">{safeDate(plan.createdAt) || "-"}</td>
 
                     <td className="p-3 text-right">
-                      <button
-                        onClick={() => onVer?.(plan)}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition shadow-sm hover:shadow"
-                      >
-                        <Eye size={14} />
-                        Ver
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => onVer?.(plan)}
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition shadow-sm hover:shadow"
+                        >
+                          <Eye size={14} />
+                          Ver
+                        </button>
+                        <button
+                          onClick={() => onEditar?.(plan)}
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition shadow-sm hover:shadow"
+                        >
+                          <Pencil size={14} />
+                          Editar
+                        </button>
+                      </div>
                     </td>
                   </tr>
 

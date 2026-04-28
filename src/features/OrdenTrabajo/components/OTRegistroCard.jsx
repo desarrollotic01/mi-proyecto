@@ -12,8 +12,10 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
+  X,
+  UserCheck,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import {
   esEquipoRegistro,
@@ -31,10 +33,23 @@ import OTActividadCorrectivaItem, {
   OTActividadesCorrectivasHeader,
 } from "./OTActividadCorrectivaItem";
 
-// ─── Selector de trabajadores con búsqueda ────────────────────────────────────
-function TrabajadoresSelector({ trabajadores, seleccionados, encargadoId, errors, onChange }) {
+// ─── Modal selector de trabajadores ──────────────────────────────────────────
+function TrabajadoresModal({ isOpen, trabajadores, seleccionados, encargadoId, onClose, onConfirm }) {
   const [busqueda, setBusqueda] = useState("");
+  const [tempSel, setTempSel] = useState([]);
+  const [tempLider, setTempLider] = useState(null);
   const [expandido, setExpandido] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTempSel(seleccionados);
+      setTempLider(encargadoId);
+      setBusqueda("");
+      setExpandido(false);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const filtrados = trabajadores.filter((t) => {
     const q = busqueda.toLowerCase();
@@ -45,140 +60,171 @@ function TrabajadoresSelector({ trabajadores, seleccionados, encargadoId, errors
   });
 
   const toggle = (id) => {
-    const current = new Set(seleccionados);
+    const current = new Set(tempSel);
     if (current.has(id)) {
       current.delete(id);
-      onChange(Array.from(current), encargadoId === id ? null : encargadoId);
+      setTempSel(Array.from(current));
+      if (tempLider === id) setTempLider(null);
     } else {
       current.add(id);
-      onChange(Array.from(current), encargadoId);
+      setTempSel(Array.from(current));
     }
   };
 
-  const setEncargado = (id) => {
-    if (!seleccionados.includes(id)) return;
-    onChange(seleccionados, encargadoId === id ? null : id);
+  const setLider = (id) => {
+    if (!tempSel.includes(id)) return;
+    setTempLider(tempLider === id ? null : id);
   };
 
-  // Seleccionados siempre arriba
   const ordenados = [
-    ...filtrados.filter((t) => seleccionados.includes(t.id)),
-    ...filtrados.filter((t) => !seleccionados.includes(t.id)),
+    ...filtrados.filter((t) => tempSel.includes(t.id)),
+    ...filtrados.filter((t) => !tempSel.includes(t.id)),
   ];
 
-  const VISIBLE_SIN_EXPANDIR = 8;
-  const mostrados = expandido ? ordenados : ordenados.slice(0, VISIBLE_SIN_EXPANDIR);
-  const hayMas = ordenados.length > VISIBLE_SIN_EXPANDIR;
-
-  const errorMsg = errors?.trabajadores || errors?.encargado;
+  const VISIBLE = 10;
+  const mostrados = expandido ? ordenados : ordenados.slice(0, VISIBLE);
+  const hayMas = ordenados.length > VISIBLE;
 
   return (
-    <div>
-      {/* Buscador */}
-      <div className="relative mb-2">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Buscar por nombre o empresa..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-        />
-      </div>
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[110] p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
 
-      {/* Resumen de seleccionados */}
-      {seleccionados.length > 0 && (
-        <div className="mb-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600">
-          <span className="font-medium">{seleccionados.length}</span> asignado{seleccionados.length !== 1 ? "s" : ""}.
-          {encargadoId
-            ? <> Líder: <span className="font-medium">{trabajadores.find((t) => t.id === encargadoId)?.nombre ?? "—"}</span></>
-            : <span className="text-amber-600"> Sin líder asignado.</span>
-          }
-        </div>
-      )}
-
-      {/* Tabla */}
-      <div className={`rounded-xl border overflow-hidden ${errorMsg ? "border-red-300" : "border-slate-200"}`}>
-        <div className="grid grid-cols-[1fr_64px_64px] bg-slate-50 border-b border-slate-200">
-          <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-            Trabajador
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-[#003087] rounded-t-2xl shrink-0">
+          <div className="flex items-center gap-2.5">
+            <Users className="w-5 h-5 text-white" />
+            <h3 className="text-base font-bold text-white">Seleccionar trabajadores</h3>
           </div>
-          <div className="px-2 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">
-            Asignar
-          </div>
-          <div className="px-2 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">
-            Líder
-          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition" type="button">
+            <X className="w-4 h-4 text-white" />
+          </button>
         </div>
 
-        {trabajadores.length === 0 && (
-          <div className="px-3 py-4 text-sm text-slate-400 text-center">
-            No hay trabajadores disponibles
+        {/* Summary bar */}
+        {tempSel.length > 0 && (
+          <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2 text-xs text-slate-600 shrink-0">
+            <UserCheck className="w-3.5 h-3.5 text-[#003087] shrink-0" />
+            <span>
+              <span className="font-semibold">{tempSel.length}</span> seleccionado{tempSel.length !== 1 ? "s" : ""}.
+            </span>
+            {tempLider ? (
+              <span>
+                Líder:{" "}
+                <span className="font-semibold">
+                  {trabajadores.find((t) => t.id === tempLider)?.nombre ?? "—"}
+                </span>
+              </span>
+            ) : (
+              <span className="text-amber-600">Sin líder asignado.</span>
+            )}
           </div>
         )}
 
-        {mostrados.length === 0 && busqueda && (
-          <div className="px-3 py-4 text-sm text-slate-400 text-center">
-            Sin resultados para "{busqueda}"
+        {/* Search */}
+        <div className="px-5 pt-4 pb-2 shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o empresa..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
           </div>
-        )}
+        </div>
 
-        {mostrados.map((t) => {
-          const asignado = seleccionados.includes(t.id);
-          const esLider = encargadoId === t.id;
-          return (
-            <div
-              key={t.id}
-              className={`grid grid-cols-[1fr_64px_64px] items-center border-b border-slate-100 last:border-b-0 transition-colors ${
-                asignado ? "bg-white" : "bg-slate-50/40"
-              }`}
-            >
-              <div className="px-3 py-2.5">
-                <p className={`text-sm ${asignado ? "text-slate-900 font-medium" : "text-slate-500"}`}>
-                  {t.nombre}
-                </p>
-                {t.empresa && (
-                  <p className="text-xs text-slate-400">{t.empresa}</p>
-                )}
-              </div>
-              <div className="flex justify-center">
-                <input
-                  type="checkbox"
-                  checked={asignado}
-                  onChange={() => toggle(t.id)}
-                  className="w-4 h-4 rounded border-slate-300 accent-slate-800 cursor-pointer"
-                />
-              </div>
-              <div className="flex justify-center">
-                <input
-                  type="radio"
-                  checked={esLider}
-                  disabled={!asignado}
-                  onChange={() => setEncargado(t.id)}
-                  className="w-4 h-4 accent-slate-800 cursor-pointer disabled:opacity-25 disabled:cursor-not-allowed"
-                />
-              </div>
+        {/* Table */}
+        <div className="px-5 pb-2 flex-1 overflow-y-auto">
+          <div className="rounded-xl border border-slate-200 overflow-hidden">
+            <div className="grid grid-cols-[1fr_64px_64px] bg-slate-50 border-b border-slate-200">
+              <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Trabajador</div>
+              <div className="px-2 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Asignar</div>
+              <div className="px-2 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Líder</div>
             </div>
-          );
-        })}
-      </div>
 
-      {/* Expandir / colapsar */}
-      {hayMas && (
-        <button
-          type="button"
-          onClick={() => setExpandido((v) => !v)}
-          className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition"
-        >
-          {expandido ? (
-            <><ChevronUp className="w-3.5 h-3.5" /> Mostrar menos</>
-          ) : (
-            <><ChevronDown className="w-3.5 h-3.5" /> Ver {ordenados.length - VISIBLE_SIN_EXPANDIR} más</>
+            {trabajadores.length === 0 && (
+              <div className="px-3 py-6 text-sm text-slate-400 text-center">
+                No hay trabajadores disponibles
+              </div>
+            )}
+            {mostrados.length === 0 && busqueda && (
+              <div className="px-3 py-6 text-sm text-slate-400 text-center">
+                Sin resultados para &ldquo;{busqueda}&rdquo;
+              </div>
+            )}
+
+            {mostrados.map((t) => {
+              const asignado = tempSel.includes(t.id);
+              const esLider = tempLider === t.id;
+              return (
+                <div
+                  key={t.id}
+                  className={`grid grid-cols-[1fr_64px_64px] items-center border-b border-slate-100 last:border-b-0 transition-colors ${
+                    asignado ? "bg-blue-50/40" : "bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="px-3 py-2.5">
+                    <p className={`text-sm ${asignado ? "text-slate-900 font-medium" : "text-slate-500"}`}>
+                      {t.nombre}
+                    </p>
+                    {t.empresa && <p className="text-xs text-slate-400">{t.empresa}</p>}
+                  </div>
+                  <div className="flex justify-center">
+                    <input
+                      type="checkbox"
+                      checked={asignado}
+                      onChange={() => toggle(t.id)}
+                      className="w-4 h-4 rounded border-slate-300 cursor-pointer accent-[#003087]"
+                    />
+                  </div>
+                  <div className="flex justify-center">
+                    <input
+                      type="radio"
+                      checked={esLider}
+                      disabled={!asignado}
+                      onChange={() => setLider(t.id)}
+                      className="w-4 h-4 cursor-pointer disabled:opacity-25 disabled:cursor-not-allowed accent-[#003087]"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {hayMas && (
+            <button
+              type="button"
+              onClick={() => setExpandido((v) => !v)}
+              className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+            >
+              {expandido ? (
+                <><ChevronUp className="w-3.5 h-3.5" /> Mostrar menos</>
+              ) : (
+                <><ChevronDown className="w-3.5 h-3.5" /> Ver {ordenados.length - VISIBLE} más</>
+              )}
+            </button>
           )}
-        </button>
-      )}
+        </div>
 
-      {errorMsg && <FieldError message={errorMsg} />}
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-slate-200 flex gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl text-sm font-medium hover:bg-slate-50 transition text-slate-700"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(tempSel, tempLider)}
+            className="flex-1 px-4 py-2.5 bg-[#003087] hover:bg-[#002266] text-white rounded-xl text-sm font-bold transition"
+          >
+            Confirmar ({tempSel.length})
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -206,12 +252,13 @@ export default function OTRegistroCard({
   onOpenDescripcion,
 }) {
   const esInstalacion = esInstalacionRegistro(registro);
+  const [modalTrabOpen, setModalTrabOpen] = useState(false);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
 
-      {/* ── Cabecera oscura ── */}
-      <div className="bg-slate-900 px-6 py-4">
+      {/* ── Cabecera ── */}
+      <div className="bg-[#003087] px-6 py-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex items-center justify-center w-9 h-9 bg-white/15 text-white rounded-xl font-bold shrink-0 text-sm">
@@ -221,7 +268,7 @@ export default function OTRegistroCard({
               <h5 className="text-base font-semibold text-white leading-tight">
                 {getRegistroNombre(registro)}
               </h5>
-              <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+              <p className="text-xs text-blue-200 flex items-center gap-1.5 mt-0.5">
                 {esInstalacion
                   ? <Package className="w-3.5 h-3.5" />
                   : esEquipoRegistro(registro)
@@ -234,20 +281,19 @@ export default function OTRegistroCard({
           <div className="flex items-center gap-2 shrink-0">
             {esEquipoRegistro(registro) && (
               <button
-              onClick={() => onOpenDetalleEquipo?.(registro.equipoId)}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
-              type="button"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              Ver detalles
-            </button>
-          )}
-          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${getEstadoBadgeColor(registro.estado)}`}>
-            {registro.estado}
-          </span>
+                onClick={() => onOpenDetalleEquipo?.(registro.equipoId)}
+                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
+                type="button"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Ver detalles
+              </button>
+            )}
+            <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${getEstadoBadgeColor(registro.estado)}`}>
+              {registro.estado}
+            </span>
+          </div>
         </div>
-        </div>
-        {/* Equipos del aviso como referencia informativa */}
         {equiposReferencia.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {equiposReferencia.map((eq, i) => (
@@ -265,46 +311,77 @@ export default function OTRegistroCard({
         )}
       </div>
 
-      {/* ── Secciones divididas por línea ── */}
+      {/* ── Secciones ── */}
       <div className="divide-y divide-slate-100">
 
-        {/* Descripción */}
-        <Section title="Descripción del trabajo">
-          <Label>
-            Descripción <span className="text-red-500">*</span>
-          </Label>
-          <textarea
-            value={
-              !esInstalacion && !esEquipoRegistro(registro)
-                ? registro.descripcionUbicacion
-                : registro.descripcionEquipo
-            }
-            onChange={(e) =>
-              onRegistroChange(
-                !esInstalacion && !esEquipoRegistro(registro)
-                  ? "descripcionUbicacion"
-                  : "descripcionEquipo",
-                e.target.value
-              )
-            }
-            rows={3}
-            className={textareaClass(errors[`equipo_${index}_descripcion`])}
-          />
-          <FieldError message={errors[`equipo_${index}_descripcion`]} />
-        </Section>
+        {/* Descripción — oculta para instalación */}
+        {!esInstalacion && (
+          <Section title="Descripción del trabajo">
+            <Label>
+              Descripción <span className="text-red-500">*</span>
+            </Label>
+            <textarea
+              value={
+                !esEquipoRegistro(registro)
+                  ? registro.descripcionUbicacion
+                  : registro.descripcionEquipo
+              }
+              onChange={(e) =>
+                onRegistroChange(
+                  !esEquipoRegistro(registro)
+                    ? "descripcionUbicacion"
+                    : "descripcionEquipo",
+                  e.target.value
+                )
+              }
+              rows={3}
+              className={textareaClass(errors[`equipo_${index}_descripcion`])}
+            />
+            <FieldError message={errors[`equipo_${index}_descripcion`]} />
+          </Section>
+        )}
 
-        {/* Prioridad */}
-        <Section title="Prioridad">
-          <select
-            value={registro.prioridad}
-            onChange={(e) => onRegistroChange("prioridad", e.target.value)}
-            className={inputClass()}
-          >
-            <option value="BAJA">Baja</option>
-            <option value="MEDIA">Media</option>
-            <option value="ALTA">Alta</option>
-            <option value="CRITICA">Crítica</option>
-          </select>
+        {/* Prioridad y Programación — en una sola fila */}
+        <Section title="Prioridad y Programación">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <Label>Prioridad</Label>
+              <select
+                value={registro.prioridad}
+                onChange={(e) => onRegistroChange("prioridad", e.target.value)}
+                className={inputClass()}
+              >
+                <option value="BAJA">Baja</option>
+                <option value="MEDIA">Media</option>
+                <option value="ALTA">Alta</option>
+                <option value="CRITICA">Crítica</option>
+              </select>
+            </div>
+            <div>
+              <Label>
+                Inicio programado <span className="text-red-500">*</span>
+              </Label>
+              <input
+                type="datetime-local"
+                value={registro.fechaInicioProgramada}
+                onChange={(e) => onRegistroChange("fechaInicioProgramada", e.target.value)}
+                className={inputClass(errors[`equipo_${index}_fechaInicioProgramada`])}
+              />
+              <FieldError message={errors[`equipo_${index}_fechaInicioProgramada`]} />
+            </div>
+            <div>
+              <Label>
+                Fin programado <span className="text-red-500">*</span>
+              </Label>
+              <input
+                type="datetime-local"
+                value={registro.fechaFinProgramada}
+                onChange={(e) => onRegistroChange("fechaFinProgramada", e.target.value)}
+                className={inputClass(errors[`equipo_${index}_fechaFinProgramada`])}
+              />
+              <FieldError message={errors[`equipo_${index}_fechaFinProgramada`]} />
+            </div>
+          </div>
         </Section>
 
         {/* Plan de mantenimiento — solo preventivo */}
@@ -337,53 +414,70 @@ export default function OTRegistroCard({
           </Section>
         )}
 
-        {/* Programación */}
-        <Section title="Programación">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label>
-                Inicio programado <span className="text-red-500">*</span>
-              </Label>
-              <input
-                type="datetime-local"
-                value={registro.fechaInicioProgramada}
-                onChange={(e) => onRegistroChange("fechaInicioProgramada", e.target.value)}
-                className={inputClass(errors[`equipo_${index}_fechaInicioProgramada`])}
-              />
-              <FieldError message={errors[`equipo_${index}_fechaInicioProgramada`]} />
-            </div>
-            <div>
-              <Label>
-                Fin programado <span className="text-red-500">*</span>
-              </Label>
-              <input
-                type="datetime-local"
-                value={registro.fechaFinProgramada}
-                onChange={(e) => onRegistroChange("fechaFinProgramada", e.target.value)}
-                className={inputClass(errors[`equipo_${index}_fechaFinProgramada`])}
-              />
-              <FieldError message={errors[`equipo_${index}_fechaFinProgramada`]} />
-            </div>
-          </div>
-        </Section>
-
         {/* Asignación de personal */}
         <Section
           title="Asignación de personal"
-          subtitle="Marca los trabajadores a asignar y selecciona el líder."
+          subtitle="Selecciona los trabajadores y el líder del equipo."
           icon={<Users className="w-4 h-4 text-slate-400" />}
         >
-          <TrabajadoresSelector
+          {/* Chips de trabajadores seleccionados */}
+          {(registro.trabajadoresAsignados || []).length > 0 ? (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {(registro.trabajadoresAsignados || []).map((id) => {
+                const t = trabajadores.find((w) => w.id === id);
+                if (!t) return null;
+                const esLider = registro.encargadoId === id;
+                return (
+                  <span
+                    key={id}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border ${
+                      esLider
+                        ? "bg-[#003087] text-white border-[#003087]"
+                        : "bg-slate-100 text-slate-700 border-slate-200"
+                    }`}
+                  >
+                    {esLider && <UserCheck className="w-3 h-3" />}
+                    {t.nombre}
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 mb-3">No hay trabajadores asignados.</p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setModalTrabOpen(true)}
+            className="px-4 py-2 bg-[#003087] hover:bg-[#002266] text-white rounded-lg text-sm font-medium flex items-center gap-2 transition"
+          >
+            <Users className="w-4 h-4" />
+            {(registro.trabajadoresAsignados || []).length > 0
+              ? "Editar trabajadores"
+              : "Seleccionar trabajadores"}
+          </button>
+
+          {errors?.[`equipo_${index}_trabajadores`] && (
+            <div className="mt-2">
+              <FieldError message={errors[`equipo_${index}_trabajadores`]} />
+            </div>
+          )}
+          {errors?.[`equipo_${index}_encargado`] && (
+            <div className="mt-1">
+              <FieldError message={errors[`equipo_${index}_encargado`]} />
+            </div>
+          )}
+
+          <TrabajadoresModal
+            isOpen={modalTrabOpen}
             trabajadores={trabajadores}
             seleccionados={registro.trabajadoresAsignados || []}
             encargadoId={registro.encargadoId}
-            errors={{
-              trabajadores: errors[`equipo_${index}_trabajadores`],
-              encargado: errors[`equipo_${index}_encargado`],
-            }}
-            onChange={(nuevos, nuevoLider) => {
+            onClose={() => setModalTrabOpen(false)}
+            onConfirm={(nuevos, nuevoLider) => {
               onRegistroChange("trabajadoresAsignados", nuevos);
               onRegistroChange("encargadoId", nuevoLider);
+              setModalTrabOpen(false);
             }}
           />
         </Section>
@@ -402,7 +496,7 @@ export default function OTRegistroCard({
               <button
                 type="button"
                 onClick={onAddActividad}
-                className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition border border-slate-900"
+                className="px-4 py-2 bg-[#003087] text-white rounded-lg text-xs font-medium hover:bg-[#002266] transition"
               >
                 + Agregar actividad
               </button>
@@ -456,7 +550,7 @@ export default function OTRegistroCard({
           )}
         </Section>
 
-        {/* Adjuntos — siempre al final */}
+        {/* Adjuntos */}
         <Section
           title="Adjuntos"
           subtitle="Archivos del equipo o ubicación técnica."
@@ -554,11 +648,11 @@ function FieldError({ message }) {
 function inputClass(hasError) {
   return `w-full px-3 py-2.5 border rounded-xl bg-white text-sm text-slate-800 ${
     hasError ? "border-red-400 bg-red-50" : "border-slate-300"
-  } focus:outline-none focus:ring-2 focus:ring-slate-200`;
+  } focus:outline-none focus:ring-2 focus:ring-blue-100`;
 }
 
 function textareaClass(hasError) {
   return `w-full px-3 py-3 border rounded-xl bg-white text-sm text-slate-800 resize-none ${
     hasError ? "border-red-400 bg-red-50" : "border-slate-300"
-  } focus:outline-none focus:ring-2 focus:ring-slate-200`;
+  } focus:outline-none focus:ring-2 focus:ring-blue-100`;
 }

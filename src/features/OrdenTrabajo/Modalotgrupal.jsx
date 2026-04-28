@@ -1151,7 +1151,7 @@ const confirmarGuardado = () => {
         <div className="bg-white rounded-3xl shadow-2xl w-[99vw] max-w-[145rem] h-[97vh] flex flex-col border border-slate-200 overflow-hidden">
 
           {/* ── Header ── */}
-          <div className="px-8 py-6 border-b bg-slate-900 shrink-0 flex items-center justify-between">
+          <div className="px-8 py-6 border-b bg-[#003087] shrink-0 flex items-center justify-between">
             <div>
               <h3 className="text-2xl font-bold text-white">
                 {mode === "edit"
@@ -1167,7 +1167,7 @@ const confirmarGuardado = () => {
                 {tipoMantenimiento && (
                   <>
                     <span>•</span>
-                    <span className="px-2.5 py-1 rounded-full border border-slate-700 bg-slate-800 text-slate-100 font-medium">
+                    <span className="px-2.5 py-1 rounded-full border border-blue-300/30 bg-white/15 text-white font-medium">
                       {tipoMantenimiento}
                     </span>
                   </>
@@ -1203,7 +1203,7 @@ const confirmarGuardado = () => {
               {/* Información general */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2.5 rounded-xl bg-slate-900">
+                  <div className="p-2.5 rounded-xl bg-[#003087]">
                     <ClipboardCheck className="w-5 h-5 text-white" />
                   </div>
                   <h4 className="text-xl font-semibold text-slate-900">
@@ -1212,7 +1212,7 @@ const confirmarGuardado = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="md:col-span-2">
+                  <div>
                     <Label>Supervisor Responsable *</Label>
                     <select
                       name="supervisorId"
@@ -1231,13 +1231,13 @@ const confirmarGuardado = () => {
                   </div>
 
                   {!esVenta && (
-                    <div className="md:col-span-2">
+                    <div>
                       <Label>Descripción General del Trabajo *</Label>
                       <textarea
                         name="descripcionGeneral"
                         value={formData.descripcionGeneral}
                         onChange={handleChange}
-                        rows={3}
+                        rows={2}
                         className={textareaClass(errors.descripcionGeneral)}
                       />
                       <FieldError message={errors.descripcionGeneral} />
@@ -1255,29 +1255,33 @@ const confirmarGuardado = () => {
                     />
                   </div>
 
-                  <div>
-                    <Label>Fecha y Hora de Inicio Total*</Label>
-                    <input
-                      type="datetime-local"
-                      name="fechaProgramadaInicio"
-                      value={formData.fechaProgramadaInicio}
-                      onChange={handleChange}
-                      className={inputClass(errors.fechaProgramadaInicio)}
-                    />
-                    <FieldError message={errors.fechaProgramadaInicio} />
-                  </div>
+                  {!esInstalacion && (
+                    <>
+                      <div>
+                        <Label>Fecha y Hora de Inicio Total*</Label>
+                        <input
+                          type="datetime-local"
+                          name="fechaProgramadaInicio"
+                          value={formData.fechaProgramadaInicio}
+                          onChange={handleChange}
+                          className={inputClass(errors.fechaProgramadaInicio)}
+                        />
+                        <FieldError message={errors.fechaProgramadaInicio} />
+                      </div>
 
-                  <div>
-                    <Label>Fecha y Hora de Fin Total*</Label>
-                    <input
-                      type="datetime-local"
-                      name="fechaProgramadaFin"
-                      value={formData.fechaProgramadaFin}
-                      onChange={handleChange}
-                      className={inputClass(errors.fechaProgramadaFin)}
-                    />
-                    <FieldError message={errors.fechaProgramadaFin} />
-                  </div>
+                      <div>
+                        <Label>Fecha y Hora de Fin Total*</Label>
+                        <input
+                          type="datetime-local"
+                          name="fechaProgramadaFin"
+                          value={formData.fechaProgramadaFin}
+                          onChange={handleChange}
+                          className={inputClass(errors.fechaProgramadaFin)}
+                        />
+                        <FieldError message={errors.fechaProgramadaFin} />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1330,8 +1334,8 @@ const confirmarGuardado = () => {
                 </div>
               )}
 
-              {/* Registros (equipos / ubicaciones) */}
-              {equipos.map((registro, index) => (
+              {/* Registros (equipos / ubicaciones) — oculto para venta */}
+              {!esVenta && equipos.map((registro, index) => (
                 <OTRegistroCard
                   key={`${getRegistroId(registro)}-${index}`}
                   registro={registro}
@@ -1399,7 +1403,7 @@ const confirmarGuardado = () => {
                   type="file"
                   multiple
                   onChange={(e) => handleUploadAdjuntos(e.target.files)}
-                  className="w-full text-sm file:mr-4 file:py-3 file:px-5 file:rounded-xl file:border-0 file:bg-slate-900 file:text-white file:font-medium hover:file:bg-slate-800 cursor-pointer border border-dashed border-slate-300 rounded-xl p-4"
+                  className="w-full text-sm file:mr-4 file:py-3 file:px-5 file:rounded-xl file:border-0 file:bg-[#003087] file:text-white file:font-medium hover:file:bg-[#002266] cursor-pointer border border-dashed border-slate-300 rounded-xl p-4"
                 />
                 {subiendoArchivos && (
                   <div className="mt-4 flex items-center gap-3 text-blue-600 bg-blue-50 p-4 rounded-xl border border-blue-200">
@@ -1471,7 +1475,7 @@ const confirmarGuardado = () => {
             </button>
             <button
               onClick={handleSubmitInternal}
-              className="px-8 py-3 bg-slate-900 text-white rounded-xl font-medium shadow-sm hover:bg-slate-800 transition flex items-center gap-3"
+              className="px-8 py-3 bg-[#003087] text-white rounded-xl font-medium shadow-sm hover:bg-[#002266] transition flex items-center gap-3"
               type="button"
             >
               <CheckCircle2 className="w-5 h-5" />
@@ -1578,7 +1582,7 @@ const confirmarGuardado = () => {
                   confirmarGuardado();
                   setMostrarConfirmacion(false);
                 }}
-                className="flex-1 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium transition"
+                className="flex-1 px-4 py-3 bg-[#003087] hover:bg-[#002266] text-white rounded-xl font-medium transition"
                 type="button"
               >
                 Confirmar
@@ -1634,7 +1638,7 @@ function ModalTextoActividad({ titulo, valor, onClose, onGuardar }) {
           <button
             type="button"
             onClick={() => onGuardar(texto)}
-            className="px-5 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition"
+            className="px-5 py-2 bg-[#003087] text-white rounded-xl text-sm font-medium hover:bg-[#002266] transition"
           >
             Guardar
           </button>

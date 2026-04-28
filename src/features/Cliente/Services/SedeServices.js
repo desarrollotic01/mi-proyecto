@@ -17,7 +17,7 @@ export const sedeService = {
   },
 
   async asignarUbicacionesTecnicas(sedeId, payload) {
-    const res = await api.put(`/sede/${sedeId}/asignar-ubicaciones`, payload);
+    const res = await api.put(`/sede/${sedeId}/asignar-ubicaciones-tecnicas`, payload);
     return res.data?.data || res.data;
   },
 };

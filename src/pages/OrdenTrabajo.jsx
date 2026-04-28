@@ -314,9 +314,9 @@ export default function OrdenTrabajo() {
 
       const { compra, almacen } = r.data;
       let msg = "✅ OT liberada correctamente.";
-      if (compra?.enviada) msg += `\n📦 Compra enviada a SAP (${compra.numeroSolicitud}).`;
-      if (almacen?.correoEnviado) msg += `\n📧 Correo de almacén enviado a ${almacen.destinatario}.`;
-      if (almacen?.errorCorreo) msg += `\n⚠️ Error enviando correo: ${almacen.errorCorreo}`;
+      if (compra?.numeroSolicitud) msg += `\n📦 Solicitud de compra consolidada (${compra.numeroSolicitud}) — pendiente de envío a SAP.`;
+      if (almacen?.numeroSolicitud) msg += `\n📦 Solicitud de almacén consolidada (${almacen.numeroSolicitud}) — pendiente de envío por correo.`;
+      if (compra?.numeroSolicitud || almacen?.numeroSolicitud) msg += "\n\n⚠️ Recuerda enviar las solicitudes desde el estado LIBERADO.";
       alert(msg);
 
       await loadOrdenesTrabajo();
@@ -403,6 +403,8 @@ export default function OrdenTrabajo() {
             <ListaView
               ordenes={filteredOrdenes}
               onViewOrden={handleViewOrden}
+              onEditarOT={handleViewOrden}
+              onEditarNotificacion={handleAbrirCierreTecnico}
               cardFields={cardFields}
               columnOrder={columnOrder}
             />

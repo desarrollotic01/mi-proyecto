@@ -14,7 +14,7 @@ export const validateOTForm = ({
 }) => {
   const newErrors = {};
 
-  if (!formData.descripcionGeneral?.trim()) {
+  if (!esInstalacion && !formData.descripcionGeneral?.trim()) {
     newErrors.descripcionGeneral = "La descripción general es requerida";
   }
 
@@ -26,15 +26,15 @@ export const validateOTForm = ({
     newErrors.encargadoId = "El encargado es requerido para OT de venta";
   }
 
-  if (!formData.fechaProgramadaInicio) {
+  if (!esInstalacion && !formData.fechaProgramadaInicio) {
     newErrors.fechaProgramadaInicio = "La fecha de inicio programada es requerida";
   }
 
-  if (!formData.fechaProgramadaFin) {
+  if (!esInstalacion && !formData.fechaProgramadaFin) {
     newErrors.fechaProgramadaFin = "La fecha de fin programada es requerida";
   }
 
-  if (formData.fechaProgramadaInicio && formData.fechaProgramadaFin) {
+  if (!esInstalacion && formData.fechaProgramadaInicio && formData.fechaProgramadaFin) {
     if (new Date(formData.fechaProgramadaFin) < new Date(formData.fechaProgramadaInicio)) {
       newErrors.fechaProgramadaFin =
         "La fecha de fin debe ser posterior a la de inicio";
@@ -50,7 +50,7 @@ export const validateOTForm = ({
       ? equipo.descripcionUbicacion
       : equipo.descripcionEquipo;
 
-    if (!descripcionTrabajo?.trim()) {
+    if (!esInstalacion && !descripcionTrabajo?.trim()) {
       newErrors[`equipo_${index}_descripcion`] =
         "La descripción del trabajo es obligatoria";
     }

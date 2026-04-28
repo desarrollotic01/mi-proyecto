@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import {
   Search,
@@ -7,7 +7,13 @@ import {
   Package,
   AlertCircle,
   Paperclip,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  History,
 } from "lucide-react";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
 import { portalClienteService } from "../mantenimiento/services/portalClienteService";
 import AdjuntosEquipoModal from "./Components/AdjuntosEquipoModal";
@@ -28,6 +34,7 @@ export default function ListaLink() {
 
   const [modalAdjuntosOpen, setModalAdjuntosOpen] = useState(false);
   const [equipoAdjuntosSeleccionado, setEquipoAdjuntosSeleccionado] = useState(null);
+  const [historialExpandido, setHistorialExpandido] = useState(new Set());
 
   useEffect(() => {
     const fetchPortal = async () => {
@@ -80,6 +87,18 @@ export default function ListaLink() {
   const cerrarModalAdjuntos = () => {
     setModalAdjuntosOpen(false);
     setEquipoAdjuntosSeleccionado(null);
+  };
+
+  const toggleHistorial = (equipoId) => {
+    setHistorialExpandido((prev) => {
+      const next = new Set(prev);
+      if (next.has(equipoId)) {
+        next.delete(equipoId);
+      } else {
+        next.add(equipoId);
+      }
+      return next;
+    });
   };
 
   const normalizarTexto = (valor) => String(valor || "").toLowerCase().trim();
@@ -226,7 +245,7 @@ export default function ListaLink() {
 
   const renderTablaEquipos = (equipos = []) => (
     <div className="overflow-x-auto rounded-2xl border border-slate-200">
-      <table className="w-full text-left min-w-[1150px]">
+      <table className="w-full text-left min-w-[1250px]">
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
             <th className="px-4 py-4">Foto</th>
@@ -238,73 +257,170 @@ export default function ListaLink() {
             <th className="px-4 py-4">Modelo</th>
             <th className="px-4 py-4">País</th>
             <th className="px-4 py-4">Adjuntos</th>
+            <th className="px-4 py-4">Historial</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {equipos.length ? (
             equipos.map((item) => {
-              const cantidadAdjuntos = Array.isArray(item?.adjuntos)
-                ? item.adjuntos.length
-                : 0;
+              const adjuntosArr = Array.isArray(item?.adjuntos) ? item.adjuntos : [];
+              const fotoAdjunto = adjuntosArr.find((a) =>
+                (a.extension || "").startsWith("image/")
+              );
+              const fotoUrl = fotoAdjunto
+                ? `${API_URL}${fotoAdjunto.url}`
+                : null;
+              const adjuntosDocs = adjuntosArr.filter(
+                (a) => !(a.extension || "").startsWith("image/")
+              );
+              const historialAbierto = historialExpandido.has(item.id);
+              const historialCierres = Array.isArray(item.historialCierres)
+                ? item.historialCierres
+                : [];
 
               return (
-                <tr key={item.id} className="hover:bg-blue-50/30 transition-all">
-                  <td className="px-4 py-3">
-                    <img
-                      src={item.foto || "https://via.placeholder.com/100"}
-                      className="w-10 h-10 rounded-lg border border-slate-200 object-cover"
-                      alt={item.nombre || "Equipo"}
-                    />
-                  </td>
-                  <td className="px-4 py-3 font-black text-[11px] text-blue-600">
-                    {item.codigo || "-"}
-                  </td>
-                  <td className="px-4 py-3 font-black text-slate-700 text-sm uppercase">
-                    {item.nombre || "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`px-3 py-1 rounded-full text-[9px] font-black border ${
-                        item.estado?.toUpperCase() === "OPERATIVO"
-                          ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                          : item.estado?.toUpperCase() === "INOPERATIVO"
-                          ? "bg-red-50 text-red-600 border-red-100"
-                          : "bg-orange-50 text-orange-600 border-orange-100"
-                      }`}
-                    >
-                      {item.estado || "SIN ESTADO"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-[10px] font-bold text-slate-400">
-                    {item.serie || "-"}
-                  </td>
-                  <td className="px-4 py-3 text-[10px] font-bold uppercase">
-                    {item.marca || "-"}
-                  </td>
-                  <td className="px-4 py-3 text-[10px] font-bold uppercase">
-                    {item.modelo || "-"}
-                  </td>
-                  <td className="px-4 py-3 text-[10px] font-bold uppercase">
-                    {item.pais?.nombre || "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => abrirModalAdjuntos(item)}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-[10px] font-black uppercase text-slate-700 transition-all"
-                    >
-                      <Paperclip size={14} />
-                      {cantidadAdjuntos > 0
-                        ? `Ver adjuntos (${cantidadAdjuntos})`
-                        : "Sin adjuntos"}
-                    </button>
-                  </td>
-                </tr>
+                <React.Fragment key={item.id}>
+                  <tr className="hover:bg-blue-50/30 transition-all">
+                    <td className="px-4 py-3">
+                      {fotoUrl ? (
+                        <img
+                          src={fotoUrl}
+                          className="w-10 h-10 rounded-lg border border-slate-200 object-cover"
+                          alt={item.nombre || "Equipo"}
+                          onError={(e) => { e.target.style.display = "none"; }}
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-100 flex items-center justify-center">
+                          <Package size={16} className="text-slate-400" />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-black text-[11px] text-blue-600">
+                      {item.codigo || "-"}
+                    </td>
+                    <td className="px-4 py-3 font-black text-slate-700 text-sm uppercase">
+                      {item.nombre || "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`px-3 py-1 rounded-full text-[9px] font-black border ${
+                          item.estado?.toUpperCase() === "OPERATIVO"
+                            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                            : item.estado?.toUpperCase() === "INOPERATIVO"
+                            ? "bg-red-50 text-red-600 border-red-100"
+                            : "bg-orange-50 text-orange-600 border-orange-100"
+                        }`}
+                      >
+                        {item.estado || "SIN ESTADO"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[10px] font-bold text-slate-400">
+                      {item.serie || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-[10px] font-bold uppercase">
+                      {item.marca || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-[10px] font-bold uppercase">
+                      {item.modelo || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-[10px] font-bold uppercase">
+                      {item.pais?.nombre || "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => abrirModalAdjuntos({ ...item, adjuntos: adjuntosDocs })}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-[10px] font-black uppercase text-slate-700 transition-all"
+                      >
+                        <Paperclip size={14} />
+                        {adjuntosDocs.length > 0
+                          ? `Ver adjuntos (${adjuntosDocs.length})`
+                          : "Sin adjuntos"}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleHistorial(item.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[10px] font-black uppercase transition-all ${
+                          historialAbierto
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                        }`}
+                      >
+                        <History size={13} />
+                        {historialCierres.length > 0
+                          ? `Historial (${historialCierres.length})`
+                          : "Historial"}
+                        {historialAbierto ? (
+                          <ChevronUp size={12} />
+                        ) : (
+                          <ChevronDown size={12} />
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+
+                  {historialAbierto && (
+                    <tr className="bg-indigo-50/40">
+                      <td colSpan={10} className="px-6 py-4">
+                        <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+                          <History size={13} />
+                          Historial del equipo — últimos cierres técnicos
+                        </p>
+                        {historialCierres.length > 0 ? (
+                          <div className="flex flex-wrap gap-3">
+                            {historialCierres.map((cierre) => {
+                              const fecha = cierre.fechaFin
+                                ? new Date(cierre.fechaFin).toLocaleDateString("es-PE", {
+                                    day: "2-digit",
+                                    month: "short",
+                                    year: "numeric",
+                                  })
+                                : "-";
+                              const tipoLabel =
+                                cierre.tipoAviso === "instalacion"
+                                  ? "Instalación"
+                                  : cierre.tipoAviso === "venta"
+                                  ? "Venta"
+                                  : "Mantenimiento";
+                              const pdfUrl = `${API_URL}/portal-cliente/${token}/notificacion/${cierre.id}/pdf`;
+                              return (
+                                <a
+                                  key={cierre.id}
+                                  href={pdfUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-indigo-200 bg-white hover:bg-indigo-50 text-slate-700 transition-all shadow-sm"
+                                >
+                                  <FileText size={14} className="text-indigo-500 shrink-0" />
+                                  <div className="text-left">
+                                    <p className="text-[10px] font-black uppercase text-indigo-700">
+                                      {tipoLabel}
+                                      {cierre.numeroOT ? ` — OT ${cierre.numeroOT}` : ""}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 font-semibold">
+                                      {fecha}
+                                    </p>
+                                  </div>
+                                </a>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500 font-semibold">
+                            Sin cierres técnicos registrados.
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })
           ) : (
             <tr>
-              <td colSpan={9} className="px-4 py-8 text-center text-slate-500 font-semibold">
+              <td colSpan={10} className="px-4 py-8 text-center text-slate-500 font-semibold">
                 No hay equipos para mostrar.
               </td>
             </tr>

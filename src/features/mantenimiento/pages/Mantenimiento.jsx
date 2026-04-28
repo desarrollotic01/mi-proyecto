@@ -14,30 +14,20 @@ import ModalMantenimiento from "../modals/ModalMantenimiento";
 import ModalMantenimientoView from "../modals/ModalMantenimientoView";
 import ModalTratamiento from "../../../components/inputs/ModalTratamiento";
 import ModalSeleccionTipoOT from "../../../features/OrdenTrabajo/Modalselecciontipoot";
-import ModalOTIndividual from "../../../features/OrdenTrabajo/Modalotindividual";
 import ModalOTGrupal from "../../../features/OrdenTrabajo/Modalotgrupal";
 import ModalConfiguracionCampos from "../../../components/ModalConfiguracionCampos";
-import ModalSeleccionEquiposOT from "../../OrdenTrabajo/Modalseleccionequiposot";
 
 import "../../../styles/fullcalendar.css";
 
 export default function Mantenimiento() {
   const m = useMantenimiento();
   
-  // 🆕 Estados para los 3 modales de OT
   const [modalSeleccionOT, setModalSeleccionOT] = useState(false);
-  const [modalIndividualOT, setModalIndividualOT] = useState(false);
   const [modalGrupalOT, setModalGrupalOT] = useState(false);
 
   // 🆕 Estado para equipos
   const [equiposData, setEquiposData] = useState([]);
   const [loadingEquipos, setLoadingEquipos] = useState(true);
-
-
-  const [modalEquiposOT, setModalEquiposOT] = useState(false);
-
-  const [equiposSeleccionados, setEquiposSeleccionados] = useState([]);
-const [indiceEquipoActual, setIndiceEquipoActual] = useState(0);
 
 
 
@@ -64,28 +54,15 @@ const [indiceEquipoActual, setIndiceEquipoActual] = useState(0);
     }
   }, [m.avisoOrdenTrabajo]);
 
-  // 🆕 Función auxiliar para cerrar todos los modales de OT
- // 🆕 Función auxiliar para cerrar todos los modales de OT
-const cerrarModalesOT = () => {
+  const cerrarModalesOT = () => {
   setModalSeleccionOT(false);
-  setModalIndividualOT(false);
   setModalGrupalOT(false);
-  setModalEquiposOT(false); 
-  setEquiposSeleccionados([]);
-  setIndiceEquipoActual(0); 
-  m.setEquiposProcesadosOT([]);
   m.setAvisoOrdenTrabajo(null);
 };
   // 🆕 Función para generar número de OT
   const generarNumeroOT = () => {
     return `OT-${Date.now().toString().slice(-6)}`;
   };
-
-  const handleEquiposSeleccionados = (equipos) => {
-  console.log("Equipos seleccionados:", equipos);
-  // aquí guardas estado, abres el modal individual, etc
-};
-
 
   // 🆕 Función para manejar el guardado de OT
   const handleGuardarOT = async (payload) => {
@@ -94,6 +71,12 @@ const cerrarModalesOT = () => {
     // Cerrar el modal de vista ya que el aviso cambió de estado
     m.setViewOpen(false);
     m.setViewData(null);
+  };
+
+  /* ================= EDITAR AVISO ================= */
+  const abrirEditarAviso = (aviso) => {
+    m.setFormData({ ...aviso });
+    m.setModalOpen(true);
   };
 
   /* ================= FILTROS ================= */
@@ -196,6 +179,7 @@ const cerrarModalesOT = () => {
               columnOrder={m.columnOrder}
               cambiarEstado={m.cambiarEstado}
               abrirTratamiento={m.abrirTratamiento}
+              onEditarAviso={abrirEditarAviso}
               setViewData={m.setViewData}
               setViewStep={m.setViewStep}
               setViewOpen={m.setViewOpen}
@@ -251,7 +235,8 @@ const cerrarModalesOT = () => {
           m.setViewData(null);
         }}
         cambiarEstado={m.cambiarEstado}
-  abrirTratamiento={m.abrirTratamiento}
+        abrirTratamiento={m.abrirTratamiento}
+        onEditarAviso={abrirEditarAviso}
       />
 
       <ModalTratamiento
@@ -264,84 +249,16 @@ const cerrarModalesOT = () => {
         onGuardar={m.guardarTratamiento}
       />
 
-      {/* 🆕 SISTEMA COMPLETO DE 3 MODALES PARA ORDEN DE TRABAJO */}
-      
-      {/* PASO 1: Modal de Selección de Tipo (Individual, Mixta o Grupal) */}
-    <ModalSeleccionTipoOT
-  isOpen={modalSeleccionOT}
-  onClose={cerrarModalesOT}
-  onSeleccionar={(tipo) => {
-    setModalSeleccionOT(false);
+      {/* Modal Grupal OT */}
+      <ModalSeleccionTipoOT
+        isOpen={modalSeleccionOT}
+        onClose={cerrarModalesOT}
+        onSeleccionar={(tipo) => {
+          setModalSeleccionOT(false);
+          if (tipo === "grupal") setModalGrupalOT(true);
+        }}
+      />
 
-    if (tipo === "individual") {
-      setModalEquiposOT(true);
-    }
-    if (tipo === "grupal") {
-      setModalGrupalOT(true);
-    }
-
-
-  }}
-/>
-
-<ModalSeleccionEquiposOT
-  isOpen={modalEquiposOT}
-  onClose={cerrarModalesOT}
-  aviso={m.avisoOrdenTrabajo}
-
-  ordenesExistentes={(() => {
-    const ordenes = m.ordenesTrabajoCompletas || [];
-    console.log("📦 Enviando a ModalSeleccionEquiposOT:");
-    console.log("- Aviso ID:", m.avisoOrdenTrabajo?.id);
-    console.log("- Total órdenes:", ordenes.length);
-    console.log("- Órdenes completas:", ordenes);
-    return ordenes;
-  })()}
-  equiposProcesados={m.equiposProcesadosOT || []}
-  onEquiposSeleccionados={(equipos) => {
-    setEquiposSeleccionados(equipos);
-    setIndiceEquipoActual(0);
-    setModalEquiposOT(false);
-    setModalIndividualOT(true);
-  }}
-/>
-
-
-
-      {/* PASO 2A: Modal Individual */}
-   <ModalOTIndividual
-  isOpen={modalIndividualOT}
-  onClose={cerrarModalesOT}
-  aviso={m.avisoOrdenTrabajo}
-  equipoActual={equiposSeleccionados[indiceEquipoActual]}
-  progresoEquipos={{
-    actual: indiceEquipoActual + 1,
-    total: equiposSeleccionados.length,
-  }}
-  onGuardar={(payload) => {
-    const equipoId = equiposSeleccionados[indiceEquipoActual].id;
-    
-    m.guardarOrdenTrabajo({
-      ...payload,
-      equipoId: equipoId,
-      avisoId: m.avisoOrdenTrabajo.id,
-    });
-
-    // ✅ IMPORTANTE: Marcar este equipo como procesado
-    m.setEquiposProcesadosOT(prev => [...(prev || []), equipoId]);
-
-    // Avanzar al siguiente equipo
-    if (indiceEquipoActual + 1 < equiposSeleccionados.length) {
-      setIndiceEquipoActual(prev => prev + 1);
-    } else {
-      cerrarModalesOT();
-      setEquiposSeleccionados([]);
-      setIndiceEquipoActual(0);
-    }
-  }}
-  onGenerarNumeroOT={generarNumeroOT}
-/>
-      {/* PASO 2C: Modal Grupal */}
       <ModalOTGrupal
         isOpen={modalGrupalOT}
         onClose={cerrarModalesOT}

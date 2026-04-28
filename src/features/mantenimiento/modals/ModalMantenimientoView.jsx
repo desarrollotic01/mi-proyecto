@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import AdjuntosViewer from "../../adjuntos/components/AdjuntosViewer";
 import { getTratamientoByAviso } from "../services/tratamientoService";
 import { ESTADOS_AV } from "../config/camposMantenimiento";
@@ -84,7 +84,7 @@ const TABS = [
 ───────────────────────────────────────────── */
 export default function ModalMantenimientoView({
   isOpen, onClose, wizardStep, setWizardStep,
-  data, cambiarEstado, abrirTratamiento,
+  data, cambiarEstado, abrirTratamiento, onEditarAviso,
 }) {
   const [tratamiento, setTratamiento] = useState(null);
   const [loadingTrat, setLoadingTrat] = useState(false);
@@ -112,7 +112,13 @@ export default function ModalMantenimientoView({
   /* ── Action buttons ── */
   const renderActions = () => {
     if (estadoKey === "CREADO") return (
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
+        {onEditarAviso && (
+          <button onClick={() => { onEditarAviso(data); onClose?.(); }}
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5">
+            <Pencil className="w-4 h-4" /> Editar
+          </button>
+        )}
         <button onClick={() => { abrirTratamiento?.(data); onClose?.(); }}
           className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-lg transition-colors">
           Tratar
@@ -124,7 +130,13 @@ export default function ModalMantenimientoView({
       </div>
     );
     if (estadoKey === "TRATADO") return (
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
+        {abrirTratamiento && (
+          <button onClick={() => { abrirTratamiento?.(data); onClose?.(); }}
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5">
+            <Pencil className="w-4 h-4" /> Editar
+          </button>
+        )}
         <button onClick={() => handleEstado("CON_OT")}
           className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-lg transition-colors">
           Generar OT

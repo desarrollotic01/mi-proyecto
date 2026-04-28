@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import {
   FileText, User, Calendar, Wrench,
   CheckCircle, Clock, Hash, ChevronUp, ChevronDown as ChevronDownIcon, ChevronsUpDown,
+  Pencil, Bell,
 } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -77,6 +78,8 @@ export const OT_DEFAULT_ORDER = Object.keys(OT_DEFAULT_FIELDS);
 export default function OrdenTrabajoLista({
   ordenes = [],
   onViewOrden,
+  onEditarOT,
+  onEditarNotificacion,
   cardFields,
   columnOrder,
 }) {
@@ -252,12 +255,32 @@ export default function OrdenTrabajoLista({
                       </td>
                     )}
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => onViewOrden(orden)}
-                        className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm hover:shadow-md"
-                      >
-                        Ver / Editar
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => onViewOrden(orden)}
+                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm hover:shadow-md"
+                        >
+                          Ver
+                        </button>
+                        {orden.estado === "CREADO" && onEditarOT && (
+                          <button
+                            onClick={() => onEditarOT(orden)}
+                            className="p-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 hover:bg-amber-100 transition-all"
+                            title="Editar OT"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        {onEditarNotificacion && (
+                          <button
+                            onClick={() => onEditarNotificacion(orden)}
+                            className="p-1.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-600 hover:bg-purple-100 transition-all"
+                            title="Editar notificación"
+                          >
+                            <Bell className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

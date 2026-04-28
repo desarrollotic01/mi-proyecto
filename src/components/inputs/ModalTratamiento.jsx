@@ -1600,7 +1600,7 @@ function ActividadCorrectivaRow({ idx, act, onChange, onDelete, onOpenObservacio
         {ROLES_TECNICOS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
       </select>
 
-      <input type="number" min={1}   value={act.cantidadTecnicos    ?? ""} onChange={(e) => onChange("cantidadTecnicos",    Number(e.target.value))} className={inputCls} />
+      <input type="number" min={1}   value={act.cantidadTecnicos    ?? ""} disabled={act.tipo === "EXTERNO"} onChange={(e) => onChange("cantidadTecnicos",    Number(e.target.value))} className={inputCls} style={{ opacity: act.tipo === "EXTERNO" ? 0.45 : 1, cursor: act.tipo === "EXTERNO" ? "not-allowed" : undefined }} />
       <input type="number" min={0}   value={act.duracionEstimadaValor ?? ""} onChange={(e) => onChange("duracionEstimadaValor", Number(e.target.value))} className={inputCls} />
 
       <select value={act.unidadDuracion ?? "min"} onChange={(e) => onChange("unidadDuracion", e.target.value)} className={inputCls}>
@@ -1704,7 +1704,7 @@ function ActividadInstalacionRow({ idx, act, onChange, onDelete, onOpenObservaci
         {ROLES_TECNICOS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
       </select>
 
-      <input type="number" min={1}   value={act.cantidadTecnicos    ?? ""} onChange={(e) => onChange("cantidadTecnicos",    Number(e.target.value))} className={inputCls} />
+      <input type="number" min={1}   value={act.cantidadTecnicos    ?? ""} disabled={act.tipo === "EXTERNO"} onChange={(e) => onChange("cantidadTecnicos",    Number(e.target.value))} className={inputCls} style={{ opacity: act.tipo === "EXTERNO" ? 0.45 : 1, cursor: act.tipo === "EXTERNO" ? "not-allowed" : undefined }} />
       <input type="number" min={0}   value={act.duracionEstimadaValor ?? ""} onChange={(e) => onChange("duracionEstimadaValor", Number(e.target.value))} className={inputCls} />
 
       <select value={act.unidadDuracion ?? "min"} onChange={(e) => onChange("unidadDuracion", e.target.value)} className={inputCls}>
@@ -1802,7 +1802,7 @@ function ActividadPreventivaRow({ act, idx, onChange, onDelete, onOpenObservacio
         {ROLES_TECNICOS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
       </select>
 
-      <input type="number" min={1} value={act.cantidadTecnicos     ?? ""} disabled={!puedeEditar("cantidadTecnicos")}     onChange={(e) => onChange("cantidadTecnicos",     Number(e.target.value))} className={inputCls("cantidadTecnicos")} />
+      <input type="number" min={1} value={act.cantidadTecnicos     ?? ""} disabled={!puedeEditar("cantidadTecnicos") || act.tipo === "EXTERNO"}     onChange={(e) => onChange("cantidadTecnicos",     Number(e.target.value))} className={inputCls("cantidadTecnicos")} style={{ opacity: (!puedeEditar("cantidadTecnicos") || act.tipo === "EXTERNO") ? 0.45 : 1, cursor: (!puedeEditar("cantidadTecnicos") || act.tipo === "EXTERNO") ? "not-allowed" : undefined }} />
       <input type="number" min={0} value={act.duracionEstimadaValor ?? ""} disabled={!puedeEditar("duracionEstimadaValor")} onChange={(e) => onChange("duracionEstimadaValor", Number(e.target.value))} className={inputCls("duracionEstimadaValor")} />
 
       <select value={act.unidadDuracion ?? "min"} disabled={!puedeEditar("unidadDuracion")} onChange={(e) => onChange("unidadDuracion", e.target.value)} className={inputCls("unidadDuracion")}>
@@ -1941,9 +1941,14 @@ function Grid({ children }) {
 }
 
 function Info({ label, value }) {
+  const display =
+    value && typeof value === "object"
+      ? value.razonSocial || value.nombre || value.nombreApellido || String(value)
+      : value || "—";
   return (
     <div className="bg-white border border-slate-100 rounded-xl p-2">
       <p className="text-xs font-semibold text-slate-500 uppercase">{label}</p>
+      <p className="text-sm text-slate-800 mt-0.5 font-medium truncate" title={String(display)}>{display}</p>
     </div>
   );
 }

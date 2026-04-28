@@ -3,6 +3,7 @@ import {
   FileText, User, Calendar, AlertCircle, Wrench, Package,
   CheckCircle, XCircle, FileCheck, Inbox, MapPin, Mail, Phone,
   Building, Box, Hash, DollarSign, ChevronUp, ChevronDown as ChevronDownIcon, ChevronsUpDown,
+  Pencil,
 } from "lucide-react";
 import { ESTADOS_AV } from "../config/camposMantenimiento";
 
@@ -14,6 +15,7 @@ export default function MantenimientoLista({
   columnOrder,
   cambiarEstado,
   abrirTratamiento,
+  onEditarAviso,
   setViewData,
   setViewStep,
   setViewOpen,
@@ -290,6 +292,15 @@ export default function MantenimientoLista({
                     <div className="flex items-center gap-2 justify-end">
                       {item.estado === "CREADO" && (
                         <>
+                          {onEditarAviso && (
+                            <button
+                              onClick={() => onEditarAviso(item)}
+                              className="p-2 bg-blue-50 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-100 transition-all"
+                              title="Editar aviso"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => abrirTratamiento(item)}
                             className="px-3 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs font-semibold rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all shadow-sm flex items-center gap-1.5 whitespace-nowrap"
@@ -306,12 +317,21 @@ export default function MantenimientoLista({
                         </>
                       )}
                       {item.estado === "TRATADO" && (
-                        <button
-                          onClick={() => cambiarEstado(item, "CON_OT")}
-                          className="px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-semibold rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-sm flex items-center gap-1.5 whitespace-nowrap"
-                        >
-                          <FileText className="w-3.5 h-3.5" />Generar OT
-                        </button>
+                        <>
+                          <button
+                            onClick={() => abrirTratamiento(item)}
+                            className="p-2 bg-amber-50 border border-amber-200 text-amber-600 rounded-lg hover:bg-amber-100 transition-all"
+                            title="Editar tratamiento"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => cambiarEstado(item, "CON_OT")}
+                            className="px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-semibold rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-sm flex items-center gap-1.5 whitespace-nowrap"
+                          >
+                            <FileText className="w-3.5 h-3.5" />Generar OT
+                          </button>
+                        </>
                       )}
                       {item.estado === "CON_OT" && (
                         <>

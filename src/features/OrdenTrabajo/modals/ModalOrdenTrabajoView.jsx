@@ -180,16 +180,16 @@ function SolicitudCard({ solicitud, tipo, onVerDetalle }) {
 }
 
 /* ══════════════════════════════════════════
-   BLOQUE DE LIBERACIÓN (consolidadas — read-only)
+   BLOQUE DE LIBERACIÓN (consolidadas)
 ══════════════════════════════════════════ */
-function BloqueLiberar({ solicitudes, tipo, onVerDetalle }) {
+function BloqueLiberar({ solicitudes, tipo, onVerDetalle, onSync, onEnviar, sincandoId }) {
   if (!solicitudes.length) return null;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
       <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center gap-2">
         <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-          Bloque 1 · Liberación automática
+          Bloque consolidado · Liberación
         </span>
         <span className="text-xs text-slate-400">({solicitudes.length} solicitud{solicitudes.length !== 1 ? "es" : ""})</span>
       </div>
@@ -198,6 +198,8 @@ function BloqueLiberar({ solicitudes, tipo, onVerDetalle }) {
           const est     = sol.estado?.toUpperCase();
           const enviada = est === "SENT" || est === "ENVIADO" || est === "APROBADO";
           const isError = est === "ERROR";
+          const isDraft = !enviada && !isError;
+          const isSyncing = sincandoId === sol.id;
 
           return (
             <div
@@ -216,7 +218,7 @@ function BloqueLiberar({ solicitudes, tipo, onVerDetalle }) {
                   isError ? "bg-red-100 text-red-700 border-red-200" :
                   "bg-amber-100 text-amber-700 border-amber-200"
                 }`}>
-                  {enviada ? "ENVIADA" : isError ? "ERROR" : sol.estado || "—"}
+                  {enviada ? "ENVIADA" : isError ? "ERROR" : "PENDIENTE"}
                 </span>
                 <button
                   onClick={() => onVerDetalle?.(sol)}
@@ -232,15 +234,41 @@ function BloqueLiberar({ solicitudes, tipo, onVerDetalle }) {
                     SAP: {sol.sapDocNum}
                   </span>
                 )}
-                {tipo === "almacen" && sol.destinatario && (
+                {tipo === "almacen" && sol.destinatario && enviada && (
                   <span className="px-1.5 py-0.5 bg-teal-50 border border-teal-200 text-teal-700 rounded">
                     A: {sol.destinatario.nombre || sol.destinatario.correo}
                   </span>
                 )}
               </div>
+
+              {/* Botones de acción cuando está pendiente */}
+              {(isDraft || isError) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {tipo === "compra" && onSync && (
+                    <button
+                      onClick={() => onSync?.(sol.id)}
+                      disabled={isSyncing}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition disabled:opacity-50"
+                    >
+                      {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                      {isError ? "Reintentar SAP" : "Enviar a SAP"}
+                    </button>
+                  )}
+                  {tipo === "almacen" && onEnviar && (
+                    <button
+                      onClick={() => onEnviar?.(sol.id)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-teal-600 hover:bg-teal-700 text-white font-semibold transition"
+                    >
+                      <Send className="w-3 h-3" />
+                      {isError ? "Reintentar correo" : "Enviar por correo"}
+                    </button>
+                  )}
+                </div>
+              )}
+
               {isError && (
                 <span className="text-red-600 font-medium text-[11px] w-full mt-1">
-                  ⚠ Error al enviar {tipo === "compra" ? "a SAP" : "por correo"}. La OT fue liberada pero este envío falló.
+                  ⚠ Error al enviar {tipo === "compra" ? "a SAP" : "por correo"}.
                 </span>
               )}
             </div>
@@ -265,7 +293,7 @@ function SolicitudesPreLiberar({ solicitudes, tipo, onVerDetalle, onEditar }) {
     <div className="rounded-xl border border-amber-200 bg-amber-50/40 overflow-hidden">
       <div className="px-4 py-2.5 bg-amber-100/60 border-b border-amber-200 flex items-center gap-2">
         <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">
-          Se enviarán al liberar la OT
+          Se consolidarán al liberar (envío manual desde LIBERADO)
         </span>
         <span className="text-xs text-amber-500">({solicitudes.length} solicitud{solicitudes.length !== 1 ? "es" : ""})</span>
       </div>
@@ -649,10 +677,9 @@ export default function ModalOrdenTrabajoView({
 
       const { compra, almacen } = r.data;
       let msg = "✅ OT liberada correctamente.";
-      if (compra?.enviada)                   msg += `\n📦 Compra enviada a SAP (${compra.numeroSolicitud}).`;
-      if (compra?.resultadoSAP && !compra.enviada) msg += `\n⚠️ Error enviando a SAP.`;
-      if (almacen?.correoEnviado)            msg += `\n📧 Correo de almacén enviado a ${almacen.destinatario}.`;
-      if (almacen?.errorCorreo)              msg += `\n⚠️ Error enviando correo: ${almacen.errorCorreo}`;
+      if (compra?.numeroSolicitud) msg += `\n📦 Solicitud de compra consolidada (${compra.numeroSolicitud}) — pendiente de envío a SAP.`;
+      if (almacen?.numeroSolicitud) msg += `\n📦 Solicitud de almacén consolidada (${almacen.numeroSolicitud}) — pendiente de envío por correo.`;
+      if (compra?.numeroSolicitud || almacen?.numeroSolicitud) msg += "\n\n⚠️ Recuerda enviar las solicitudes desde el estado LIBERADO.";
       alert(msg);
 
       if (typeof onOrdenActualizada === "function") {
@@ -1233,13 +1260,15 @@ export default function ModalOrdenTrabajoView({
                         />
                       )}
 
-                      {/* Bloque 1: Post-liberación (enviado automáticamente) */}
+                      {/* Bloque consolidado de liberación */}
                       {bloqueCompra.length > 0 && (
                         <div>
                           <BloqueLiberar
                             solicitudes={bloqueCompra}
                             tipo="compra"
                             onVerDetalle={(s) => { setSolicitudDetalle(s); setTipoDetalle("compra"); }}
+                            onSync={handleSyncCompraIndividual}
+                            sincandoId={syncandoId}
                           />
                         </div>
                       )}
@@ -1312,12 +1341,16 @@ export default function ModalOrdenTrabajoView({
                         />
                       )}
 
-                      {/* Bloque 1: Post-liberación (enviado automáticamente) */}
+                      {/* Bloque consolidado de liberación */}
                       {bloqueAlmacen.length > 0 && (
                         <BloqueLiberar
                           solicitudes={bloqueAlmacen}
                           tipo="almacen"
                           onVerDetalle={(s) => { setSolicitudDetalle(s); setTipoDetalle("almacen"); }}
+                          onEnviar={(solId) => {
+                            setBloqueEnviar(null);
+                            setOpenEnviarAlmacen(true);
+                          }}
                         />
                       )}
 
@@ -1429,7 +1462,9 @@ export default function ModalOrdenTrabajoView({
         solicitudesAlmacen={
           bloqueEnviar
             ? nuevasAlmacen.filter((s) => s.bloque_id === bloqueEnviar)
-            : nuevasAlmacen
+            : bloqueAlmacen.length > 0 && nuevasAlmacen.length === 0
+              ? bloqueAlmacen
+              : nuevasAlmacen
         }
         ordenTrabajoId={orden?.id}
         onEnviado={async () => { await recargarSolicitudes(); }}

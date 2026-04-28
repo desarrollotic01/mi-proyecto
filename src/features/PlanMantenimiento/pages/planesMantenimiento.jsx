@@ -21,6 +21,7 @@ export default function PlanesMantenimiento() {
   const [planes, setPlanes] = useState([]);
   const [planSeleccionado, setPlanSeleccionado] = useState(null);
   const [mostrarModalCrear, setMostrarModalCrear] = useState(false);
+  const [planAEditar, setPlanAEditar] = useState(null);
 
   const [vista, setVista] = useState("SIMPLE");
   const [q, setQ] = useState("");
@@ -261,11 +262,13 @@ export default function PlanesMantenimiento() {
               getEquiposLabel={getEquiposLabel}
               onVerPlan={(plan) => setPlanSeleccionado(plan)}
               onCrearPlan={() => setMostrarModalCrear(true)}
+              onEditarPlan={(plan) => setPlanAEditar(plan)}
             />
           ) : (
             <PlanesMantenimientoExcel
               planes={planesFiltrados}
               onVer={(plan) => setPlanSeleccionado(plan)}
+              onEditar={(plan) => setPlanAEditar(plan)}
             />
           )}
         </div>
@@ -284,6 +287,15 @@ export default function PlanesMantenimiento() {
         <ModalCrearPlan
           onClose={() => setMostrarModalCrear(false)}
           onCreated={cargarPlanes}
+        />
+      )}
+
+      {/* MODAL EDITAR */}
+      {planAEditar && (
+        <ModalCrearPlan
+          initialPlan={planAEditar}
+          onClose={() => setPlanAEditar(null)}
+          onCreated={() => { cargarPlanes(); setPlanAEditar(null); }}
         />
       )}
     </div>

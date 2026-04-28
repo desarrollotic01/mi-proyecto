@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, RefreshCw, Loader2, AlertCircle, Paperclip, X, ExternalLink, Package } from "lucide-react";
+import { Search, RefreshCw, Loader2, AlertCircle, Paperclip, Pencil, X, ExternalLink, Package } from "lucide-react";
 import { planMantenimientoService } from "../../PlanMantenimiento/services/planMantenimientoService";
+import ModalCrearPlan from "./ModalCrearPlan";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const val = (x) => (x === null || x === undefined || x === "" ? "—" : String(x));
@@ -170,7 +171,7 @@ const ACT_COLS = [
 ];
 
 // ─── FILA CABECERA DEL PLAN (gris claro) ─────────────────────────────────────
-function PlanHeaderRow({ plan, colCount, onItems, onAdjuntos }) {
+function PlanHeaderRow({ plan, colCount, onItems, onAdjuntos, onEditar }) {
   const equipo  = (plan.equipos  || [])[0];
   const adjPlan = plan.adjuntos  || [];
   const itPlan  = plan.items     || [];
@@ -220,25 +221,24 @@ function PlanHeaderRow({ plan, colCount, onItems, onAdjuntos }) {
           <PlanField label="Creado" value={<span className="text-gray-600 text-xs">{fmtDate(plan.createdAt)}</span>} />
 
           {/* botones del plan */}
-          {(itPlan.length > 0 || adjPlan.length > 0) && (
-            <>
-              <div className="w-px h-5 bg-gray-300 flex-none" />
-              <div className="flex items-center gap-2 flex-none">
-                {itPlan.length > 0 && (
-                  <button onClick={() => onItems(itPlan, plan.codigoPlan)}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 text-[10px] font-bold border border-teal-200 transition-colors">
-                    <Package className="w-3 h-3" />{itPlan.length} ítems del plan  
-                  </button>
-                )}
-                {adjPlan.length > 0 && (
-                  <button onClick={() => onAdjuntos(adjPlan, plan.codigoPlan)}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold border border-rose-200 transition-colors">
-                    <Paperclip className="w-3 h-3" />{adjPlan.length} adjuntos del plan
-                  </button>
-                )}
-              </div>
-            </>
-          )}
+          <div className="ml-auto flex items-center gap-2 flex-none">
+            {itPlan.length > 0 && (
+              <button onClick={() => onItems(itPlan, plan.codigoPlan)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 text-[10px] font-bold border border-teal-200 transition-colors">
+                <Package className="w-3 h-3" />{itPlan.length} ítems
+              </button>
+            )}
+            {adjPlan.length > 0 && (
+              <button onClick={() => onAdjuntos(adjPlan, plan.codigoPlan)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold border border-rose-200 transition-colors">
+                <Paperclip className="w-3 h-3" />{adjPlan.length} adj.
+              </button>
+            )}
+            <button onClick={() => onEditar?.(plan)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold border border-amber-200 transition-colors">
+              <Pencil className="w-3 h-3" /> Editar
+            </button>
+          </div>
         </div>
       </td>
     </tr>
@@ -276,6 +276,7 @@ export default function PlanMantenimientoExcelPage() {
   const [q, setQ] = useState("");
   const [modalItems,    setModalItems]    = useState(null);
   const [modalAdjuntos, setModalAdjuntos] = useState(null);
+  const [planAEditar,   setPlanAEditar]   = useState(null);
 
   const fetchPlanes = async () => {
     setLoading(true); setError(null);
@@ -377,6 +378,7 @@ export default function PlanMantenimientoExcelPage() {
                         colCount={COL_COUNT}
                         onItems={(items, t)  => setModalItems({ items, titulo: t })}
                         onAdjuntos={(adj, t) => setModalAdjuntos({ adjuntos: adj, titulo: t })}
+                        onEditar={(p) => setPlanAEditar(p)}
                       />,
 
                       // 2️⃣ FILA CABECERAS DE COLUMNAS (propia de este plan)
@@ -481,6 +483,13 @@ export default function PlanMantenimientoExcelPage() {
       {/* MODALS */}
       {modalItems    && <ModalItems    {...modalItems}    onClose={() => setModalItems(null)} />}
       {modalAdjuntos && <ModalAdjuntos {...modalAdjuntos} onClose={() => setModalAdjuntos(null)} />}
+      {planAEditar && (
+        <ModalCrearPlan
+          initialPlan={planAEditar}
+          onClose={() => setPlanAEditar(null)}
+          onCreated={() => { fetchPlanes(); setPlanAEditar(null); }}
+        />
+      )}
     </div>
   );
 }

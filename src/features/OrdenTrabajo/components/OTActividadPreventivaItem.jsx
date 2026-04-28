@@ -39,7 +39,7 @@ const inputStyle = {
   outline: "none",
 };
 
-function ExcelInput({ value, onChange, type = "text", placeholder, min }) {
+function ExcelInput({ value, onChange, type = "text", placeholder, min, disabled }) {
   return (
     <input
       type={type}
@@ -47,8 +47,13 @@ function ExcelInput({ value, onChange, type = "text", placeholder, min }) {
       onChange={onChange}
       placeholder={placeholder}
       min={min}
-      style={inputStyle}
-      onFocus={(e) => (e.target.style.background = "var(--color-background-info)")}
+      disabled={disabled}
+      style={{
+        ...inputStyle,
+        opacity: disabled ? 0.45 : 1,
+        cursor: disabled ? "not-allowed" : "text",
+      }}
+      onFocus={(e) => !disabled && (e.target.style.background = "var(--color-background-info)")}
       onBlur={(e) => (e.target.style.background = "transparent")}
     />
   );
@@ -278,6 +283,7 @@ export default function OTActividadPreventivaItem({
           type="number"
           value={act.cantidadTecnicos}
           min={1}
+          disabled={act.tipo === "EXTERNO"}
           onChange={(e) => onChange("cantidadTecnicos", Number(e.target.value))}
         />
       </div>
