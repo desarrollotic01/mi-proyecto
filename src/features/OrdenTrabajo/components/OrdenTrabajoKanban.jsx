@@ -308,6 +308,7 @@ export default function KanbanView({
         onClose={() => setOtSeleccionadaInformes(null)}
         ordenTrabajoId={otSeleccionadaInformes?.id}
         numeroOT={otSeleccionadaInformes?.numeroOT}
+        tipoAviso={otSeleccionadaInformes?.aviso?.tipoAviso}
       />
     </>
   );

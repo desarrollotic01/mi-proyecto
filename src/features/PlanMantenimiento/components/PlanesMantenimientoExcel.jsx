@@ -12,6 +12,8 @@ import {
   Users,
   Layers,
   Tag,
+  Trash2,
+  FileSpreadsheet,
 } from "lucide-react";
 
 /**
@@ -24,6 +26,8 @@ export default function PlanesMantenimientoExcel({
   planes = [],
   onVer,
   onEditar,
+  onEliminar,
+  onExportar,
   title = "Vista Detallada (Excel)",
 }) {
   const [expanded, setExpanded] = useState(() => new Set()); // planId
@@ -446,6 +450,20 @@ export default function PlanesMantenimientoExcel({
                         >
                           <Pencil size={14} />
                           Editar
+                        </button>
+                        <button
+                          onClick={() => onExportar?.(plan)}
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition shadow-sm hover:shadow"
+                        >
+                          <FileSpreadsheet size={14} />
+                          Exportar
+                        </button>
+                        <button
+                          onClick={() => onEliminar?.(plan)}
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition shadow-sm hover:shadow"
+                        >
+                          <Trash2 size={14} />
+                          Eliminar
                         </button>
                       </div>
                     </td>

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { planMantenimientoService } from "../services/planMantenimientoService";
+import { parseExcelPlanMantenimiento, exportarPlanExcel, exportarListaPlanes, descargarPlantillaImportacion } from "../utils/planExcelUtils";
 import {
   Plus,
   Wrench,
@@ -10,12 +10,18 @@ import {
   Filter,
   BadgeCheck,
   FileSpreadsheet,
+  Upload,
+  Trash2,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 
 import ModalCrearPlan from "../components/ModalCrearPlan";
 import VistaPlanesSimple from "../components/VistaPlanesSimple";
 import PlanesMantenimientoExcel from "../components/PlanesMantenimientoExcel";
-import ModalDetallePlan from "../components/Modaldetalleplan"; 
+import ModalDetallePlan from "../components/Modaldetalleplan";
 
 export default function PlanesMantenimiento() {
   const [planes, setPlanes] = useState([]);
@@ -27,6 +33,15 @@ export default function PlanesMantenimiento() {
   const [q, setQ] = useState("");
   const [fTipo, setFTipo] = useState("TODOS");
   const [fEstado, setFEstado] = useState("TODOS");
+
+  // Import Excel state
+  const importInputRef = useRef(null);
+  const [importando, setImportando] = useState(false);
+  const [importModal, setImportModal] = useState(null); // { planes, resultados, fase: 'preview'|'done' }
+
+  // Delete state
+  const [confirmEliminar, setConfirmEliminar] = useState(null); // plan a eliminar
+  const [eliminando, setEliminando] = useState(false);
 
   const cargarPlanes = async () => {
     try {
@@ -41,6 +56,84 @@ export default function PlanesMantenimiento() {
   useEffect(() => {
     cargarPlanes();
   }, []);
+
+  const handleImportarExcel = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    try {
+      setImportando(true);
+      const planes = await parseExcelPlanMantenimiento(file);
+      if (!planes.length) {
+        alert("No se encontraron planes válidos en el Excel.");
+        return;
+      }
+      setImportModal({ planes, resultados: [], fase: "preview" });
+    } catch (err) {
+      console.error(err);
+      alert("Error al leer el Excel: " + err.message);
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  const handleConfirmarImport = async () => {
+    if (!importModal) return;
+    const { planes } = importModal;
+    const resultados = [];
+    setImportModal((prev) => ({ ...prev, fase: "creando" }));
+
+    for (const planData of planes) {
+      try {
+        const payload = {
+          nombre: planData.nombre,
+          tipo: planData.tipo,
+          frecuencia: planData.frecuencia,
+          contextoObjetivo: planData.contextoObjetivo,
+          esEspecifico: false,
+          tipoEquipo: planData.tipoEquipo || null,
+          modeloEquipo: planData.modeloEquipo || null,
+          actividades: JSON.stringify(
+            planData.actividades.map((a, idx) => ({
+              codigoActividad: a.codigoActividad,
+              sistema: a.sistema || null,
+              subsistema: a.subsistema || null,
+              componente: a.componente || null,
+              tarea: a.tarea,
+              tipoTrabajo: a.tipoTrabajo,
+              cantidadTecnicos: a.cantidadTecnicos,
+              duracionMinutos: a.duracionMinutos,
+              unidadDuracion: a.unidadDuracion,
+              orden: idx + 1,
+              items: [],
+            }))
+          ),
+        };
+        const created = await planMantenimientoService.createPlan(payload);
+        resultados.push({ nombre: planData.nombre, ok: true, id: created?.id });
+      } catch (err) {
+        resultados.push({ nombre: planData.nombre, ok: false, error: err?.response?.data?.error || err.message });
+      }
+    }
+
+    setImportModal((prev) => ({ ...prev, resultados, fase: "done" }));
+    cargarPlanes();
+  };
+
+  const handleEliminarPlan = async (plan) => {
+    try {
+      setEliminando(true);
+      await planMantenimientoService.deletePlan(plan.id);
+      setConfirmEliminar(null);
+      cargarPlanes();
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar: " + (err?.response?.data?.error || err.message));
+    } finally {
+      setEliminando(false);
+    }
+  };
 
   const getTipoBadge = (tipo) => {
     const styles = {
@@ -114,30 +207,37 @@ export default function PlanesMantenimiento() {
               </h1>
               <p className="text-slate-600 ml-16">Gestiona y organiza tus planes de mantenimiento</p>
             </div>
-            <div className="flex items-center gap-3 self-start lg:self-auto">
+            <div className="flex items-center gap-3 self-start lg:self-auto flex-wrap">
+              {/* Input oculto para importar */}
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleImportarExcel}
+              />
               <button
-                onClick={() => {
-                  const data = planesFiltrados.map((p) => ({
-                    Código: p.codigoPlan || "",
-                    Nombre: p.nombre || "",
-                    Tipo: p.tipo || "",
-                    "Modelo Equipo": p.modeloEquipo || "",
-                    "Tipo Equipo": p.tipoEquipo || "",
-                    Equipos: getEquiposLabel(p),
-                    Estado: p.activo ? "Activo" : "Inactivo",
-                    Específico: p.esEspecifico ? "Sí" : "No",
-                    "Fecha Creación": p.createdAt ? new Date(p.createdAt).toLocaleDateString("es-PE") : "",
-                    Actividades: (p.actividades || []).length,
-                  }));
-                  const ws = XLSX.utils.json_to_sheet(data);
-                  const wb = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(wb, ws, "Planes");
-                  XLSX.writeFile(wb, `Planes_Mantenimiento_${new Date().toISOString().slice(0,10)}.xlsx`);
-                }}
+                onClick={descargarPlantillaImportacion}
+                className="bg-white hover:bg-amber-50 border-2 border-amber-400 text-amber-700 px-5 py-3 rounded-xl flex items-center gap-2 transition-all duration-200 font-semibold"
+                title="Descarga una plantilla Excel con instrucciones para importar planes"
+              >
+                <FileSpreadsheet size={18} className="text-amber-500" />
+                Plantilla
+              </button>
+              <button
+                onClick={() => importInputRef.current?.click()}
+                disabled={importando}
+                className="bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-violet-500/30 transition-all duration-200 font-semibold"
+              >
+                {importando ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+                Importar Excel
+              </button>
+              <button
+                onClick={() => exportarListaPlanes(planesFiltrados)}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-all duration-200 font-semibold"
               >
                 <FileSpreadsheet size={18} />
-                Exportar Excel
+                Exportar lista
               </button>
               <button
                 onClick={() => setMostrarModalCrear(true)}
@@ -263,12 +363,16 @@ export default function PlanesMantenimiento() {
               onVerPlan={(plan) => setPlanSeleccionado(plan)}
               onCrearPlan={() => setMostrarModalCrear(true)}
               onEditarPlan={(plan) => setPlanAEditar(plan)}
+              onEliminarPlan={(plan) => setConfirmEliminar(plan)}
+              onExportarPlan={exportarPlanExcel}
             />
           ) : (
             <PlanesMantenimientoExcel
               planes={planesFiltrados}
               onVer={(plan) => setPlanSeleccionado(plan)}
               onEditar={(plan) => setPlanAEditar(plan)}
+              onEliminar={(plan) => setConfirmEliminar(plan)}
+              onExportar={exportarPlanExcel}
             />
           )}
         </div>
@@ -297,6 +401,143 @@ export default function PlanesMantenimiento() {
           onClose={() => setPlanAEditar(null)}
           onCreated={() => { cargarPlanes(); setPlanAEditar(null); }}
         />
+      )}
+
+      {/* MODAL IMPORTAR EXCEL */}
+      {importModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div>
+                <h2 className="text-lg font-black text-slate-800">Importar desde Excel</h2>
+                <p className="text-sm text-slate-500">
+                  {importModal.fase === "preview"
+                    ? `Se crearán ${importModal.planes.length} plan(es)`
+                    : importModal.fase === "creando"
+                    ? "Creando planes..."
+                    : `Importación finalizada`}
+                </p>
+              </div>
+              {importModal.fase !== "creando" && (
+                <button
+                  onClick={() => setImportModal(null)}
+                  className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-6 space-y-2">
+              {importModal.fase === "preview" &&
+                importModal.planes.map((p, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50">
+                    <FileSpreadsheet size={16} className="text-violet-600 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-800 text-sm truncate">{p.nombre}</p>
+                      <p className="text-xs text-slate-500">
+                        {p.frecuencia} · {p.actividades.length} actividades
+                        {p.tipoEquipo ? ` · ${p.tipoEquipo}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+              {importModal.fase === "creando" && (
+                <div className="flex flex-col items-center justify-center py-10 gap-3">
+                  <Loader2 size={32} className="animate-spin text-violet-600" />
+                  <p className="text-slate-600 font-semibold">Creando planes, por favor espera...</p>
+                </div>
+              )}
+
+              {importModal.fase === "done" &&
+                importModal.resultados.map((r, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-3 p-3 rounded-xl border ${
+                      r.ok ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"
+                    }`}
+                  >
+                    {r.ok
+                      ? <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                      : <AlertCircle size={16} className="text-red-600 shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-bold text-sm ${r.ok ? "text-emerald-800" : "text-red-800"} truncate`}>
+                        {r.nombre}
+                      </p>
+                      {!r.ok && <p className="text-xs text-red-600">{r.error}</p>}
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+              {importModal.fase === "preview" && (
+                <>
+                  <button
+                    onClick={() => setImportModal(null)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700 text-sm transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleConfirmarImport}
+                    className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-sm transition"
+                  >
+                    Importar {importModal.planes.length} plan(es)
+                  </button>
+                </>
+              )}
+              {importModal.fase === "done" && (
+                <button
+                  onClick={() => setImportModal(null)}
+                  className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm transition"
+                >
+                  Cerrar
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIRMAR ELIMINAR */}
+      {confirmEliminar && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                <Trash2 size={20} className="text-red-600" />
+              </div>
+              <div>
+                <h2 className="font-black text-slate-800">Eliminar plan</h2>
+                <p className="text-sm text-slate-500">Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+            <p className="text-slate-700 text-sm mb-6">
+              ¿Estás seguro de que quieres eliminar{" "}
+              <span className="font-bold">{confirmEliminar.nombre}</span>?
+              Se eliminarán todas sus actividades e ítems.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmEliminar(null)}
+                disabled={eliminando}
+                className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700 text-sm transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleEliminarPlan(confirmEliminar)}
+                disabled={eliminando}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition flex items-center gap-2 disabled:opacity-50"
+              >
+                {eliminando && <Loader2 size={14} className="animate-spin" />}
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

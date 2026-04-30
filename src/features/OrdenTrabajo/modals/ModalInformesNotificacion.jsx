@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X, FileText, Loader2, CheckCircle2, Package, MapPinned, Table2 } from "lucide-react";
+import { X, FileText, Loader2, CheckCircle2, Package, MapPinned, Table2, PenLine, ChevronDown, ChevronUp } from "lucide-react";
 import AdjuntosViewer from "../../adjuntos/components/AdjuntosViewer";
 import {
   getNotificacionesByOT,
@@ -76,10 +76,17 @@ export default function ModalInformesNotificacion({
   onClose,
   ordenTrabajoId,
   numeroOT,
+  tipoAviso,
 }) {
   const [loading, setLoading] = useState(false);
   const [notificaciones, setNotificaciones] = useState([]);
   const [showResumen, setShowResumen] = useState(false);
+  const [showFirmaPanel, setShowFirmaPanel] = useState(false);
+  const [firmas, setFirmas] = useState({ elaboradoPor: "", revisadoPor: "", recibidoPor: "" });
+
+  const esMantenimiento = !tipoAviso || tipoAviso === "mantenimiento";
+
+  const updateFirma = (key, value) => setFirmas((prev) => ({ ...prev, [key]: value }));
 
   useEffect(() => {
     if (!isOpen || !ordenTrabajoId) return;
@@ -211,7 +218,7 @@ export default function ModalInformesNotificacion({
 
                       <button
                         type="button"
-                        onClick={() => abrirPdfNotificacion(n.id)}
+                        onClick={() => abrirPdfNotificacion(n.id, firmas)}
                         className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition"
                       >
                         <FileText className="w-4 h-4" />
@@ -290,10 +297,37 @@ export default function ModalInformesNotificacion({
           )}
         </div>
 
+        {/* Firma panel */}
+        {showFirmaPanel && (
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+              Nombres para las firmas (se incluirán en todos los PDFs generados)
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { key: "elaboradoPor", label: "Elaborado por" },
+                { key: "revisadoPor", label: "Revisado por" },
+                { key: "recibidoPor", label: "Recibido por" },
+              ].map(({ key, label }) => (
+                <div key={key}>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">{label}</label>
+                  <input
+                    type="text"
+                    value={firmas[key]}
+                    onChange={(e) => updateFirma(key, e.target.value)}
+                    placeholder={`Nombre — ${label}`}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="px-6 py-4 bg-white border-t border-slate-200 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={() => abrirPdfCombinadoOT(ordenTrabajoId)}
+            onClick={() => abrirPdfCombinadoOT(ordenTrabajoId, firmas)}
             disabled={notificaciones.length === 0}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 text-white font-bold text-sm hover:bg-slate-900 transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -301,14 +335,30 @@ export default function ModalInformesNotificacion({
             PDF Completo
           </button>
 
+          {esMantenimiento && (
+            <button
+              type="button"
+              onClick={() => setShowResumen(true)}
+              disabled={notificaciones.length === 0}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-800 text-white font-bold text-sm hover:bg-blue-900 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Table2 className="w-4 h-4" />
+              Tabla repuestos para cambio
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={() => setShowResumen(true)}
-            disabled={notificaciones.length === 0}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-800 text-white font-bold text-sm hover:bg-blue-900 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            onClick={() => setShowFirmaPanel((v) => !v)}
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border font-bold text-sm transition ${
+              showFirmaPanel
+                ? "bg-violet-700 text-white border-violet-700"
+                : "bg-white text-violet-700 border-violet-300 hover:bg-violet-50"
+            }`}
           >
-            <Table2 className="w-4 h-4" />
-            Tabla repuestos para cambio
+            <PenLine className="w-4 h-4" />
+            Firma
+            {showFirmaPanel ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
 
           <button
@@ -326,6 +376,7 @@ export default function ModalInformesNotificacion({
         onClose={() => setShowResumen(false)}
         ordenTrabajoId={ordenTrabajoId}
         numeroOT={numeroOT}
+        firmas={firmas}
       />
     </div>
   );

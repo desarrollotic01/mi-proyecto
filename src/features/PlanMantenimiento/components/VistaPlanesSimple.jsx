@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, RefreshCw, Loader2, AlertCircle, Paperclip, Pencil, X, ExternalLink, Package } from "lucide-react";
+import { Search, RefreshCw, Loader2, AlertCircle, Paperclip, Pencil, X, ExternalLink, Package, Trash2, FileSpreadsheet } from "lucide-react";
 import { planMantenimientoService } from "../../PlanMantenimiento/services/planMantenimientoService";
 import ModalCrearPlan from "./ModalCrearPlan";
 
@@ -171,7 +171,7 @@ const ACT_COLS = [
 ];
 
 // ─── FILA CABECERA DEL PLAN (gris claro) ─────────────────────────────────────
-function PlanHeaderRow({ plan, colCount, onItems, onAdjuntos, onEditar }) {
+function PlanHeaderRow({ plan, colCount, onItems, onAdjuntos, onEditar, onEliminar, onExportar }) {
   const equipo  = (plan.equipos  || [])[0];
   const adjPlan = plan.adjuntos  || [];
   const itPlan  = plan.items     || [];
@@ -238,6 +238,14 @@ function PlanHeaderRow({ plan, colCount, onItems, onAdjuntos, onEditar }) {
               className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold border border-amber-200 transition-colors">
               <Pencil className="w-3 h-3" /> Editar
             </button>
+            <button onClick={() => onExportar?.(plan)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-200 transition-colors">
+              <FileSpreadsheet className="w-3 h-3" /> Exportar
+            </button>
+            <button onClick={() => onEliminar?.(plan)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold border border-red-200 transition-colors">
+              <Trash2 className="w-3 h-3" /> Eliminar
+            </button>
           </div>
         </div>
       </td>
@@ -269,7 +277,7 @@ function ActColHeaders() {
 }
 
 // ─── MAIN ────────────────────────────────────────────────────────────────────
-export default function PlanMantenimientoExcelPage() {
+export default function PlanMantenimientoExcelPage({ onEliminarPlan, onExportarPlan } = {}) {
   const [planes, setPlanes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -379,6 +387,8 @@ export default function PlanMantenimientoExcelPage() {
                         onItems={(items, t)  => setModalItems({ items, titulo: t })}
                         onAdjuntos={(adj, t) => setModalAdjuntos({ adjuntos: adj, titulo: t })}
                         onEditar={(p) => setPlanAEditar(p)}
+                        onEliminar={onEliminarPlan}
+                        onExportar={onExportarPlan}
                       />,
 
                       // 2️⃣ FILA CABECERAS DE COLUMNAS (propia de este plan)

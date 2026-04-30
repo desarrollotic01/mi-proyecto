@@ -35,7 +35,7 @@ const newGrupo = () => ({
   collapsed: false,
 });
 
-export default function ModalResumenOT({ isOpen, onClose, ordenTrabajoId, numeroOT }) {
+export default function ModalResumenOT({ isOpen, onClose, ordenTrabajoId, numeroOT, firmas = {} }) {
   const [notificaciones, setNotificaciones] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
   const [grupos, setGrupos] = useState([newGrupo()]);
@@ -114,7 +114,8 @@ export default function ModalResumenOT({ isOpen, onClose, ordenTrabajoId, numero
           columnas: g.columnas,
           notificacionIds: g.notificacionIds,
           valores: g.valores,
-        }))
+        })),
+        firmas
       );
     } catch (err) {
       setError("Error al generar PDF: " + (err?.response?.data?.message || err.message));

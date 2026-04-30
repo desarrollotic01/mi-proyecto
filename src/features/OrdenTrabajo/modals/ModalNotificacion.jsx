@@ -512,6 +512,25 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
      CARGA AUTOMÁTICA DE TÉCNICOS DEL REGISTRO OT
   ========================================================= */
 
+  // Para venta: cargar automáticamente el supervisor de la OT como técnico encargado
+  useEffect(() => {
+    if (!esVenta || !ordenTrabajo) return;
+    const sup = ordenTrabajo.supervisor;
+    if (!sup?.id) return;
+    setTecnicosSeleccionados((prev) => {
+      if (prev.some((t) => t.id === sup.id)) return prev;
+      return [
+        {
+          id: sup.id,
+          nombre: `${sup.nombre || ""} ${sup.apellido || ""}`.trim() || `Supervisor ${sup.id}`,
+          rol: formatearRol(sup.rol || ""),
+          empresa: sup.empresa || "—",
+          esEncargado: true,
+        },
+      ];
+    });
+  }, [esVenta, ordenTrabajo?.id]);
+
   useEffect(() => {
     if (!equipoSeleccionado) return;
 
@@ -815,7 +834,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
         .filter(Boolean)
         .join("\n");
 
-      await crearNotificacionService({
+      const resultado = await crearNotificacionService({
         ...form,
         resumenCorrectivos,
         ordenTrabajoId: ordenTrabajo?.id,
@@ -840,13 +859,19 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
         adjuntos,
       });
 
+      const nuevaNotifId = resultado?.data?.id;
+
       await cargarNotificacionesOT();
 
-      alert("✅ Notificación creada.");
+      alert("✅ Notificación creada. Se abrirá el PDF automáticamente.");
       resetForm();
       if (!esVenta) {
         setEquipoSeleccionado(null);
         setOpenSelectEquipo(true);
+      }
+
+      if (nuevaNotifId) {
+        abrirPdfNotificacion(nuevaNotifId);
       }
     } catch (error) {
       console.error(error);
@@ -966,7 +991,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
             }
           : null,
     }] : []),
-    {
+    ...(!esVenta ? [{
       id: "correctivos",
       label: "Correctivos",
       icon: "🔧",
@@ -974,7 +999,7 @@ const CrearNotificacionModal = ({ isOpen, onClose, ordenTrabajoId, tipoAviso }) 
         correctivos.length > 0
           ? { text: correctivos.length, done: false }
           : null,
-    },
+    }] : []),
     { id: "adjuntos", label: "Adjuntos", icon: "📎" },
   ];
 

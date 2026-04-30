@@ -1168,11 +1168,9 @@ export default function ModalOrdenTrabajoView({
                               <h4 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
                                 <ShoppingCart className="w-4 h-4 text-slate-500" />Solicitud de compra
                               </h4>
-                              {esLiberado && (
-                                <button onClick={() => abrirCompraParaEquipo(eq)} className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50">
-                                  + Agregar
-                                </button>
-                              )}
+                              <button onClick={() => abrirCompraParaEquipo(eq)} className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50">
+                                + Agregar
+                              </button>
                             </div>
                             {solCompra.length > 0 ? (
                               <div className="space-y-2">
@@ -1189,11 +1187,9 @@ export default function ModalOrdenTrabajoView({
                               <h4 className="font-semibold text-sm text-slate-800 flex items-center gap-2">
                                 <Boxes className="w-4 h-4 text-slate-500" />Solicitud de almacén
                               </h4>
-                              {esLiberado && (
-                                <button onClick={() => abrirAlmacenParaEquipo(eq)} className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50">
-                                  + Agregar
-                                </button>
-                              )}
+                              <button onClick={() => abrirAlmacenParaEquipo(eq)} className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50">
+                                + Agregar
+                              </button>
                             </div>
                             {solAlmacen.length > 0 ? (
                               <div className="space-y-2">
@@ -1236,14 +1232,12 @@ export default function ModalOrdenTrabajoView({
                         {todasSolicitudesCompra.length}
                       </span>
                     </h3>
-                    {esLiberado && (
-                      <button
-                        onClick={() => { setTargetSeleccionado(null); setOpenSolicitudCompra(true); }}
-                        className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50"
-                      >
-                        + Nueva solicitud
-                      </button>
-                    )}
+                    <button
+                      onClick={() => { setTargetSeleccionado(null); setOpenSolicitudCompra(true); }}
+                      className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50"
+                    >
+                      + Nueva solicitud
+                    </button>
                   </div>
 
                   {loadingSolicitudes ? (
@@ -1273,26 +1267,24 @@ export default function ModalOrdenTrabajoView({
                         </div>
                       )}
 
-                      {/* Solicitudes adicionales post-liberación */}
-                      {esLiberado && (
-                        <div className="space-y-2">
-                          {nuevasCompra.length > 0 && (
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                              Solicitudes adicionales ({nuevasCompra.length})
-                            </p>
-                          )}
-                          {nuevasCompra.map((sol) => (
-                            <BloqueAdicionalCompra
-                              key={sol.id}
-                              solicitud={sol}
-                              onVerDetalle={(s) => { setSolicitudDetalle(s); setTipoDetalle("compra"); }}
-                              onEditar={(s) => setEditandoCompra(s)}
-                              onSync={handleSyncCompraIndividual}
-                              sincandoId={syncandoId}
-                            />
-                          ))}
-                        </div>
-                      )}
+                      {/* Solicitudes adicionales */}
+                      <div className="space-y-2">
+                        {nuevasCompra.length > 0 && (
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                            Solicitudes adicionales ({nuevasCompra.length})
+                          </p>
+                        )}
+                        {nuevasCompra.map((sol) => (
+                          <BloqueAdicionalCompra
+                            key={sol.id}
+                            solicitud={sol}
+                            onVerDetalle={(s) => { setSolicitudDetalle(s); setTipoDetalle("compra"); }}
+                            onEditar={(s) => setEditandoCompra(s)}
+                            onSync={handleSyncCompraIndividual}
+                            sincandoId={syncandoId}
+                          />
+                        ))}
+                      </div>
 
                       {todasSolicitudesCompra.length === 0 && (
                         <p className="text-sm text-slate-400 border border-dashed border-slate-200 rounded-lg p-4 text-center">
@@ -1317,14 +1309,12 @@ export default function ModalOrdenTrabajoView({
                         {todasSolicitudesAlmacen.length}
                       </span>
                     </h3>
-                    {esLiberado && (
-                      <button
-                        onClick={() => { setTargetSeleccionado(null); setOpenSolicitudAlmacen(true); }}
-                        className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50"
-                      >
-                        + Nueva solicitud
-                      </button>
-                    )}
+                    <button
+                      onClick={() => { setTargetSeleccionado(null); setOpenSolicitudAlmacen(true); }}
+                      className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-50"
+                    >
+                      + Nueva solicitud
+                    </button>
                   </div>
 
                   {loadingSolicitudes ? (
@@ -1354,25 +1344,23 @@ export default function ModalOrdenTrabajoView({
                         />
                       )}
 
-                      {/* Bloques adicionales post-liberación (agrupados por bloque_id) */}
-                      {esLiberado && (
-                        <div className="space-y-3">
-                          {gruposAlmacenList.length > 0 && (
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                              Solicitudes adicionales ({nuevasAlmacen.length})
-                            </p>
-                          )}
-                          {gruposAlmacenList.map((grupo, i) => (
-                            <BloqueAdicionalAlmacen
-                              key={grupo[0]?.bloque_id || i}
-                              grupo={grupo}
-                              onVerDetalle={(s) => { setSolicitudDetalle(s); setTipoDetalle("almacen"); }}
-                              onEditar={(s) => setEditandoAlmacen(s)}
-                              onEnviar={(bid) => handleEnviarCorreoAlmacen(bid)}
-                            />
-                          ))}
-                        </div>
-                      )}
+                      {/* Bloques adicionales (agrupados por bloque_id) */}
+                      <div className="space-y-3">
+                        {gruposAlmacenList.length > 0 && (
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                            Solicitudes adicionales ({nuevasAlmacen.length})
+                          </p>
+                        )}
+                        {gruposAlmacenList.map((grupo, i) => (
+                          <BloqueAdicionalAlmacen
+                            key={grupo[0]?.bloque_id || i}
+                            grupo={grupo}
+                            onVerDetalle={(s) => { setSolicitudDetalle(s); setTipoDetalle("almacen"); }}
+                            onEditar={(s) => setEditandoAlmacen(s)}
+                            onEnviar={(bid) => handleEnviarCorreoAlmacen(bid)}
+                          />
+                        ))}
+                      </div>
 
                       {todasSolicitudesAlmacen.length === 0 && (
                         <p className="text-sm text-slate-400 border border-dashed border-slate-200 rounded-lg p-4 text-center">

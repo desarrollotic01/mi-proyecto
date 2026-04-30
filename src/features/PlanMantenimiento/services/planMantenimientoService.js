@@ -7,6 +7,7 @@ export const planMantenimientoService = {
   getPlanesByUbicacionTecnica,
   createPlan,
   updatePlan,
+  deletePlan,
 };
 
 function getPlanes() {
@@ -37,4 +38,8 @@ function createPlan(payload) {
 
 function updatePlan(id, payload) {
   return api.put(`/plan-mantenimiento/${id}`, payload).then((res) => res.data);
+}
+
+function deletePlan(id) {
+  return api.delete(`/plan-mantenimiento/${id}`).then((res) => res.data);
 }

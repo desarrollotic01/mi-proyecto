@@ -18,10 +18,10 @@ export const finalizarNotificacionService = async (id) => {
 export const getNotificacionesByOT = (ordenTrabajoId) =>
   api.get(`/notificaciones/ot/${ordenTrabajoId}`).then(r => r.data);
 
-export const generarPdfResumenOT = async (ordenTrabajoId, grupos) => {
+export const generarPdfResumenOT = async (ordenTrabajoId, grupos, firmas = {}) => {
   const res = await api.post(
     `/notificaciones/ot/${ordenTrabajoId}/pdf-resumen`,
-    { grupos },
+    { grupos, firmas },
     { responseType: "blob" }
   );
   const file = new Blob([res.data], { type: "application/pdf" });
@@ -30,11 +30,13 @@ export const generarPdfResumenOT = async (ordenTrabajoId, grupos) => {
   setTimeout(() => URL.revokeObjectURL(fileURL), 60_000);
 };
 
-export const abrirPdfCombinadoOT = async (ordenTrabajoId) => {
+export const abrirPdfCombinadoOT = async (ordenTrabajoId, firmas = {}) => {
   try {
-    const res = await api.get(`/notificaciones/ot/${ordenTrabajoId}/pdf-completo`, {
-      responseType: "blob",
-    });
+    const res = await api.post(
+      `/notificaciones/ot/${ordenTrabajoId}/pdf-completo`,
+      { firmas },
+      { responseType: "blob" }
+    );
     const file = new Blob([res.data], { type: "application/pdf" });
     const fileURL = URL.createObjectURL(file);
     window.open(fileURL, "_blank", "noopener,noreferrer");
@@ -45,11 +47,13 @@ export const abrirPdfCombinadoOT = async (ordenTrabajoId) => {
   }
 };
 
-export const abrirPdfNotificacion = async (id) => {
+export const abrirPdfNotificacion = async (id, firmas = {}) => {
   try {
-    const res = await api.get(`/notificaciones/${id}/pdf`, {
-      responseType: "blob",
-    });
+    const res = await api.post(
+      `/notificaciones/${id}/pdf`,
+      { firmas },
+      { responseType: "blob" }
+    );
 
     const file = new Blob([res.data], { type: "application/pdf" });
     const fileURL = URL.createObjectURL(file);
