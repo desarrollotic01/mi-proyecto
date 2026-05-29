@@ -151,7 +151,7 @@ const TrabajadorModal = ({ isOpen, mode, trabajador, onClose, onSave }) => {
 
             <div className="form-group">
               <label htmlFor="dni" className="form-label">DNI <span className="required">*</span></label>
-              <input type="text" id="dni" name="dni" value={formData.dni} onChange={handleChange} className={`form-input ${errors.dni ? 'input-error' : ''}`} placeholder="12345678" maxLength="8" />
+              <input type="text" id="dni" name="dni" value={formData.dni} onChange={handleChange} className={`form-input ${errors.dni ? 'input-error' : ''}`} placeholder="Ingrese 8 dígitos" maxLength="8" />
               {errors.dni && <span className="error-message">{errors.dni}</span>}
             </div>
 
@@ -167,6 +167,9 @@ const TrabajadorModal = ({ isOpen, mode, trabajador, onClose, onSave }) => {
                 <option value="tecnico_mecanico">Técnico Mecánico</option>
                 <option value="operario_de_mantenimiento">Operario de Mantenimiento</option>
                 <option value="supervisor">Supervisor</option>
+                <option value="analista_de_mantenimiento">Analista de Mantenimiento</option>
+                <option value="programador_de_mantenimiento">Programador de Mantenimiento</option>
+                <option value="coordinador_de_mantenimiento">Coordinador de Mantenimiento</option>
               </select>
             </div>
 
@@ -177,7 +180,12 @@ const TrabajadorModal = ({ isOpen, mode, trabajador, onClose, onSave }) => {
 
             <div className="form-group">
               <label htmlFor="zona" className="form-label">Zona</label>
-              <input type="text" id="zona" name="zona" value={formData.zona} onChange={handleChange} className="form-input" placeholder="Zona de trabajo" />
+              <select id="zona" name="zona" value={formData.zona} onChange={handleChange} className="form-input">
+                <option value="">-- Seleccionar zona --</option>
+                <option value="Norte">Norte</option>
+                <option value="Sur">Sur</option>
+                <option value="Centro">Centro</option>
+              </select>
             </div>
 
             <div className="form-group form-group-full">

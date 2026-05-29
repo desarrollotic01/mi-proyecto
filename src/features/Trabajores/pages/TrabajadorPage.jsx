@@ -117,7 +117,10 @@ const TrabajadoresPage = () => {
       'tecnico_electrico': 'Técnico Eléctrico',
       'tecnico_mecanico': 'Técnico Mecánico',
       'operario_de_mantenimiento': 'Operario de Mantenimiento',
-      'supervisor': 'Supervisor'
+      'supervisor': 'Supervisor',
+      'analista_de_mantenimiento': 'Analista de Mantenimiento',
+      'programador_de_mantenimiento': 'Programador de Mantenimiento',
+      'coordinador_de_mantenimiento': 'Coordinador de Mantenimiento',
     };
     return labels[rol] || rol;
   };

@@ -19,6 +19,9 @@ export const ROLES_TECNICOS = [
   { value: "operario_de_mantenimiento", label: "Operario de Mantenimiento" },
   { value: "tecnico_mecanico", label: "Técnico Mecánico" },
   { value: "supervisor", label: "Supervisor" },
+  { value: "analista_de_mantenimiento", label: "Analista de Mantenimiento" },
+  { value: "programador_de_mantenimiento", label: "Programador de Mantenimiento" },
+  { value: "coordinador_de_mantenimiento", label: "Coordinador de Mantenimiento" },
 ];
 
 export const createId = () =>

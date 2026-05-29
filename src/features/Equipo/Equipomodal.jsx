@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
-import { 
-  X, Loader2, AlertCircle, Calendar, Package, User, MapPin, 
-  Wrench, Plus, ShoppingCart, Building2, Globe, CheckCircle2, 
-  Search, Image as ImageIcon, UploadCloud 
+import {
+  X, Loader2, AlertCircle, Calendar, Package, User, MapPin,
+  Wrench, Plus, ShoppingCart, Building2, Globe, CheckCircle2,
+  Search, Image as ImageIcon, UploadCloud
 } from "lucide-react";
 import { planMantenimientoService } from "../PlanMantenimiento/services/planMantenimientoService";
+import AdjuntoUploader from "../adjuntos/components/AdjuntoUploader";
 
 // 👇 AYUDANTES PARA LIMPIAR DATOS Y EVITAR ERRORES
 const normalizeStr = (v) => {
@@ -64,6 +65,9 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
   const [loadingPlanes, setLoadingPlanes] = useState(false);
   const [busquedaPlan, setBusquedaPlan] = useState("");
 
+  const [adjuntosFiles, setAdjuntosFiles] = useState([]);
+  const [imagenFiles, setImagenFiles] = useState([]);
+
   const planesFiltrados = useMemo(() => {
     return planes.filter(p =>
       p.nombre?.toLowerCase().includes(busquedaPlan.toLowerCase()) ||
@@ -121,6 +125,8 @@ export default function EquipoModal({ isOpen, onClose, onSave, initialData, clie
     setActiveTab("general");
     setShowNewFamilia(false);
     setNewFamilia({ nombre: "", descripcion: "" });
+    setAdjuntosFiles([]);
+    setImagenFiles([]);
   }, [initialData, isOpen]);
 
   if (!isOpen) return null;
@@ -171,7 +177,6 @@ const handleSubmit = async () => {
         }
       });
 
-      // 2. Preparamos los datos básicos 
       const dataToSave = {
         ...cleanForm,
         newFamilia: showNewFamilia && newFamilia.nombre?.trim()
@@ -180,6 +185,7 @@ const handleSubmit = async () => {
               descripcion: newFamilia.descripcion?.trim() || "",
             }
           : null,
+        _files: { documentos: adjuntosFiles, imagen: imagenFiles },
       };
 
       // Mandamos la data limpia a EquiposPage
@@ -619,11 +625,22 @@ const handleSubmit = async () => {
 
           {/* TAB: Archivos */}
           {activeTab === "archivos" && (
-            <div className="space-y-4">
-              <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-2xl p-10 bg-slate-50 cursor-pointer">
-                <UploadCloud size={32} className="text-blue-600 mb-3" />
-                <span className="text-sm font-bold text-slate-600">Subida de archivos en construcción</span>
-              </div>
+            <div className="space-y-6">
+              <AdjuntoUploader
+                mode="local"
+                multiple
+                label="Documentos adjuntos"
+                placeholder="Arrastra documentos aquí o haz clic para seleccionar"
+                onFilesChange={setAdjuntosFiles}
+              />
+              <AdjuntoUploader
+                mode="local"
+                multiple={false}
+                accept="image/*"
+                label="Imagen del equipo"
+                placeholder="Arrastra una imagen aquí o haz clic para seleccionar"
+                onFilesChange={setImagenFiles}
+              />
             </div>
           )}
 

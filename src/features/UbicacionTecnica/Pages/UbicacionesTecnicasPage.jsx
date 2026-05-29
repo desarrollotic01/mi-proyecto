@@ -63,7 +63,7 @@ export default function UbicacionesTecnicasPage() {
     const q = searchTerm.trim().toLowerCase();
     return items.filter((u) => {
       if (!q) return true;
-      return [u.codigo, u.nombre, u.idPlaca, u.numeroOV, u.especialidad, u.almacen]
+      return [u.codigo, u.nombre, u.especialidad, u.almacen]
         .some(f => String(f).toLowerCase().includes(q));
     });
   }, [items, searchTerm]);
@@ -131,15 +131,11 @@ export default function UbicacionesTecnicasPage() {
                    return {
                      Código: u.codigo || "",
                      Nombre: u.nombre || "",
-                     "ID Placa": u.idPlaca || "",
-                     "N° OV": u.numeroOV || "",
                      Especialidad: u.especialidad || "",
                      Almacén: u.almacen || "",
-                     "Tipo Propiedad": u.tipoEquipoPropiedad || "",
                      Cliente: cli?.nombre || cli?.razonSocial || "",
                      País: p?.nombre || "",
-                     "Fecha Instalación": fmtDate(u.fechaInstalacion),
-                     "Fecha Garantía": fmtDate(u.fechaGarantia),
+                     "N° OC": u.numeroOrdenCliente || "",
                    };
                  });
                  const ws = XLSX.utils.json_to_sheet(data);
@@ -186,13 +182,11 @@ export default function UbicacionesTecnicasPage() {
         {/* TABLA EXCEL-STYLE */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm w-full overflow-hidden">
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-[11px] border-collapse min-w-[1400px]">
+            <table className="w-full text-[11px] border-collapse min-w-[900px]">
               <thead>
                 <tr className="bg-slate-800 text-white text-[10px] font-bold uppercase tracking-wider">
                   <th className="px-2 py-2.5 border border-slate-700 text-center w-8">#</th>
                   <th className="px-3 py-2.5 border border-slate-700">Código</th>
-                  <th className="px-3 py-2.5 border border-slate-700">Placa / ID</th>
-                  <th className="px-3 py-2.5 border border-slate-700">Propiedad</th>
                   <th className="px-3 py-2.5 border border-slate-700 min-w-[160px]">Nombre</th>
                   <th className="px-3 py-2.5 border border-slate-700">Especialidad</th>
                   <th className="px-3 py-2.5 border border-slate-700 min-w-[140px]">Cliente</th>
@@ -200,17 +194,14 @@ export default function UbicacionesTecnicasPage() {
                   <th className="px-3 py-2.5 border border-slate-700">País</th>
                   <th className="px-3 py-2.5 border border-slate-700">Almacén</th>
                   <th className="px-3 py-2.5 border border-slate-700">Operador</th>
-                  <th className="px-3 py-2.5 border border-slate-700">OV</th>
                   <th className="px-3 py-2.5 border border-slate-700">OC</th>
-                  <th className="px-3 py-2.5 border border-slate-700 whitespace-nowrap">Entrega Real</th>
-                  <th className="px-3 py-2.5 border border-slate-700 whitespace-nowrap">Fin Garantía</th>
                   <th className="px-3 py-2.5 border border-slate-700 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan="16" className="p-10 text-center text-slate-400 font-bold border border-slate-100">
+                    <td colSpan="11" className="p-10 text-center text-slate-400 font-bold border border-slate-100">
                       Sin registros
                     </td>
                   </tr>
@@ -223,12 +214,6 @@ export default function UbicacionesTecnicasPage() {
                         className={`transition-colors hover:bg-blue-50 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
                         <td className="px-2 py-2 border border-slate-200 text-center text-slate-400 font-mono">{idx + 1}</td>
                         <td className="px-3 py-2 border border-slate-200 font-black text-blue-700">{val(item.codigo)}</td>
-                        <td className="px-3 py-2 border border-slate-200 font-semibold text-slate-700">{val(item.idPlaca)}</td>
-                        <td className="px-3 py-2 border border-slate-200">
-                          <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold">
-                            {val(item.tipoEquipoPropiedad)}
-                          </span>
-                        </td>
                         <td className="px-3 py-2 border border-slate-200 font-bold text-slate-800">{val(item.nombre)}</td>
                         <td className="px-3 py-2 border border-slate-200 text-blue-600 font-semibold">{val(item.especialidad)}</td>
                         <td className="px-3 py-2 border border-slate-200 font-semibold text-slate-800">{cli?.razonSocial || cli?.nombre || "—"}</td>
@@ -236,10 +221,7 @@ export default function UbicacionesTecnicasPage() {
                         <td className="px-3 py-2 border border-slate-200 text-slate-600">{pFound?.nombre || "—"}</td>
                         <td className="px-3 py-2 border border-slate-200 text-slate-600">{val(item.almacen)}</td>
                         <td className="px-3 py-2 border border-slate-200 text-slate-600">{val(item.operadorLogistico)}</td>
-                        <td className="px-3 py-2 border border-slate-200 font-mono text-slate-700">{val(item.numeroOV)}</td>
                         <td className="px-3 py-2 border border-slate-200 font-mono text-slate-700">{val(item.numeroOrdenCliente)}</td>
-                        <td className="px-3 py-2 border border-slate-200 text-slate-700 whitespace-nowrap">{fmtDate(item.fechaEntregaReal)}</td>
-                        <td className="px-3 py-2 border border-slate-200 text-emerald-700 font-bold whitespace-nowrap">{fmtDate(item.finGarantia)}</td>
                         <td className="px-3 py-2 border border-slate-200">
                           <div className="flex items-center justify-center gap-1.5">
                             <button onClick={() => handleOpenPDF(item)} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="PDF">

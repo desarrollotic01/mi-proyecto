@@ -124,11 +124,26 @@ function EquiposPageContent() {
         const familiaCreada = await familiaService.createFamilia(payload.newFamilia);
         familiaIdFinal = familiaCreada.id;
       }
-      const datosEquipo = { ...payload, familiaId: familiaIdFinal };
-      delete datosEquipo.newFamilia;
 
-      if (editing) await equipoService.updateEquipo(editing.id, datosEquipo);
-      else await equipoService.createEquipo(datosEquipo);
+      const { _files, newFamilia: _nf, ...equipoData } = { ...payload, familiaId: familiaIdFinal };
+
+      const hasFiles = _files && (_files.documentos?.length > 0 || _files.imagen?.length > 0);
+
+      let finalPayload = equipoData;
+      if (hasFiles) {
+        const formData = new FormData();
+        Object.entries(equipoData).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) {
+            formData.append(key, Array.isArray(value) ? JSON.stringify(value) : String(value));
+          }
+        });
+        _files.documentos?.forEach((file) => formData.append("adjuntos", file));
+        if (_files.imagen?.length > 0) formData.append("imagenEquipo", _files.imagen[0]);
+        finalPayload = formData;
+      }
+
+      if (editing) await equipoService.updateEquipo(editing.id, finalPayload);
+      else await equipoService.createEquipo(finalPayload);
 
       await loadData();
       setModalOpen(false);
