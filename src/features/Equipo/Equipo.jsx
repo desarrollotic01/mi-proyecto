@@ -471,7 +471,7 @@ function EquiposPageContent() {
           </div>
           </div>
         ) : (
-          <div className="flex w-full gap-3 pb-4 h-[calc(100dvh-130px)] lg:h-[calc(100vh-160px)] overflow-x-auto lg:overflow-hidden px-2 lg:px-1 snap-x snap-mandatory lg:snap-none items-start">
+          <div className="flex w-full gap-3 pb-4 min-h-0 overflow-x-auto overflow-y-auto px-2 lg:px-1 snap-x snap-mandatory lg:snap-none items-start">
   {/* Aquí van tus KanbanColumn */}
     {viewMode === "propiedad" ? (
               <>
