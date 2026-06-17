@@ -21,6 +21,8 @@ import EquipoDetailModal from "./Components/EquipoDetailModal";
 import { GlobalPDFModal } from "../../components/GlobalPDFModal.jsx";
 import { UbicacionPDF } from "../UbicacionTecnica/Components/UbicacionPDF.jsx";
 import { usePDFReport } from "../../hooks/usePDFReport.js";
+import { usePagination } from "../../hooks/usePagination.js";
+import Pagination from "../../components/Pagination.jsx";
 
 // =========================================================================
 // ATRAPADOR DE ERRORES: Evita la pantalla en blanco y muestra el error
@@ -191,6 +193,9 @@ function EquiposPageContent() {
       return matchSearch && matchEstado && matchCliente;
     });
   }, [equipos, searchTerm, filterEstado, filterCliente]);
+
+  const { currentPage, setCurrentPage, totalPages, paginatedItems: equiposPaginados, totalItems: totalEquipos, startIndex } =
+    usePagination(filteredEquipos, 100);
 
   const vendidos = filteredEquipos.filter((e) => e?.tipoEquipoPropiedad === "Vendido");
   const propios = filteredEquipos.filter((e) => e?.tipoEquipoPropiedad === "Propio");
@@ -385,7 +390,7 @@ function EquiposPageContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEquipos.length === 0 ? (
+                  {equiposPaginados.length === 0 ? (
                     <tr>
                       <td colSpan="15" className="p-10 text-center text-slate-400 font-bold border border-slate-100">
                         <Box className="w-10 h-10 mx-auto mb-2 opacity-30" />
@@ -393,10 +398,10 @@ function EquiposPageContent() {
                       </td>
                     </tr>
                   ) : (
-                    filteredEquipos.map((equipo, idx) => (
+                    equiposPaginados.map((equipo, idx) => (
                       <tr key={equipo?.id || idx}
                         className={`transition-colors hover:bg-blue-50 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
-                        <td className="px-3 py-2 border border-slate-200 text-center text-slate-400 font-mono">{idx + 1}</td>
+                        <td className="px-3 py-2 border border-slate-200 text-center text-slate-400 font-mono">{startIndex + idx + 1}</td>
                         <td className="px-3 py-2 border border-slate-200 font-black text-blue-700">{equipo?.codigo || "—"}</td>
                         <td className="px-3 py-2 border border-slate-200 text-slate-700 font-semibold font-mono">{equipo?.serie || "—"}</td>
                         <td className="px-3 py-2 border border-slate-200 text-slate-700 font-semibold">{equipo?.idPlaca || "—"}</td>
@@ -437,6 +442,15 @@ function EquiposPageContent() {
                 </tbody>
               </table>
             </div>
+          <div className="px-4 pb-4 pt-3">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalEquipos}
+              pageSize={100}
+              onPageChange={setCurrentPage}
+            />
+          </div>
           </div>
         ) : (
           <div className="flex w-full gap-3 pb-4 h-[calc(100dvh-130px)] lg:h-[calc(100vh-160px)] overflow-x-auto lg:overflow-hidden px-2 lg:px-1 snap-x snap-mandatory lg:snap-none items-start">

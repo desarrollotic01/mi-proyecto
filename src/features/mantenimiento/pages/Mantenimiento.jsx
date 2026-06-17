@@ -216,10 +216,17 @@ export default function Mantenimiento() {
       {/* ================= MODALES ================= */}
       <ModalMantenimiento
         isOpen={m.modalOpen}
-        onClose={() => m.setModalOpen(false)}
+        onClose={() => {
+          m.setModalOpen(false);
+          m.resetFormData();
+        }}
         formData={m.formData}
         setFormData={m.setFormData}
         handleSaveAll={m.handleSaveAll}
+        onCreated={() => {
+          m.cargarAvisos();
+          m.resetFormData();
+        }}
         listaAvisos={Object.values(m.columns).flatMap(
           (c) => c.items
         )}

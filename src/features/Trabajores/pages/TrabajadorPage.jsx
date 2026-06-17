@@ -3,6 +3,8 @@ import * as XLSX from 'xlsx';
 import { trabajadorService } from '../../mantenimiento/services/trabajadoresService';
 import TrabajadorModal from '../components/TrabajadorModal';
 import ModalImportMasivo from '../../../components/inputs/ModalImportMasivo';
+import { usePagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/Pagination';
 import './TrabajadorPage.css';
 
 const TrabajadoresPage = () => {
@@ -92,6 +94,9 @@ const TrabajadoresPage = () => {
 
   const roles = [...new Set(trabajadores.map(t => t.rol))];
   const empresas = [...new Set(trabajadores.map(t => t.empresa))];
+
+  const { currentPage, setCurrentPage, totalPages, paginatedItems, totalItems, startIndex } =
+    usePagination(filteredTrabajadores, 100);
 
   const exportarExcel = () => {
     const data = filteredTrabajadores.map((t, i) => ({
@@ -190,12 +195,12 @@ const TrabajadoresPage = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredTrabajadores.length === 0 ? (
+            {paginatedItems.length === 0 ? (
               <tr><td colSpan="6" className="empty-state">No se encontraron registros</td></tr>
             ) : (
-              filteredTrabajadores.map((trabajador, index) => (
+              paginatedItems.map((trabajador, index) => (
                 <tr key={trabajador.id}>
-                  <td className="row-number">{index + 1}</td>
+                  <td className="row-number">{startIndex + index + 1}</td>
                   
                   {/* DATOS PERSONALES: Nombre, Apellido, DNI */}
                   <td>
@@ -253,6 +258,16 @@ const TrabajadoresPage = () => {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div style={{ padding: '0 0 16px 0' }}>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={100}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {isModalOpen && (

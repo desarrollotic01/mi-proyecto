@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { itemService } from "../features/PlanMantenimiento/services/itemService";
 import { Loader2, AlertCircle, Search, RefreshCw, Package } from "lucide-react";
+import { usePagination } from "../hooks/usePagination";
+import Pagination from "../components/Pagination";
 
 export default function ItemsPage() {
   const [items, setItems] = useState([]);
@@ -33,6 +35,9 @@ export default function ItemsPage() {
         item.nombre?.toLowerCase().includes(q)
     );
   }, [items, searchTerm]);
+
+  const { currentPage, setCurrentPage, totalPages, paginatedItems, totalItems, startIndex } =
+    usePagination(filtered, 100);
 
   const fmtStock = (val) => {
     if (val === null || val === undefined || val === "") return "-";
@@ -71,6 +76,9 @@ export default function ItemsPage() {
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest hidden sm:block">
               {filtered.length} de {items.length} items
             </span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest hidden sm:block">
+              · Pág. {currentPage}/{totalPages}
+            </span>
             <button
               onClick={cargarItems}
               className="p-2 sm:p-2.5 text-slate-400 hover:text-blue-600 transition-colors border border-transparent hover:border-slate-200 rounded-lg bg-slate-50 hover:bg-white"
@@ -105,19 +113,19 @@ export default function ItemsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {paginatedItems.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="p-10 text-center text-slate-400 font-bold border border-slate-100">
                       {searchTerm ? "Sin resultados para la búsqueda" : "No hay items registrados"}
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((item, idx) => (
+                  paginatedItems.map((item, idx) => (
                     <tr
                       key={item.id}
                       className={`transition-colors hover:bg-blue-50 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"}`}
                     >
-                      <td className="px-2 py-2 border border-slate-200 text-center text-slate-400 font-mono">{idx + 1}</td>
+                      <td className="px-2 py-2 border border-slate-200 text-center text-slate-400 font-mono">{startIndex + idx + 1}</td>
                       <td className="px-3 py-2 border border-slate-200 font-black text-blue-700 font-mono whitespace-nowrap">
                         {item.sapCode || "-"}
                       </td>
@@ -143,6 +151,14 @@ export default function ItemsPage() {
             </table>
           </div>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={100}
+          onPageChange={setCurrentPage}
+        />
 
       </div>
     </div>

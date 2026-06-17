@@ -531,8 +531,11 @@ const iniciarOTs = (equipos) => {
     equiposProcesadosOT,
     setEquiposProcesadosOT,
     indiceEquipoActual,
-    setIndiceEquipoActual,  
+    setIndiceEquipoActual,
     abrirOrdenTrabajo,
+
+    cargarAvisos,
+    resetFormData: () => setFormData(initialFormData),
 
   };
 } 

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import {
   X, ChevronRight, ChevronLeft, Save, FileText, Users, Settings,
-  AlertCircle, Plus, Trash2, Wrench, Package, MapPin, Calendar,
-  User, Building, Phone, Mail, Upload, CheckCircle, Search, ShoppingCart
+  AlertCircle, Plus, Trash2, Wrench, Package, MapPin,
+  Phone, Mail, CheckCircle, ShoppingCart
 } from "lucide-react";
 
 import { useAuth } from "../../../auth/context/AuthContext";
@@ -14,6 +14,8 @@ import { getContactosPorCliente } from "../services/ContactoService";
 import { paisService } from "../services/paisService";
 import { getTrabajadores } from "../services/trabajadoresService";
 import AdjuntoUploader from "../../adjuntos/components/AdjuntoUploader";
+import ModalBusquedaUniversal from "../../../components/inputs/ModalBusquedaUniversal";
+import { cachedGet } from "../../../utils/dataCache";
 
 
 const opcionesProducto = [
@@ -21,147 +23,6 @@ const opcionesProducto = [
   "Equipos Propios", "Sanitarias", "HVAC", "DACI", "ACI",
   "Datos y Comunicaciones", "Eléctrico", "Pisos y Estructuras",
 ];
-
-/* ================= MODAL DE BÚSQUEDA ================= */
-function ModalBusqueda({ isOpen, onClose, title, data, onSelect, tipo, equiposSeleccionados = [], ubicacionesSeleccionadas = [] }) {
-  const [searchTerm, setSearchTerm] = useState("");
-
-  if (!isOpen) return null;
-
-  const filteredData = data.filter((item) => {
-    const search = searchTerm.toLowerCase();
-    return (
-      item.codigo?.toLowerCase().includes(search) ||
-      item.nombre?.toLowerCase().includes(search)
-    );
-  });
-
-  const isEquipoSeleccionado = (equipoId) => {
-    return equiposSeleccionados.includes(equipoId);
-  };
-
-  const isUbicacionSeleccionada = (ubicacionId) => {
-    return ubicacionesSeleccionadas.includes(ubicacionId);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900">{title}</h3>
-              {tipo === "equipos" && equiposSeleccionados.length > 0 && (
-                <p className="text-sm text-gray-500 mt-1">
-                  {equiposSeleccionados.length} equipo{equiposSeleccionados.length !== 1 ? 's' : ''} seleccionado{equiposSeleccionados.length !== 1 ? 's' : ''}
-                </p>
-              )}
-              {tipo === "ubicacion" && ubicacionesSeleccionadas.length > 0 && (
-                <p className="text-sm text-gray-500 mt-1">
-                  {ubicacionesSeleccionadas.length} ubicación{ubicacionesSeleccionadas.length !== 1 ? 'es' : ''} seleccionada{ubicacionesSeleccionadas.length !== 1 ? 's' : ''}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
-
-          {/* Buscador */}
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Buscar por código o nombre..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-              autoFocus
-            />
-          </div>
-        </div>
-
-        {/* Lista */}
-        <div className="p-6 max-h-[400px] overflow-y-auto">
-          {filteredData.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p className="font-medium">No se encontraron resultados</p>
-              <p className="text-sm mt-1">Intenta con otro término de búsqueda</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredData.map((item) => {
-                const yaSeleccionado =
-                  (tipo === "equipos" && isEquipoSeleccionado(item.id)) ||
-                  (tipo === "ubicacion" && isUbicacionSeleccionada(item.id));
-
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      onSelect(item);
-                      // Never auto-close — user clicks "Listo" to dismiss
-                    }}
-                    disabled={yaSeleccionado}
-                    className={`w-full p-4 border rounded-xl text-left group transition-all ${
-                      yaSeleccionado
-                        ? "border-green-300 bg-green-50 cursor-not-allowed"
-                        : "border-gray-200 hover:border-blue-500 hover:bg-blue-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          {tipo === "equipos" ? (
-                            <Package className={`w-5 h-5 ${yaSeleccionado ? "text-green-600" : "text-blue-600"}`} />
-                          ) : (
-                            <MapPin className={`w-5 h-5 ${yaSeleccionado ? "text-green-600" : "text-emerald-600"}`} />
-                          )}
-                          <div>
-                            <p className={`font-semibold ${yaSeleccionado ? "text-green-900" : "text-gray-900"}`}>
-                              {item.nombre}
-                            </p>
-                            <p className="text-sm text-gray-500 font-mono">{item.codigo}</p>
-                          </div>
-                        </div>
-                        {item.descripcion && (
-                          <p className="text-sm text-gray-600 mt-2 ml-8">{item.descripcion}</p>
-                        )}
-                      </div>
-                      {yaSeleccionado ? (
-                        <div className="flex items-center gap-2 text-green-600">
-                          <CheckCircle className="w-5 h-5" />
-                          <span className="text-sm font-medium">Seleccionado</span>
-                        </div>
-                      ) : (
-                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Footer con botón cerrar (siempre visible para multi-select) */}
-        <div className="p-6 border-t border-gray-100 bg-gray-50">
-          <button
-            onClick={onClose}
-            className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
-          >
-            Listo - Cerrar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ================= MODAL PRINCIPAL ================= */
 export default function ModalMantenimiento({
@@ -212,28 +73,26 @@ useEffect(() => {
 }, [user]);
 
 
-  /* ================= CARGAR DATOS DEL BACKEND ================= */
+  /* ================= CARGAR DATOS DEL BACKEND (con caché) ================= */
   useEffect(() => {
     if (!isOpen) return;
 
     const loadData = async () => {
       setLoading(true);
       try {
-        const [clientesData, equiposResp, ubicacionesResp,paisesResp,supervisoresResp] = await Promise.all([
-          clienteService.getClientes(),
-          equipoService.getEquipos(),
-          UbicacionTecnicaService.getUbicacionTecnicas(),
-          paisService.getPaises(),
-          getTrabajadores("supervisor")
+        const [clientesData, equiposResp, ubicacionesResp, paisesResp, supervisoresResp] = await Promise.all([
+          cachedGet("clientes",       () => clienteService.getClientes()),
+          cachedGet("equipos",        () => equipoService.getEquipos()),
+          cachedGet("ubicaciones",    () => UbicacionTecnicaService.getUbicacionTecnicas()),
+          cachedGet("paises",         () => paisService.getPaises()),
+          cachedGet("supervisores",   () => getTrabajadores("supervisor")),
         ]);
-
 
         setPaises(paisesResp);
         setClientes(clientesData);
         setEquiposData(equiposResp);
         setUbicacionesData(ubicacionesResp);
         setSupervisores(supervisoresResp);
-
       } catch (error) {
         console.error("Error cargando datos:", error);
         alert("Error al cargar los datos iniciales");
@@ -413,24 +272,69 @@ const getUbicacionData = (ubicacionId) => {
     }));
   };
 
+const validarCampos = () => {
+  const errors = [];
+
+  if (!formData.ordenVenta && !formData.centroCosto) {
+    errors.push("Orden de Venta o Centro de Costo es obligatorio (Paso 1)");
+  }
+  if (tipoAviso === "mantenimiento" && !formData.tipoMantenimiento) {
+    errors.push("Tipo de Mantenimiento es obligatorio (Paso 1)");
+  }
+  if (!formData.paisId) {
+    errors.push("País es obligatorio (Paso 1)");
+  }
+  if (!formData.producto) {
+    errors.push("Producto es obligatorio (Paso 1)");
+  }
+  if (!formData.descripcion) {
+    errors.push("Descripción Detallada es obligatoria (Paso 1)");
+  }
+  if (!formData.fechaAtencion) {
+    errors.push("Fecha de Atención es obligatoria (Paso 1)");
+  }
+  if (tipoAviso !== "venta") {
+    const tieneEq = (formData.equipos || []).length > 0;
+    const tieneUb = (formData.ubicaciones || []).length > 0;
+    if (!tieneEq && !tieneUb) {
+      errors.push("Debe agregar al menos un Equipo o una Ubicación Técnica (Paso 1)");
+    }
+  }
+  if (!formData.clienteId) {
+    errors.push("Cliente es obligatorio (Paso 2)");
+  }
+  if (!formData.nombreContacto) {
+    errors.push("Contacto es obligatorio — selecciona un cliente con contactos (Paso 2)");
+  }
+  if (!formData.correoContacto) {
+    errors.push("Correo del Contacto es obligatorio (Paso 2)");
+  }
+  if (!formData.numeroContacto) {
+    errors.push("Teléfono del Contacto es obligatorio (Paso 2)");
+  }
+  return errors;
+};
+
 const handleGuardarAviso = async () => {
+  const validationErrors = validarCampos();
+  if (validationErrors.length > 0) {
+    setSubmitErrors(validationErrors);
+    return;
+  }
+
   setSaving(true);
   setSubmitErrors([]);
 
   try {
-    if (tipoAviso === "mantenimiento" && !formData.tipoMantenimiento) {
-      setSubmitErrors(["Debe seleccionar el tipo de mantenimiento"]);
-      return;
-    }
 
     const formDataToSend = new FormData();
 
-    // Campos normales (excluir tipoAviso — se agrega abajo desde el estado)
+    const SKIP_KEYS = ["documentos", "documentoFinal", "equipos", "ubicaciones", "tipoAviso"];
+
     Object.entries(formData).forEach(([key, value]) => {
-      if (["documentos", "documentoFinal", "equipos", "ubicaciones", "tipoAviso"].includes(key)) return;
-      if (value !== null && value !== undefined) {
-        formDataToSend.append(key, value);
-      }
+      if (SKIP_KEYS.includes(key)) return;
+      if (value === null || value === undefined || value === "") return;
+      formDataToSend.append(key, value);
     });
 
     // tipoAviso desde el estado (una sola vez, correcto)
@@ -1198,26 +1102,44 @@ const handleGuardarAviso = async () => {
         </div>
       </div>
 
-      {/* Modal de Búsqueda para Equipos */}
-      <ModalBusqueda
+      {/* Búsqueda de Equipos */}
+      <ModalBusquedaUniversal
         isOpen={lookupOpen === "equipos"}
         onClose={() => setLookupOpen(null)}
-        title="Buscar Equipos"
+        title="Seleccionar Equipos"
+        icon={<Package />}
+        colorAccent="blue"
         data={equiposData}
+        loading={loading}
+        columns={[
+          { key: "codigo", label: "Código", mono: true },
+          { key: "nombre", label: "Nombre", flex: true },
+        ]}
+        searchKeys={["codigo", "nombre"]}
+        subtitle={(eq) => eq.ubicacionTecnica || null}
+        multiSelect
+        selectedIds={formData.equipos || []}
         onSelect={handleSelectEquipo}
-        tipo="equipos"
-        equiposSeleccionados={formData.equipos || []}
       />
 
-      {/* Modal de Búsqueda para Ubicación Técnica */}
-      <ModalBusqueda
+      {/* Búsqueda de Ubicaciones Técnicas */}
+      <ModalBusquedaUniversal
         isOpen={lookupOpen === "ubicacion"}
         onClose={() => setLookupOpen(null)}
-        title="Buscar Ubicación Técnica"
+        title="Seleccionar Ubicación Técnica"
+        icon={<MapPin />}
+        colorAccent="green"
         data={ubicacionesData}
+        loading={loading}
+        columns={[
+          { key: "codigo", label: "Código", mono: true },
+          { key: "nombre", label: "Nombre", flex: true },
+        ]}
+        searchKeys={["codigo", "nombre"]}
+        subtitle={(ub) => ub.descripcion || null}
+        multiSelect
+        selectedIds={formData.ubicaciones || []}
         onSelect={handleSelectUbicacion}
-        tipo="ubicacion"
-        ubicacionesSeleccionadas={formData.ubicaciones || []}
       />
     </div>
   );

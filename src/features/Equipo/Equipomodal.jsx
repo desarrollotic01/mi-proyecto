@@ -588,7 +588,9 @@ const handleSubmit = async () => {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Línea</label>
                 <select value={form.linea || "Acceso"} onChange={(e) => setForm({ ...form, linea: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" disabled={loading}>
                   <option value="Acceso">Acceso</option>
-                  <option value="Autosat">Autosat</option>
+                  <option value="AutoSat">AutoSat</option>
+                  <option value="Puertas Rápidas">Puertas Rápidas</option>
+                  <option value="Transpaleta">Transpaleta</option>
                   <option value="Vehiculos">Vehículos</option>
                   <option value="Otros">Otros</option>
                 </select>

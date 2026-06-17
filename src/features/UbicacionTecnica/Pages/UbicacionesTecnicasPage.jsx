@@ -5,6 +5,8 @@ import {
   Building2, Globe, Truck, FileText, Calendar, Tag, Box, Zap, Package, FileSpreadsheet
 } from "lucide-react";
 import ModalImportMasivo from "../../../components/inputs/ModalImportMasivo";
+import { usePagination } from "../../../hooks/usePagination";
+import Pagination from "../../../components/Pagination";
 
 import UbicacionTecnicaModal from "../Components/UbicacionTecnicaModal";
 import { UbicacionTecnicaService } from "../../mantenimiento/services/ubicacionService";
@@ -73,6 +75,9 @@ export default function UbicacionesTecnicasPage() {
     paises: new Set(filtered.map(u => u.paisId).filter(Boolean)).size,
     vendidos: filtered.filter(u => String(u.tipoEquipoPropiedad).toLowerCase() === "vendido").length
   }), [filtered]);
+
+  const { currentPage, setCurrentPage, totalPages, paginatedItems, totalItems, startIndex } =
+    usePagination(filtered, 100);
 
   const handleSave = async (payload, mode) => {
     try {
@@ -199,20 +204,20 @@ export default function UbicacionesTecnicasPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {paginatedItems.length === 0 ? (
                   <tr>
                     <td colSpan="11" className="p-10 text-center text-slate-400 font-bold border border-slate-100">
                       Sin registros
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((item, idx) => {
+                  paginatedItems.map((item, idx) => {
                     const cli = clientes.find(c => String(c.id) === String(item.clienteId));
                     const pFound = paises.find(p => String(p.id) === String(item.paisId));
                     return (
                       <tr key={item.id}
                         className={`transition-colors hover:bg-blue-50 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
-                        <td className="px-2 py-2 border border-slate-200 text-center text-slate-400 font-mono">{idx + 1}</td>
+                        <td className="px-2 py-2 border border-slate-200 text-center text-slate-400 font-mono">{startIndex + idx + 1}</td>
                         <td className="px-3 py-2 border border-slate-200 font-black text-blue-700">{val(item.codigo)}</td>
                         <td className="px-3 py-2 border border-slate-200 font-bold text-slate-800">{val(item.nombre)}</td>
                         <td className="px-3 py-2 border border-slate-200 text-blue-600 font-semibold">{val(item.especialidad)}</td>
@@ -243,6 +248,14 @@ export default function UbicacionesTecnicasPage() {
             </table>
           </div>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={100}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       <UbicacionTecnicaModal isOpen={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); }} onSave={handleSave} initialData={editing} />
