@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import * as XLSX from "xlsx";
 import {
   Search, Plus, AlertCircle, Loader2, Filter, ChevronDown,
@@ -153,33 +153,43 @@ function EquiposPageContent() {
     } catch (err) { throw err; }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     if (confirm("¿Estás seguro de eliminar este equipo?")) {
       try {
         await equipoService.deleteEquipo(id);
         await loadData();
       } catch (err) { alert("Error al eliminar el equipo: " + err.message); }
     }
-  };
+  }, []);
 
-  const handleMove = async (equipo, field, newValue) => {
+  const handleMove = useCallback(async (equipo, field, newValue) => {
     try {
       await equipoService.updateEquipo(equipo.id, { ...equipo, [field]: newValue });
       await loadData();
     } catch (err) { alert("Error al mover el equipo: " + err.message); }
-  };
+  }, []);
 
-  const handleCreatePlan = (equipo) => {
+  const handleCreatePlan = useCallback((equipo) => {
     setEquipoParaPlan(equipo);
     setPlanModalOpen(true);
-  };
+  }, []);
 
-  const handlePlanCreated = () => {
+  const handlePlanCreated = useCallback(() => {
     setPlanModalOpen(false);
     setEquipoParaPlan(null);
     alert("Plan de mantenimiento creado exitosamente");
     loadData();
-  };
+  }, []);
+
+  const handleView = useCallback((equipo) => {
+    setSelectedEquipo(equipo);
+    setDetailModalOpen(true);
+  }, []);
+
+  const handleEdit = useCallback((equipo) => {
+    setEditing(equipo);
+    setModalOpen(true);
+  }, []);
 
   const filteredEquipos = useMemo(() => {
     if (!Array.isArray(equipos)) return [];
@@ -197,12 +207,20 @@ function EquiposPageContent() {
   const { currentPage, setCurrentPage, totalPages, paginatedItems: equiposPaginados, totalItems: totalEquipos, startIndex } =
     usePagination(filteredEquipos, 100);
 
-  const vendidos = filteredEquipos.filter((e) => e?.tipoEquipoPropiedad === "Vendido");
-  const propios = filteredEquipos.filter((e) => e?.tipoEquipoPropiedad === "Propio");
-  const atendidos = filteredEquipos.filter((e) => e?.tipoEquipoPropiedad === "Atendido");
-  const almacen = filteredEquipos.filter((e) => e?.status === "Almacen" || e?.status === "Almacén");
-  const enCompra = filteredEquipos.filter((e) => e?.status === "En compra");
-  const entregado = filteredEquipos.filter((e) => e?.status === "Entregado");
+  const { vendidos, propios, atendidos, almacen, enCompra, entregado } = useMemo(() => {
+    const v = [], p = [], a = [], al = [], ec = [], en = [];
+    for (const e of filteredEquipos) {
+      if (!e) continue;
+      if (e.tipoEquipoPropiedad === "Vendido") v.push(e);
+      else if (e.tipoEquipoPropiedad === "Propio") p.push(e);
+      else if (e.tipoEquipoPropiedad === "Atendido") a.push(e);
+      const st = e.status;
+      if (st === "Almacen" || st === "Almacén") al.push(e);
+      else if (st === "En compra") ec.push(e);
+      else if (st === "Entregado") en.push(e);
+    }
+    return { vendidos: v, propios: p, atendidos: a, almacen: al, enCompra: ec, entregado: en };
+  }, [filteredEquipos]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -457,15 +475,15 @@ function EquiposPageContent() {
   {/* Aquí van tus KanbanColumn */}
     {viewMode === "propiedad" ? (
               <>
-                <KanbanColumn title="Vendidos" icon={ShoppingCart} color="blue" equipos={vendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
-                <KanbanColumn title="Propios" icon={Building2} color="orange" equipos={propios} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
-                <KanbanColumn title="Atendidos" icon={Wrench} color="purple" equipos={atendidos} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
+                <KanbanColumn title="Vendidos" icon={ShoppingCart} color="blue" equipos={vendidos} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
+                <KanbanColumn title="Propios" icon={Building2} color="orange" equipos={propios} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
+                <KanbanColumn title="Atendidos" icon={Wrench} color="purple" equipos={atendidos} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="propiedad" />
               </>
             ) : (
               <>
-                <KanbanColumn title="Almacén" icon={Package} color="indigo" equipos={almacen} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="logistica" />
-                <KanbanColumn title="En compra" icon={CreditCard} color="orange" equipos={enCompra} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="logistica" />
-                <KanbanColumn title="Entregado" icon={CheckCircle} color="green" equipos={entregado} onView={(equipo) => { setSelectedEquipo(equipo); setDetailModalOpen(true); }} onEdit={(equipo) => { setEditing(equipo); setModalOpen(true); }} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="logistica" />
+                <KanbanColumn title="Almacén" icon={Package} color="indigo" equipos={almacen} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="logistica" />
+                <KanbanColumn title="En compra" icon={CreditCard} color="orange" equipos={enCompra} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="logistica" />
+                <KanbanColumn title="Entregado" icon={CheckCircle} color="green" equipos={entregado} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} onMove={handleMove} onCreatePlan={handleCreatePlan} onOpenPDF={handleOpenPDF} moveCategory="logistica" />
               </>
             )}
           </div>

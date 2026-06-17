@@ -1,8 +1,9 @@
-import { Box } from "lucide-react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { Box, ChevronDown } from "lucide-react";
 import EquipoCard from "./EquipoCard";
 
+const BATCH_SIZE = 30;
 
-//kanban de equipos en el dashboard
 export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit, onDelete, onView, onMove, onCreatePlan, onOpenPDF, moveCategory }) {
   const colorStyles = {
     blue: "bg-[#3b82f6]",
@@ -15,14 +16,25 @@ export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit
   };
 
   const bgHeader = colorStyles[color] || colorStyles.blue;
-  
-  // Protección contra arrays rotos
   const equiposSeguros = Array.isArray(equipos) ? equipos : [];
+
+  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    setVisibleCount(BATCH_SIZE);
+  }, [equipos]);
+
+  const showMore = useCallback(() => {
+    setVisibleCount((prev) => prev + BATCH_SIZE);
+  }, []);
+
+  const visibleEquipos = equiposSeguros.slice(0, visibleCount);
+  const remaining = equiposSeguros.length - visibleCount;
 
   return (
     <div className="flex flex-col rounded-2xl border border-slate-200 bg-white overflow-hidden
       shrink-0 w-[85vw] md:w-[320px] lg:flex-1 lg:w-auto lg:min-w-0 snap-center">
-   {/* Contenido de la columna */}
       <div className={`${bgHeader} rounded-t-[1rem] p-3.5 flex items-center justify-between shadow-sm`}>
         <div className="flex items-center gap-2.5">
           <div className="text-white/90">
@@ -35,28 +47,40 @@ export default function KanbanColumn({ title, icon: Icon, color, equipos, onEdit
         </div>
       </div>
 
-      <div className="bg-[#f8fafc] border-x border-b border-slate-200 p-3 min-h-[450px] space-y-3 rounded-b-[1rem] shadow-sm">
+      <div
+        ref={scrollRef}
+        className="bg-[#f8fafc] border-x border-b border-slate-200 p-3 min-h-[450px] space-y-3 rounded-b-[1rem] shadow-sm overflow-y-auto max-h-[calc(100dvh-260px)]"
+      >
         {equiposSeguros.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 opacity-30">
             <Box size={48} className="text-slate-400 mb-3" />
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sin equipos</p>
           </div>
-
-          
         ) : (
-          equiposSeguros.map((equipo) => (
-            <EquipoCard
-              key={equipo?.id || Math.random()}
-              equipo={equipo}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onView={onView}
-              onMove={onMove}
-              onCreatePlan={onCreatePlan}
-              onOpenPDF={onOpenPDF}
-              moveCategory={moveCategory}
-            />
-          ))
+          <>
+            {visibleEquipos.map((equipo) => (
+              <EquipoCard
+                key={equipo?.id}
+                equipo={equipo}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onView={onView}
+                onMove={onMove}
+                onCreatePlan={onCreatePlan}
+                onOpenPDF={onOpenPDF}
+                moveCategory={moveCategory}
+              />
+            ))}
+            {remaining > 0 && (
+              <button
+                onClick={showMore}
+                className="w-full py-3 text-xs font-black text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-200 transition-colors flex items-center justify-center gap-2 uppercase tracking-wider"
+              >
+                <ChevronDown size={14} strokeWidth={3} />
+                Cargar {Math.min(remaining, BATCH_SIZE)} más de {remaining} restantes
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { 
-  ShoppingCart, Building2, Wrench, Package, CreditCard, 
-  Truck, Box, Eye, Edit2, Trash2, User, RefreshCw, 
+import { useState, memo } from "react";
+import {
+  ShoppingCart, Building2, Wrench, Package, CreditCard,
+  Truck, Box, Eye, Edit2, Trash2, User, RefreshCw,
   Globe, Shield, FileText, ChevronDown, MapPin, Tag, Hash
 } from "lucide-react";
 
-export default function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, onOpenPDF, moveCategory }) {
+export default memo(function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, onCreatePlan, onOpenPDF, moveCategory }) {
   if (!equipo) return null;
 
   const [showMoveMenu, setShowMoveMenu] = useState(false);
@@ -162,4 +162,4 @@ export default function EquipoCard({ equipo, onEdit, onDelete, onView, onMove, o
       </div>
     </div>
   );
-}
+})
