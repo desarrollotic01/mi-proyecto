@@ -947,15 +947,61 @@ useEffect(() => {
     };
   };
 
+  const buildDraftPayload = () => {
+    const actividades = [];
+    for (const te of tratamientoExistente?.equipos || []) {
+      for (const act of te.actividades || []) {
+        const targetId = String(te.equipoId || te.ubicacionTecnicaId);
+        let localAct = null;
+        if (te.planMantenimientoId) {
+          const pack = data.preventivoPorEquipo?.[targetId];
+          localAct = (pack?.actividades || []).find(
+            (a) => a.idLocal === act.id || a.planMantenimientoActividadId === act.planMantenimientoActividadId
+          );
+        } else {
+          const manuals = data.actividadesManuales?.[targetId] || [];
+          localAct = manuals.find((a) => a.idLocal === act.id);
+        }
+        if (localAct) {
+          actividades.push({
+            id: act.id,
+            duracionEstimadaValor: Number(localAct.duracionEstimadaValor) || 0,
+            unidadDuracion: localAct.unidadDuracion || "min",
+            cantidadTecnicos: Number(localAct.cantidadTecnicos) || 1,
+            rolTecnico: localAct.rolTecnico || undefined,
+            observaciones: localAct.observaciones || undefined,
+          });
+        }
+      }
+    }
+
+    const solicitudesPorEquipo = {};
+    const allSolCompra = { ...(solicitudesCompra?.solicitudesPorEquipo || {}) };
+    const allSolAlmacen = { ...(solicitudesAlmacen?.solicitudesPorEquipo || {}) };
+    for (const [key, form] of Object.entries({ ...allSolCompra, ...allSolAlmacen })) {
+      if (form) solicitudesPorEquipo[key] = buildSolicitudForBackend(form);
+    }
+
+    return {
+      actividades,
+      solicitudGeneral: solicitudesCompra?.solicitudGeneral
+        ? buildSolicitudForBackend(solicitudesCompra.solicitudGeneral)
+        : undefined,
+      solicitudesPorEquipo,
+    };
+  };
+
   const handleGuardar = async () => {
     setErrorMsg("");
     const msg = validateBeforeSave();
     if (msg) { setErrorMsg(msg); return; }
     setLoading(true);
     try {
-      const payload = buildPayload();
-      if (tratamientoExistente?.id) await saveTratamientoDraft(tratamientoExistente.id, payload);
-      else await createTratamiento(aviso.id, payload);
+      if (tratamientoExistente?.id) {
+        await saveTratamientoDraft(tratamientoExistente.id, buildDraftPayload());
+      } else {
+        await createTratamiento(aviso.id, buildPayload());
+      }
       onSuccess?.();
       onClose?.();
     } catch (err) {
@@ -976,8 +1022,9 @@ useEffect(() => {
     }
     setLoading(true);
     try {
-      await saveTratamientoDraft(tratamientoExistente.id, buildPayload());
-      alert("✅ Cambios guardados como PENDIENTE.");
+      await saveTratamientoDraft(tratamientoExistente.id, buildDraftPayload());
+      onSuccess?.();
+      onClose?.();
     } catch (err) {
       console.log("BACKEND ERROR:", err?.response?.data);
       setErrorMsg(err?.response?.data?.message || err?.message || "Error guardando cambios (pendiente).");

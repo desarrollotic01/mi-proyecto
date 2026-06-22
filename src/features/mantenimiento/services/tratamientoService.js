@@ -12,5 +12,5 @@ export const getTratamientoByAviso = (avisoId) =>
 
 // Guardar cambios de un tratamiento existente
 export const saveTratamientoDraft = (tratamientoId, payload) =>
-  api.post(`tratamiento/${tratamientoId}/guardar`, payload)
+  api.patch(`tratamiento/${tratamientoId}/guardar`, payload)
     .then((r) => r.data);

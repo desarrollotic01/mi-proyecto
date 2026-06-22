@@ -42,7 +42,9 @@ export const obtenerAvisosOrigenGuia = async () => {
 };
 
 export const crearAviso = async (payload) => {
-  const { data } = await api.post("/avisos", payload);
+  const isFormData = payload instanceof FormData;
+  const config = isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {};
+  const { data } = await api.post("/avisos", payload, config);
   return normalizarAviso(data);
 };
 

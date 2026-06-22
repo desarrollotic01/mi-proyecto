@@ -151,6 +151,7 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
     solicitante: "",
     equipos: [],
     documentos: [],
+    documentoFinal: [],
   };
 
   const [formData, setFormData] = useState(initialFormData);

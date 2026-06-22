@@ -329,11 +329,12 @@ const handleGuardarAviso = async () => {
 
     const formDataToSend = new FormData();
 
-    const SKIP_KEYS = ["documentos", "documentoFinal", "equipos", "ubicaciones", "tipoAviso"];
+    const SKIP_KEYS = ["documentos", "documentoFinal", "equipos", "ubicaciones", "tipoAviso", "solicitante", "cliente"];
 
     Object.entries(formData).forEach(([key, value]) => {
       if (SKIP_KEYS.includes(key)) return;
       if (value === null || value === undefined || value === "") return;
+      if (typeof value === "object") return;
       formDataToSend.append(key, value);
     });
 
@@ -355,10 +356,9 @@ const handleGuardarAviso = async () => {
       formData.documentos.forEach((file) => formDataToSend.append("documentos", file));
     }
 
-    // Documento final
-    if (formData.documentoFinal) {
-      formDataToSend.append("documentoFinal", formData.documentoFinal);
-    }
+    // Documentos finales
+    const finales = Array.isArray(formData.documentoFinal) ? formData.documentoFinal : (formData.documentoFinal ? [formData.documentoFinal] : []);
+    finales.forEach((file) => formDataToSend.append("documentoFinal", file));
 
     await crearAviso(formDataToSend);
 
@@ -432,7 +432,7 @@ const handleGuardarAviso = async () => {
             <button
               onClick={() => {
                 setTipoAviso("instalacion");
-                setFormData(p => ({ ...p, tipoMantenimiento: null }));
+                setFormData(p => ({ ...p, tipoMantenimiento: "" }));
               }}
               className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
                 tipoAviso === "instalacion"
@@ -447,7 +447,7 @@ const handleGuardarAviso = async () => {
               onClick={() => {
                 setTipoAviso("venta");
                 setWizardStep(1);
-                setFormData(p => ({ ...p, tipoMantenimiento: null, ubicaciones: [] }));
+                setFormData(p => ({ ...p, tipoMantenimiento: "", ubicaciones: [] }));
               }}
               className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
                 tipoAviso === "venta"
@@ -885,9 +885,10 @@ const handleGuardarAviso = async () => {
                   <AdjuntoUploader
                     mode="local"
                     multiple
-                    maxFiles={10}
+                    maxFiles={15}
                     label="Documentos Adjuntos"
                     placeholder="Arrastra archivos aquí o haz clic para seleccionar"
+                    initialLocalFiles={formData.documentos}
                     onFilesChange={(files) =>
                       setFormData((p) => ({ ...p, documentos: files }))
                     }
@@ -1035,11 +1036,13 @@ const handleGuardarAviso = async () => {
                 <div className="col-span-full">
                   <AdjuntoUploader
                     mode="local"
-                    multiple={false}
+                    multiple
+                    maxFiles={15}
                     label="Documentos de Cierre"
-                    placeholder="Adjunta el documento de cierre del servicio"
+                    placeholder="Adjunta los documentos de cierre del servicio"
+                    initialLocalFiles={formData.documentoFinal ? (Array.isArray(formData.documentoFinal) ? formData.documentoFinal : [formData.documentoFinal]) : []}
                     onFilesChange={(files) =>
-                      setFormData((p) => ({ ...p, documentoFinal: files[0] ?? null }))
+                      setFormData((p) => ({ ...p, documentoFinal: files }))
                     }
                   />
                 </div>

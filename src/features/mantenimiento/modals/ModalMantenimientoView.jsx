@@ -360,7 +360,6 @@ export default function ModalMantenimientoView({
           {/* ======= TAB 4: DOCUMENTOS ======= */}
           {wizardStep === 4 && (
             <>
-              {/* Documentos adjuntos */}
               <SectionBlock title="Documentos adjuntos">
                 <AdjuntosViewer
                   adjuntos={Array.isArray(data.documentos) ? data.documentos : []}
@@ -369,22 +368,23 @@ export default function ModalMantenimientoView({
                 />
               </SectionBlock>
 
-              {/* Documento final */}
-              {data.documentoFinal && (
-                <SectionBlock title="Documento final">
-                  <AdjuntosViewer
-                    adjuntos={[{
-                      nombre: data.documentoFinal.split("/").pop(),
-                      url: data.documentoFinal,
-                      tipo: data.documentoFinal.split(".").pop(),
-                      categoria: "DOCUMENTO FINAL",
-                    }]}
-                    titulo=""
-                  />
-                </SectionBlock>
-              )}
-
-              {!Array.isArray(data.documentos) || (data.documentos.length === 0 && !data.documentoFinal) ? null : null}
+              <SectionBlock title="Documentos de cierre">
+                <AdjuntosViewer
+                  adjuntos={
+                    Array.isArray(data.documentoFinal)
+                      ? data.documentoFinal
+                      : typeof data.documentoFinal === "string" && data.documentoFinal
+                        ? [{
+                            nombre: data.documentoFinal.split("/").pop(),
+                            url: data.documentoFinal,
+                            tipo: data.documentoFinal.split(".").pop(),
+                          }]
+                        : []
+                  }
+                  titulo=""
+                  emptyMessage="No se adjuntaron documentos de cierre."
+                />
+              </SectionBlock>
             </>
           )}
         </div>
