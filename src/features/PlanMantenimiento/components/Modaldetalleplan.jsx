@@ -380,9 +380,9 @@ export default function ModalDetallePlan({ plan, onClose }) {
                                 <Package size={15} className="text-slate-400" />
                                 Items ({items.length})
                               </p>
-                              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                              <div className="overflow-auto max-h-[50vh] rounded-2xl border border-slate-200 bg-white">
                                 <table className="min-w-[700px] w-full text-sm">
-                                  <thead>
+                                  <thead className="sticky top-0 z-10">
                                     <tr className="border-b border-slate-100 bg-slate-50">
                                       <th className="p-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Recurso</th>
                                       <th className="p-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Item</th>

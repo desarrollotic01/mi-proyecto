@@ -386,9 +386,9 @@ function EquiposPageContent() {
         {/* CONTENIDO: KANBAN O TABLA */}
         {viewMode === "lista" ? (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-300">
-            <div className="overflow-x-auto w-full">
+            <div className="overflow-auto max-h-[70vh] w-full">
               <table className="w-full border-collapse text-[11px] min-w-[1200px]">
-                <thead>
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-800 text-white text-[10px] font-bold uppercase tracking-wider">
                     <th className="px-3 py-2.5 border border-slate-700 text-center w-8">#</th>
                     <th className="px-3 py-2.5 border border-slate-700">Código</th>

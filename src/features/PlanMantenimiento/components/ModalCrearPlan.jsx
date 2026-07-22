@@ -52,7 +52,7 @@ const DEFAULT_ACTIVIDAD = () => ({
 
 const DEFAULT_ITEM = () => ({
   uid: uid(),
-  itemId: "", itemCode: "", description: "",
+  itemId: "", itemCode: "", description: "", unidad: "",
   quantity: 1, warehouseCode: "01",
   rubroSapCode: "", paqueteTrabajo: "", observacion: "",
 });
@@ -346,6 +346,7 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
       itemId:      item.id || "",
       itemCode:    item.sapCode || "",
       description: item.nombre || "",
+      unidad:      item.unidadInventario || "",
     };
     const { target } = itemModal;
     if (!target) return;
@@ -467,85 +468,83 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
 
   /* ── Render de una fila de ítem (reutilizado en plan y actividades) ── */
   const renderItemRow = ({ it, onSelectItem, onUpdate, onRemove }) => (
-    <div key={it.uid} className="border border-slate-200 rounded-lg p-4 bg-white">
-      <div className="flex justify-end mb-3">
+    <tr key={it.uid} className="border-b border-slate-100 align-top">
+      <td className="p-2 min-w-[220px]">
+        <ItemSelector
+          itemCode={it.itemCode}
+          description={it.description}
+          onClick={onSelectItem}
+        />
+      </td>
+      <td className="p-2 min-w-[110px]">
+        <Input value={it.itemCode} readOnly className="bg-slate-100" />
+      </td>
+      <td className="p-2 min-w-[180px]">
+        <Input value={it.description}
+          onChange={(e) => onUpdate({ description: e.target.value })} />
+      </td>
+      <td className="p-2 min-w-[90px]">
+        <Input value={it.unidad || ""} readOnly className="bg-slate-100 text-center" />
+      </td>
+      <td className="p-2 min-w-[90px]">
+        <Input type="number" min="1" value={it.quantity}
+          onChange={(e) => onUpdate({ quantity: Number(e.target.value) })} />
+      </td>
+      <td className="p-2 min-w-[100px]">
+        <Input value={it.warehouseCode}
+          onChange={(e) => onUpdate({ warehouseCode: e.target.value })} />
+      </td>
+      <td className="p-2 min-w-[180px]">
+        <SelectField
+          value={it.rubroSapCode != null && it.rubroSapCode !== "" ? String(it.rubroSapCode) : ""}
+          onChange={(e) => onUpdate({ rubroSapCode: e.target.value })}
+        >
+          <option value="">{loadingCatalogos ? "Cargando..." : "Seleccione rubro"}</option>
+          {rubros.map((r) => (
+            <option key={String(r.codigo)} value={String(r.codigo)}>
+              {r.codigo} — {r.descripcion}
+            </option>
+          ))}
+        </SelectField>
+      </td>
+      <td className="p-2 min-w-[180px]">
+        <SelectField value={it.paqueteTrabajo || ""}
+          onChange={(e) => onUpdate({ paqueteTrabajo: e.target.value })}>
+          <option value="">{loadingCatalogos ? "Cargando..." : "Seleccione paquete"}</option>
+          {paquetes.map((p) => (
+            <option key={p.codigo} value={p.codigo}>
+              {p.codigo} — {p.descripcion}
+            </option>
+          ))}
+        </SelectField>
+      </td>
+      <td className="p-2 min-w-[180px]">
+        <Input value={it.observacion}
+          onChange={(e) => onUpdate({ observacion: e.target.value })} />
+      </td>
+      <td className="p-2 text-center">
         <button type="button" onClick={onRemove}
           className="inline-flex items-center gap-1 text-sm text-rose-600 hover:text-rose-700">
-          <Trash2 size={15} /> Eliminar
+          <Trash2 size={15} />
         </button>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+      </td>
+    </tr>
+  );
 
-        {/* Ítem — abre modal */}
-        <div className="md:col-span-2">
-          <Field label="Ítem" required>
-            <ItemSelector
-              itemCode={it.itemCode}
-              description={it.description}
-              onClick={onSelectItem}
-            />
-          </Field>
-        </div>
+  const ITEM_COLUMNS = ["Ítem", "Código SAP", "Descripción", "Unidad", "Cantidad", "Almacén", "Rubro", "Paquete de trabajo", "Observación", ""];
 
-        {/* ItemCode (read-only) */}
-        <Field label="Código SAP">
-          <Input value={it.itemCode} readOnly className="bg-slate-100" />
-        </Field>
-
-        {/* Descripción */}
-        <Field label="Descripción">
-          <Input value={it.description}
-            onChange={(e) => onUpdate({ description: e.target.value })} />
-        </Field>
-
-        {/* Cantidad */}
-        <Field label="Cantidad" required>
-          <Input type="number" min="1" value={it.quantity}
-            onChange={(e) => onUpdate({ quantity: Number(e.target.value) })} />
-        </Field>
-
-        {/* Almacén */}
-        <Field label="Almacén">
-          <Input value={it.warehouseCode}
-            onChange={(e) => onUpdate({ warehouseCode: e.target.value })} />
-        </Field>
-
-        {/* Rubro */}
-        <Field label="Rubro">
-          <SelectField
-            value={it.rubroSapCode != null && it.rubroSapCode !== "" ? String(it.rubroSapCode) : ""}
-            onChange={(e) => onUpdate({ rubroSapCode: e.target.value })}
-          >
-            <option value="">{loadingCatalogos ? "Cargando..." : "Seleccione rubro"}</option>
-            {rubros.map((r) => (
-              <option key={String(r.codigo)} value={String(r.codigo)}>
-                {r.codigo} — {r.descripcion}
-              </option>
+  const renderItemsTable = (rowsRenderer) => (
+    <div className="border border-slate-200 rounded-lg overflow-x-auto">
+      <table className="w-full text-sm min-w-[1300px]">
+        <thead className="sticky top-0 z-10 bg-slate-50">
+          <tr className="border-b border-slate-200">
+            {ITEM_COLUMNS.map((col, i) => (
+              <th key={i} className="p-2 text-left text-xs font-semibold text-slate-600 whitespace-nowrap">{col}</th>
             ))}
-          </SelectField>
-        </Field>
-
-        {/* Paquete de trabajo */}
-        <Field label="Paquete de trabajo">
-          <SelectField value={it.paqueteTrabajo || ""}
-            onChange={(e) => onUpdate({ paqueteTrabajo: e.target.value })}>
-            <option value="">{loadingCatalogos ? "Cargando..." : "Seleccione paquete"}</option>
-            {paquetes.map((p) => (
-              <option key={p.codigo} value={p.codigo}>
-                {p.codigo} — {p.descripcion}
-              </option>
-            ))}
-          </SelectField>
-        </Field>
-
-        {/* Observación */}
-        <div className="md:col-span-2 xl:col-span-4">
-          <Field label="Observación">
-            <Input value={it.observacion}
-              onChange={(e) => onUpdate({ observacion: e.target.value })} />
-          </Field>
-        </div>
-      </div>
+          </tr>
+        </thead>
+        <tbody>{rowsRenderer()}</tbody>
+      </table>
     </div>
   );
 
@@ -695,16 +694,20 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
                 </button>
               }
             >
-              <div className="space-y-3">
-                {itemsPlan.map((it) =>
-                  renderItemRow({
-                    it,
-                    onSelectItem: () => openItemModal({ context: "plan", uidItem: it.uid }),
-                    onUpdate: (patch) => updateItemPlan(it.uid, patch),
-                    onRemove: () => removeItemPlan(it.uid),
-                  })
-                )}
-              </div>
+              {itemsPlan.length === 0 ? (
+                <EmptyState text="Sin recursos agregados" />
+              ) : (
+                renderItemsTable(() =>
+                  itemsPlan.map((it) =>
+                    renderItemRow({
+                      it,
+                      onSelectItem: () => openItemModal({ context: "plan", uidItem: it.uid }),
+                      onUpdate: (patch) => updateItemPlan(it.uid, patch),
+                      onRemove: () => removeItemPlan(it.uid),
+                    })
+                  )
+                )
+              )}
             </Section>
 
             {/* ── ADJUNTOS PLAN ── */}
@@ -867,17 +870,19 @@ export default function ModalCrearPlan({ onClose, onCreated, equipoPreselecciona
                                   <Plus size={15} /> Agregar
                                 </button>
                               </div>
-                              <div className="p-4 space-y-3">
+                              <div className="p-4">
                                 {act.items.length === 0 ? (
                                   <EmptyState text="No hay recursos en esta actividad." />
                                 ) : (
-                                  act.items.map((item) =>
-                                    renderItemRow({
-                                      it: item,
-                                      onSelectItem: () => openItemModal({ context: "actividad", uidActividad: act.uid, uidItem: item.uid }),
-                                      onUpdate: (patch) => updateItemActividad(act.uid, item.uid, patch),
-                                      onRemove: () => removeItemActividad(act.uid, item.uid),
-                                    })
+                                  renderItemsTable(() =>
+                                    act.items.map((item) =>
+                                      renderItemRow({
+                                        it: item,
+                                        onSelectItem: () => openItemModal({ context: "actividad", uidActividad: act.uid, uidItem: item.uid }),
+                                        onUpdate: (patch) => updateItemActividad(act.uid, item.uid, patch),
+                                        onRemove: () => removeItemActividad(act.uid, item.uid),
+                                      })
+                                    )
                                   )
                                 )}
                               </div>

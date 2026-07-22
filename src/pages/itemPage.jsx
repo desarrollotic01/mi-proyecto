@@ -9,6 +9,8 @@ export default function ItemsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterEstado, setFilterEstado] = useState("activo");
+  const [filterRubro, setFilterRubro] = useState("all");
 
   const cargarItems = async () => {
     try {
@@ -26,15 +28,31 @@ export default function ItemsPage() {
 
   useEffect(() => { cargarItems(); }, []);
 
+  const rubros = useMemo(() => {
+    const nombres = new Set(
+      items.map((item) => item.rubro?.nombre || item.rubroNombre).filter(Boolean)
+    );
+    return [...nombres].sort();
+  }, [items]);
+
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (item) =>
+    return items.filter((item) => {
+      const matchesSearch =
+        !q ||
         item.sapCode?.toLowerCase().includes(q) ||
-        item.nombre?.toLowerCase().includes(q)
-    );
-  }, [items, searchTerm]);
+        item.nombre?.toLowerCase().includes(q);
+
+      const matchesEstado =
+        filterEstado === "all" ||
+        (filterEstado === "activo" ? !!item.activoSAP : !item.activoSAP);
+
+      const rubroNombre = item.rubro?.nombre || item.rubroNombre;
+      const matchesRubro = filterRubro === "all" || rubroNombre === filterRubro;
+
+      return matchesSearch && matchesEstado && matchesRubro;
+    });
+  }, [items, searchTerm, filterEstado, filterRubro]);
 
   const { currentPage, setCurrentPage, totalPages, paginatedItems, totalItems, startIndex } =
     usePagination(filtered, 100);
@@ -88,34 +106,56 @@ export default function ItemsPage() {
           </div>
         </div>
 
-        {/* Buscador */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por código SAP o descripción..."
-            className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-[12px] font-medium outline-none focus:border-blue-500 bg-white shadow-sm transition-all text-slate-700 placeholder:text-slate-400"
-          />
+        {/* Buscador + filtros */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por código SAP o descripción..."
+              className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-[12px] font-medium outline-none focus:border-blue-500 bg-white shadow-sm transition-all text-slate-700 placeholder:text-slate-400"
+            />
+          </div>
+          <select
+            value={filterEstado}
+            onChange={(e) => setFilterEstado(e.target.value)}
+            className="px-4 py-3 rounded-xl border border-slate-200 text-[12px] font-bold outline-none focus:border-blue-500 bg-white shadow-sm text-slate-700"
+          >
+            <option value="all">Todos los estados</option>
+            <option value="activo">Activos</option>
+            <option value="inactivo">Inactivos</option>
+          </select>
+          <select
+            value={filterRubro}
+            onChange={(e) => setFilterRubro(e.target.value)}
+            className="px-4 py-3 rounded-xl border border-slate-200 text-[12px] font-bold outline-none focus:border-blue-500 bg-white shadow-sm text-slate-700"
+          >
+            <option value="all">Todos los rubros</option>
+            {rubros.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
         </div>
 
         {/* Tabla */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px] border-collapse min-w-[600px]">
-              <thead>
+          <div className="overflow-auto max-h-[70vh]">
+            <table className="w-full text-[11px] border-collapse min-w-[700px]">
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-slate-800 text-white text-[10px] font-bold uppercase tracking-wider">
                   <th className="px-2 py-2.5 border border-slate-700 text-center w-8">#</th>
                   <th className="px-3 py-2.5 border border-slate-700 whitespace-nowrap">Código SAP</th>
                   <th className="px-3 py-2.5 border border-slate-700 min-w-[300px]">Descripción</th>
                   <th className="px-3 py-2.5 border border-slate-700 text-center whitespace-nowrap">Unidad</th>
                   <th className="px-3 py-2.5 border border-slate-700 text-center whitespace-nowrap">Stock Mínimo</th>
+                  <th className="px-3 py-2.5 border border-slate-700 text-center whitespace-nowrap">Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedItems.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="p-10 text-center text-slate-400 font-bold border border-slate-100">
+                    <td colSpan="6" className="p-10 text-center text-slate-400 font-bold border border-slate-100">
                       {searchTerm ? "Sin resultados para la búsqueda" : "No hay items registrados"}
                     </td>
                   </tr>
@@ -143,6 +183,17 @@ export default function ItemsPage() {
                       </td>
                       <td className="px-3 py-2 border border-slate-200 text-center font-mono font-bold text-slate-700">
                         {fmtStock(item.stockMinimo)}
+                      </td>
+                      <td className="px-3 py-2 border border-slate-200 text-center">
+                        {item.activoSAP ? (
+                          <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200 text-[10px] font-bold uppercase">
+                            Activo
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 text-[10px] font-bold uppercase">
+                            Inactivo
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))

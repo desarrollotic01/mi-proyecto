@@ -13,6 +13,7 @@ import { UbicacionTecnicaService } from "../services/ubicacionService";
 import { getContactosPorCliente } from "../services/ContactoService";
 import { paisService } from "../services/paisService";
 import { getTrabajadores } from "../services/trabajadoresService";
+import { ordenVentaService } from "../services/ordenVentaService";
 import AdjuntoUploader from "../../adjuntos/components/AdjuntoUploader";
 import ModalBusquedaUniversal from "../../../components/inputs/ModalBusquedaUniversal";
 import { cachedGet } from "../../../utils/dataCache";
@@ -62,6 +63,7 @@ const [distritos, setDistritos] = useState([]);
 
 
 const [supervisores, setSupervisores] = useState([]);
+const [ordenesVentaData, setOrdenesVentaData] = useState([]);
 
 useEffect(() => {
   if (user?.nombre) {
@@ -80,12 +82,13 @@ useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [clientesData, equiposResp, ubicacionesResp, paisesResp, supervisoresResp] = await Promise.all([
+        const [clientesData, equiposResp, ubicacionesResp, paisesResp, supervisoresResp, ordenesVentaResp] = await Promise.all([
           cachedGet("clientes",       () => clienteService.getClientes()),
           cachedGet("equipos",        () => equipoService.getEquipos()),
           cachedGet("ubicaciones",    () => UbicacionTecnicaService.getUbicacionTecnicas()),
           cachedGet("paises",         () => paisService.getPaises()),
           cachedGet("supervisores",   () => getTrabajadores("supervisor")),
+          cachedGet("ordenesVenta",   () => ordenVentaService.getAll()),
         ]);
 
         setPaises(paisesResp);
@@ -93,6 +96,7 @@ useEffect(() => {
         setEquiposData(equiposResp);
         setUbicacionesData(ubicacionesResp);
         setSupervisores(supervisoresResp);
+        setOrdenesVentaData(ordenesVentaResp);
       } catch (error) {
         console.error("Error cargando datos:", error);
         alert("Error al cargar los datos iniciales");
@@ -182,8 +186,8 @@ const handleProvincia = (e) => {
   return;
 }
 
-    if (name === "ordenVenta") {
-      setFormData((p) => ({ ...p, ordenVenta: value }));
+    if (name === "centroCosto") {
+      setFormData((p) => ({ ...p, centroCosto: value, ordenVenta: value ? "" : p.ordenVenta }));
       return;
     }
 
@@ -248,6 +252,19 @@ const handleSelectUbicacion = (ubicacion) => {
 };
 
 
+const handleSelectOrdenVenta = (orden) => {
+  setFormData((p) => ({
+    ...p,
+    ordenVenta: orden.docNum,
+    centroCosto: "",
+  }));
+  setLookupOpen(null);
+};
+
+const handleClearOrdenVenta = () => {
+  setFormData((p) => ({ ...p, ordenVenta: "" }));
+};
+
 const removeUbicacion = (ubicacionId) => {
   setFormData((p) => ({
     ...p,
@@ -275,8 +292,12 @@ const getUbicacionData = (ubicacionId) => {
 const validarCampos = () => {
   const errors = [];
 
-  if (!formData.ordenVenta && !formData.centroCosto) {
-    errors.push("Orden de Venta o Centro de Costo es obligatorio (Paso 1)");
+  if (Boolean(formData.ordenVenta) === Boolean(formData.centroCosto)) {
+    errors.push(
+      formData.ordenVenta
+        ? "No puede ingresar Orden de Venta y Centro de Costo a la vez (Paso 1)"
+        : "Orden de Venta o Centro de Costo es obligatorio (Paso 1)"
+    );
   }
   if (tipoAviso === "mantenimiento" && !formData.tipoMantenimiento) {
     errors.push("Tipo de Mantenimiento es obligatorio (Paso 1)");
@@ -517,14 +538,34 @@ const handleGuardarAviso = async () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Orden de Venta <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    name="ordenVenta"
-                    value={formData.ordenVenta || ""}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                    placeholder="Ej: OV-2024-001"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formData.ordenVenta || ""}
+                      disabled
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-700 outline-none"
+                      placeholder="Buscar orden de venta en SAP..."
+                    />
+                    {formData.ordenVenta ? (
+                      <button
+                        type="button"
+                        onClick={handleClearOrdenVenta}
+                        className="px-3 py-2.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 text-gray-500"
+                        title="Quitar orden de venta"
+                      >
+                        ✕
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setLookupOpen("ordenVenta")}
+                        disabled={!!formData.centroCosto}
+                        className="px-4 py-2.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 text-gray-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        Buscar
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -536,8 +577,9 @@ const handleGuardarAviso = async () => {
                     name="centroCosto"
                     value={formData.centroCosto || ""}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                    placeholder="Ej: CC-001"
+                    disabled={!!formData.ordenVenta}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none disabled:bg-gray-50 disabled:text-gray-400"
+                    placeholder={formData.ordenVenta ? "No disponible (ya hay Orden de Venta)" : "Ej: CC-001"}
                   />
                 </div>
 
@@ -1104,6 +1146,24 @@ const handleGuardarAviso = async () => {
           </div>
         </div>
       </div>
+
+      {/* Búsqueda de Orden de Venta (SAP) */}
+      <ModalBusquedaUniversal
+        isOpen={lookupOpen === "ordenVenta"}
+        onClose={() => setLookupOpen(null)}
+        title="Seleccionar Orden de Venta"
+        icon={<ShoppingCart />}
+        colorAccent="orange"
+        data={ordenesVentaData}
+        loading={loading}
+        columns={[
+          { key: "docNum", label: "N° Orden", mono: true },
+          { key: "cardName", label: "Cliente", flex: true },
+        ]}
+        searchKeys={["docNum", "cardName", "cardCode"]}
+        subtitle={(o) => o.docDate || null}
+        onSelect={handleSelectOrdenVenta}
+      />
 
       {/* Búsqueda de Equipos */}
       <ModalBusquedaUniversal

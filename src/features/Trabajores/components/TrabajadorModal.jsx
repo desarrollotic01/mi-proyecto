@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import './TrabajadorModal.css';
 
+const PUESTOS_TRABAJO = [
+  { value: 'operario_de_mantenimiento', label: 'Operario de Mantenimiento' },
+  { value: 'tecnico_electrico', label: 'Técnico de Mantenimiento Eléctrico' },
+  { value: 'tecnico_mecanico', label: 'Técnico de Mantenimiento Mecánico' },
+  { value: 'tecnico_mantenimiento', label: 'Técnico de Mantenimiento' },
+  { value: 'supervisor_senior_mantenimiento', label: 'Supervisor Senior de Mantenimiento' },
+  { value: 'supervisor', label: 'Supervisor de Mantenimiento' },
+  { value: 'programador_de_mantenimiento', label: 'Programador de Mantenimiento' },
+  { value: 'coordinador_de_mantenimiento', label: 'Coordinador de Mantenimiento' },
+];
+
 const TrabajadorModal = ({ isOpen, mode, trabajador, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     nombre: '',
@@ -151,7 +162,7 @@ const TrabajadorModal = ({ isOpen, mode, trabajador, onClose, onSave }) => {
 
             <div className="form-group">
               <label htmlFor="dni" className="form-label">DNI <span className="required">*</span></label>
-              <input type="text" id="dni" name="dni" value={formData.dni} onChange={handleChange} className={`form-input ${errors.dni ? 'input-error' : ''}`} placeholder="Ingrese 8 dígitos" maxLength="8" />
+              <input type="text" id="dni" name="dni" value={formData.dni} onChange={handleChange} className={`form-input ${errors.dni ? 'input-error' : ''}`} placeholder="Ingrese 8 dígitos" maxLength="8" autoComplete="off" />
               {errors.dni && <span className="error-message">{errors.dni}</span>}
             </div>
 
@@ -161,15 +172,14 @@ const TrabajadorModal = ({ isOpen, mode, trabajador, onClose, onSave }) => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="rol" className="form-label">Rol <span className="required">*</span></label>
+              <label htmlFor="rol" className="form-label">Puesto de Trabajo <span className="required">*</span></label>
               <select id="rol" name="rol" value={formData.rol} onChange={handleChange} className="form-input">
-                <option value="tecnico_electrico">Técnico Eléctrico</option>
-                <option value="tecnico_mecanico">Técnico Mecánico</option>
-                <option value="operario_de_mantenimiento">Operario de Mantenimiento</option>
-                <option value="supervisor">Supervisor</option>
-                <option value="analista_de_mantenimiento">Analista de Mantenimiento</option>
-                <option value="programador_de_mantenimiento">Programador de Mantenimiento</option>
-                <option value="coordinador_de_mantenimiento">Coordinador de Mantenimiento</option>
+                {PUESTOS_TRABAJO.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+                {formData.rol && !PUESTOS_TRABAJO.some((p) => p.value === formData.rol) && (
+                  <option value={formData.rol}>{formData.rol}</option>
+                )}
               </select>
             </div>
 
@@ -185,12 +195,26 @@ const TrabajadorModal = ({ isOpen, mode, trabajador, onClose, onSave }) => {
                 <option value="Norte">Norte</option>
                 <option value="Sur">Sur</option>
                 <option value="Centro">Centro</option>
+                <option value="Provincia">Provincia</option>
               </select>
             </div>
 
             <div className="form-group form-group-full">
               <label htmlFor="direccion" className="form-label">Dirección</label>
-              <input type="text" id="direccion" name="direccion" value={formData.direccion} onChange={handleChange} className="form-input" placeholder="Dirección completa" />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="text" id="direccion" name="direccion" value={formData.direccion} onChange={handleChange} className="form-input" placeholder="Dirección completa" />
+                {formData.direccion?.trim() && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.direccion)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-secondary"
+                    style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}
+                  >
+                    Ver en mapa
+                  </a>
+                )}
+              </div>
             </div>
 
             <div className="form-group form-group-full">
