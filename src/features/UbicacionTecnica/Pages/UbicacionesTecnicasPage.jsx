@@ -186,9 +186,9 @@ export default function UbicacionesTecnicasPage() {
 
         {/* TABLA EXCEL-STYLE */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm w-full overflow-hidden">
-          <div className="overflow-x-auto w-full">
+          <div className="overflow-auto max-h-[70vh] w-full">
             <table className="w-full text-[11px] border-collapse min-w-[900px]">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-slate-800 text-white text-[10px] font-bold uppercase tracking-wider">
                   <th className="px-2 py-2.5 border border-slate-700 text-center w-8">#</th>
                   <th className="px-3 py-2.5 border border-slate-700">Código</th>

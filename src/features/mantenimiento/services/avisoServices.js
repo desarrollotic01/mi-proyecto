@@ -54,3 +54,8 @@ export const actualizarEstadoAviso = async (id, estadoAviso) => {
   });
   return normalizarAviso(data);
 };
+
+export const eliminarAviso = async (id) => {
+  const { data } = await api.delete(`/avisos/${id}`);
+  return data;
+};

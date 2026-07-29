@@ -7,6 +7,7 @@ import {
   actualizarEstadoAviso,
   obtenerAvisosOrigenManual,
   obtenerAvisosOrigenGuia,
+  eliminarAviso,
 } from "../services/avisoServices";
 import { getAllOrdenesTrabajo } from "../services/ordenTrabajoService";
 
@@ -345,6 +346,16 @@ const [ordenesTrabajoCompletas, setOrdenesTrabajoCompletas] = useState([]);
     await cargarAvisos();
   };
 
+  const eliminarAvisoKanban = async (aviso) => {
+    const confirmado = window.confirm(
+      `¿Eliminar el aviso ${aviso.numeroAviso || ""}? Podrás recuperarlo solo desde soporte.`
+    );
+    if (!confirmado) return;
+
+    await eliminarAviso(aviso.id);
+    await cargarAvisos();
+  };
+
   /* ================= CONFIG ACTIONS ================= */
   const guardarConfigVista = async () => {
     await saveViewConfig(activeTab, {
@@ -516,6 +527,7 @@ const iniciarOTs = (equipos) => {
 
     handleSaveAll,
     cambiarEstado,
+    eliminarAvisoKanban,
 
     getEstadoBadge,
 

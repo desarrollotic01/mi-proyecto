@@ -255,7 +255,7 @@ const handleSelectUbicacion = (ubicacion) => {
 const handleSelectOrdenVenta = (orden) => {
   setFormData((p) => ({
     ...p,
-    ordenVenta: orden.docNum,
+    ordenVenta: orden.codigoProyecto,
     centroCosto: "",
   }));
   setLookupOpen(null);
@@ -263,6 +263,24 @@ const handleSelectOrdenVenta = (orden) => {
 
 const handleClearOrdenVenta = () => {
   setFormData((p) => ({ ...p, ordenVenta: "" }));
+};
+
+const handleSelectCliente = async (cliente) => {
+  setFormData((p) => ({
+    ...p,
+    clienteId: cliente.id,
+    nombreContacto: "",
+    correoContacto: "",
+    numeroContacto: "",
+  }));
+  setLookupOpen(null);
+
+  try {
+    const contactosData = await getContactosPorCliente(cliente.id);
+    setContactos(contactosData);
+  } catch {
+    setContactos([]);
+  }
 };
 
 const removeUbicacion = (ubicacionId) => {
@@ -946,19 +964,43 @@ const handleGuardarAviso = async () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Cliente <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    name="clienteId"
-                    value={formData.clienteId || ""}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  >
-                    <option value="">Seleccionar cliente</option>
-                    {clientes.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.razonSocial}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={
+                        clientes.find((c) => c.id === formData.clienteId)?.razonSocial || ""
+                      }
+                      disabled
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-700 outline-none"
+                      placeholder="Buscar cliente..."
+                    />
+                    {formData.clienteId ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((p) => ({
+                            ...p,
+                            clienteId: "",
+                            nombreContacto: "",
+                            correoContacto: "",
+                            numeroContacto: "",
+                          }))
+                        }
+                        className="px-3 py-2.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 text-gray-500"
+                        title="Quitar cliente"
+                      >
+                        ✕
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setLookupOpen("cliente")}
+                        className="px-4 py-2.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 text-gray-700 font-semibold whitespace-nowrap"
+                      >
+                        Buscar
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -1147,6 +1189,23 @@ const handleGuardarAviso = async () => {
         </div>
       </div>
 
+      {/* Búsqueda de Cliente */}
+      <ModalBusquedaUniversal
+        isOpen={lookupOpen === "cliente"}
+        onClose={() => setLookupOpen(null)}
+        title="Seleccionar Cliente"
+        icon={<Users />}
+        colorAccent="blue"
+        data={clientes}
+        loading={loading}
+        columns={[
+          { key: "razonSocial", label: "Razón Social", flex: true },
+          { key: "ruc", label: "RUC", mono: true },
+        ]}
+        searchKeys={["razonSocial", "ruc", "sapCode"]}
+        onSelect={handleSelectCliente}
+      />
+
       {/* Búsqueda de Orden de Venta (SAP) */}
       <ModalBusquedaUniversal
         isOpen={lookupOpen === "ordenVenta"}
@@ -1157,11 +1216,10 @@ const handleGuardarAviso = async () => {
         data={ordenesVentaData}
         loading={loading}
         columns={[
-          { key: "docNum", label: "N° Orden", mono: true },
-          { key: "cardName", label: "Cliente", flex: true },
+          { key: "codigoProyecto", label: "Código de Proyecto", mono: true },
+          { key: "nombreProyecto", label: "Nombre", flex: true },
         ]}
-        searchKeys={["docNum", "cardName", "cardCode"]}
-        subtitle={(o) => o.docDate || null}
+        searchKeys={["codigoProyecto", "nombreProyecto"]}
         onSelect={handleSelectOrdenVenta}
       />
 

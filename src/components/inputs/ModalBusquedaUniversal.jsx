@@ -186,7 +186,7 @@ export default function ModalBusquedaUniversal({
         </div>
 
         {/* ── BODY ── */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-auto">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
               <Loader2 className="w-8 h-8 animate-spin" />

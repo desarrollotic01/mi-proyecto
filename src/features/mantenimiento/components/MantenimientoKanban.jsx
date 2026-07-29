@@ -3,6 +3,7 @@ import {
   FileText, User, Calendar, Wrench, Package,
   CheckCircle, XCircle, Clock, FileCheck, Layers, MapPin,
   AlertTriangle, ChevronRight, Mail, Phone, Building, Box, Hash, DollarSign,
+  Trash2,
 } from "lucide-react";
 import { ESTADOS_AV } from "../config/camposMantenimiento";
 
@@ -54,6 +55,7 @@ export default function MantenimientoKanban({
   cambiarEstado,
   abrirTratamiento,
   onDragEnd,
+  onEliminar,
   equiposData = [],
   ordenesTrabajoData = [],
 }) {
@@ -305,6 +307,15 @@ export default function MantenimientoKanban({
                                 {estadoReal === "FINALIZADO" && (
                                   <button onClick={() => cambiarEstado(item, "FACTURADO")} className="flex-1 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-200 text-[10px] font-bold rounded-lg hover:bg-indigo-600 hover:text-white transition-colors">
                                     Facturar
+                                  </button>
+                                )}
+                                {onEliminar && (
+                                  <button
+                                    onClick={() => onEliminar(item)}
+                                    title="Eliminar aviso"
+                                    className="px-2 py-1.5 bg-slate-50 text-slate-400 border border-slate-200 rounded-lg hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors"
+                                  >
+                                    <Trash2 size={12} />
                                   </button>
                                 )}
                               </div>

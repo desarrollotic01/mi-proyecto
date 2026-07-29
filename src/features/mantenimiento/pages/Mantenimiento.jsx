@@ -166,6 +166,7 @@ export default function Mantenimiento() {
               cambiarEstado={m.cambiarEstado}
               abrirTratamiento={m.abrirTratamiento}
               onDragEnd={m.onDragEnd}
+              onEliminar={m.eliminarAvisoKanban}
               equiposData={equiposData}
               ordenesTrabajoData={m.ordenesTrabajoCompletas}
             />

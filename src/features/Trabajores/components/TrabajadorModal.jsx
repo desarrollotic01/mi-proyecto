@@ -201,20 +201,7 @@ const TrabajadorModal = ({ isOpen, mode, trabajador, onClose, onSave }) => {
 
             <div className="form-group form-group-full">
               <label htmlFor="direccion" className="form-label">Dirección</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input type="text" id="direccion" name="direccion" value={formData.direccion} onChange={handleChange} className="form-input" placeholder="Dirección completa" />
-                {formData.direccion?.trim() && (
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.direccion)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-secondary"
-                    style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}
-                  >
-                    Ver en mapa
-                  </a>
-                )}
-              </div>
+              <input type="text" id="direccion" name="direccion" value={formData.direccion} onChange={handleChange} className="form-input" placeholder="Dirección completa" />
             </div>
 
             <div className="form-group form-group-full">
