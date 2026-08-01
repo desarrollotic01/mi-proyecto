@@ -38,6 +38,7 @@ import {
 } from "./helpers/solicitudAlmacenAdapter";
 
 import ModalSolicitudCompra from "../../components/inputs/ModalSolicitudCompra";
+import ModalCamposFaltantes from "../../components/inputs/ModalCamposFaltantes";
 
 /* =========================================================
    HELPERS
@@ -330,6 +331,8 @@ export default function ModalOTGrupal({
   const [numeroOTGenerado, setNumeroOTGenerado] = useState("");
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   const [mostrarInfoAviso, setMostrarInfoAviso] = useState(false);
+  const [mostrarCamposFaltantes, setMostrarCamposFaltantes] = useState(false);
+  const [camposFaltantesLista, setCamposFaltantesLista] = useState([]);
 
   const [archivosAdjuntos, setArchivosAdjuntos] = useState([]);
   const [subiendoArchivos, setSubiendoArchivos] = useState(false);
@@ -1102,7 +1105,11 @@ const [solicitudesAlmacenOT, setSolicitudesAlmacenOT] = useState(null);
   const handleSubmitInternal = () => {
     const newErrors = validateOTForm({ formData, equipos, esPreventivo, esCorrectivo, esVenta, esInstalacion });
     setErrors(newErrors);
-    if (Object.keys(newErrors).length > 0) return;
+    if (Object.keys(newErrors).length > 0) {
+      setCamposFaltantesLista(Object.values(newErrors));
+      setMostrarCamposFaltantes(true);
+      return;
+    }
     setMostrarConfirmacion(true);
   };
 
@@ -1492,6 +1499,13 @@ const confirmarGuardado = () => {
         aviso={aviso}
       />
 
+      <ModalCamposFaltantes
+        isOpen={mostrarCamposFaltantes}
+        onClose={() => setMostrarCamposFaltantes(false)}
+        titulo="Faltan completar estos campos"
+        items={camposFaltantesLista}
+      />
+
       <ModalDetallesEquipo
         equipoId={equipoDetalleModal}
         isOpen={!!equipoDetalleModal}
@@ -1507,6 +1521,8 @@ const confirmarGuardado = () => {
         ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
         equiposInfo={equiposInfo}
         initialValue={solicitudesCompraOT || initialSolicitudesCompra}
+        ordenVenta={aviso?.ordenVenta || ""}
+        centroCosto={aviso?.centroCosto || ""}
       />
 
       <ModalSolicitudAlmacen
@@ -1518,7 +1534,9 @@ const confirmarGuardado = () => {
         ubicacionesRelacion={aviso?.ubicacionesRelacion || []}
         equiposInfo={equiposInfo}
         initialValue={solicitudesAlmacenOT || initialSolicitudesAlmacen}
-        mostrarDestinatario={true}  
+        mostrarDestinatario={true}
+        ordenVenta={aviso?.ordenVenta || ""}
+        centroCosto={aviso?.centroCosto || ""}
       />
 
       {/* Modal de texto (observación / descripción de actividad) */}

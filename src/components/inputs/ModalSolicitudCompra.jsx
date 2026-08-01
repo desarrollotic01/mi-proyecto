@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { itemService } from "../../features/PlanMantenimiento/services/itemService";
 import { sapCatalogosService } from "../../features/PlanMantenimiento/services/sapCatalogosService";
+import ModalCamposFaltantes from "./ModalCamposFaltantes";
 
 /* ══════════════════════════════════════════
    HELPERS
@@ -50,13 +51,16 @@ const normalizeLinea = (l = {}, defaultProjectCode = "") => ({
   paqueteTrabajoId: l.paqueteTrabajoId || null,
 });
 
-const normalizeForm = (form) => {
+const normalizeForm = (form, defaultProjectCode = "") => {
   const f = form || emptyForm();
   const lineas = Array.isArray(f.lineas) ? f.lineas : [];
   return {
     ...emptyForm(),
     requiredDate: f.requiredDate ? String(f.requiredDate).slice(0, 10) : "",
-    lineas: lineas.length > 0 ? lineas.map(normalizeLinea) : [emptyLinea()],
+    lineas:
+      lineas.length > 0
+        ? lineas.map((l) => normalizeLinea(l, defaultProjectCode))
+        : [emptyLinea(defaultProjectCode)],
   };
 };
 
@@ -68,6 +72,27 @@ const isSolicitudVacia = (s) => {
       (l.itemCode?.trim() || l.description?.trim()) && Number(l.quantity) > 0
     );
   return !(hasDate || hasLineas);
+};
+
+// Devuelve los mensajes de campos faltantes/inválidos de una solicitud no vacía
+const validarCamposSolicitud = (form, nombre) => {
+  const mensajes = [];
+
+  if (!form.requiredDate) {
+    mensajes.push(`${nombre}: falta la fecha requerida`);
+  }
+
+  (form.lineas || []).forEach((l, idx) => {
+    const lineaVacia = !(l.itemCode?.trim() || l.description?.trim()) || !(Number(l.quantity) > 0);
+    if (lineaVacia) return;
+
+    const n = idx + 1;
+    if (!l.itemCode?.trim()) mensajes.push(`${nombre}: falta el ítem en la línea ${n}`);
+    if (!(Number(l.quantity) > 0)) mensajes.push(`${nombre}: cantidad inválida en la línea ${n}`);
+    if (!l.warehouseCode?.trim()) mensajes.push(`${nombre}: falta el almacén en la línea ${n}`);
+  });
+
+  return mensajes;
 };
 
 // Convierte el form local al payload que espera el backend
@@ -288,6 +313,8 @@ export default function ModalSolicitudCompra({
   const [rubros, setRubros] = useState([]);
   const [paquetes, setPaquetes] = useState([]);
   const [loadingCatalogos, setLoadingCatalogos] = useState(false);
+  const [mostrarCamposFaltantes, setMostrarCamposFaltantes] = useState(false);
+  const [camposFaltantesLista, setCamposFaltantesLista] = useState([]);
 
   const normalizedTargets = useMemo(() => {
     const source = Array.isArray(contextoOt?.targets) && contextoOt.targets.length > 0
@@ -426,6 +453,23 @@ export default function ModalSolicitudCompra({
   );
 
   const handleConfirm = () => {
+  const mensajes = [];
+  if (!isSolicitudVacia(general)) {
+    mensajes.push(...validarCamposSolicitud(general, "General"));
+  }
+  normalizedTargets.forEach((target) => {
+    const f = porTarget[String(target.id)];
+    if (!isSolicitudVacia(f)) {
+      mensajes.push(...validarCamposSolicitud(f, target.nombre || target.id));
+    }
+  });
+
+  if (mensajes.length > 0) {
+    setCamposFaltantesLista(mensajes);
+    setMostrarCamposFaltantes(true);
+    return;
+  }
+
   const solicitudesPorEquipo = {};
   normalizedTargets.forEach((target) => {
     const key = String(target.id);
@@ -452,6 +496,7 @@ export default function ModalSolicitudCompra({
   if (!isOpen) return null;
 
   return (
+    <>
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
       <div className="bg-white w-full max-w-6xl rounded-2xl flex flex-col max-h-[92vh] shadow-2xl">
 
@@ -535,7 +580,7 @@ export default function ModalSolicitudCompra({
               </div>
               {tab !== "general" && (
                 <button type="button"
-                  onClick={() => setPorTarget((p) => ({ ...p, [String(tab)]: normalizeForm(emptyForm()) }))}
+                  onClick={() => setPorTarget((p) => ({ ...p, [String(tab)]: normalizeForm(emptyForm(), ordenVenta) }))}
                   className="text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-lg hover:bg-white/60 transition">
                   Limpiar
                 </button>
@@ -573,5 +618,13 @@ export default function ModalSolicitudCompra({
         </div>
       </div>
     </div>
+
+    <ModalCamposFaltantes
+      isOpen={mostrarCamposFaltantes}
+      onClose={() => setMostrarCamposFaltantes(false)}
+      titulo="Faltan completar estos campos"
+      items={camposFaltantesLista}
+    />
+    </>
   );
 }

@@ -55,13 +55,6 @@ export default function ModalMantenimiento({
   const tieneEquipos = (formData.equipos || []).length > 0;
 const tieneUbicacion = (formData.ubicaciones||[]).length > 0;
 
-  const esPeru = paises.find(p => p.id === formData.paisId)?.nombre === "PERÚ";
-
-  const [departamentos, setDepartamentos] = useState([]);
-const [provincias, setProvincias] = useState([]);
-const [distritos, setDistritos] = useState([]);
-
-
 const [supervisores, setSupervisores] = useState([]);
 const [ordenesVentaData, setOrdenesVentaData] = useState([]);
 
@@ -125,31 +118,6 @@ useEffect(() => {
     );
   };
 
-  const handleDepartamento = (e) => {
-  const dep = e.target.value;
-  setFormData(prev => ({
-    ...prev,
-    departamento: dep,
-    provincia: "",
-    distrito: "",
-  }));
-
-  // cargar provincias
-  const provs = getProvincias(dep); 
-  setProvincias(provs);
-};
-
-const handleProvincia = (e) => {
-  const prov = e.target.value;
-  setFormData(prev => ({
-    ...prev,
-    provincia: prov,
-    distrito: "",
-  }));
-
-  const dists = getDistritos(prov);
-  setDistritos(dists);
-};
 
   useEffect(() => {
     const direccionesValidas = direccionesDesdeEquipos();
@@ -757,68 +725,16 @@ const handleGuardarAviso = async () => {
     Dirección de Atención
   </label>
 
-  {/* 🇵🇪 PERÚ */}
-  {esPeru ? (
-    <div className="grid grid-cols-3 gap-3">
-      
-      {/* Departamento */}
-      <select
-        value={formData.departamento || ""}
-        onChange={handleDepartamento}
-        className="px-3 py-2 border rounded-xl"
-      >
-        <option value="">Departamento</option>
-        {departamentos.map((d) => (
-          <option key={d} value={d}>{d}</option>
-        ))}
-      </select>
+  <input
+    type="text"
+    name="direccionAtencion"
+    placeholder="Ingrese dirección"
+    value={formData.direccionAtencion || ""}
+    onChange={handleInputChange}
+    className="w-full px-4 py-2.5 border rounded-xl"
+  />
 
-      {/* Provincia */}
-      <select
-        value={formData.provincia || ""}
-        onChange={handleProvincia}
-        className="px-3 py-2 border rounded-xl"
-        disabled={!formData.departamento}
-      >
-        <option value="">Provincia</option>
-        {provincias.map((p) => (
-          <option key={p} value={p}>{p}</option>
-        ))}
-      </select>
-
-      {/* Distrito */}
-      <select
-        value={formData.distrito || ""}
-        onChange={(e) =>
-          setFormData(prev => ({ ...prev, distrito: e.target.value }))
-        }
-        className="px-3 py-2 border rounded-xl"
-        disabled={!formData.provincia}
-      >
-        <option value="">Distrito</option>
-        {distritos.map((d) => (
-          <option key={d} value={d}>{d}</option>
-        ))}
-      </select>
-
-    </div>
-  ) : (
-    /* 🌎 OTROS PAÍSES */
-    <input
-      type="text"
-      name="direccionAtencion"
-      placeholder="Ingrese dirección"
-      value={formData.direccionAtencion || ""}
-      onChange={handleInputChange}
-      className="w-full px-4 py-2.5 border rounded-xl"
-    />
-  )}
-
-  <p className="text-xs text-gray-500 mt-1">
-    {esPeru
-      ? "Seleccione ubicación por niveles"
-      : "Ingrese dirección manual"}
-  </p>
+  <p className="text-xs text-gray-500 mt-1">Ingrese dirección manual</p>
 </div>
 
                 {/* Prioridad */}
@@ -1235,8 +1151,10 @@ const handleGuardarAviso = async () => {
         columns={[
           { key: "codigo", label: "Código", mono: true },
           { key: "nombre", label: "Nombre", flex: true },
+          { key: "marca", label: "Marca" },
+          { key: "modelo", label: "Modelo" },
         ]}
-        searchKeys={["codigo", "nombre"]}
+        searchKeys={["codigo", "nombre", "marca", "modelo"]}
         subtitle={(eq) => eq.ubicacionTecnica || null}
         multiSelect
         selectedIds={formData.equipos || []}

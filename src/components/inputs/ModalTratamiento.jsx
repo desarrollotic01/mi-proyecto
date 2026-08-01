@@ -1122,6 +1122,11 @@ useEffect(() => {
                             {t.type === TARGET_TYPES.EQUIPO ? "Equipo" : "Ubicación técnica"} · {t.tag}
                           </p>
                           {t.ubicacion && <p className="text-xs text-slate-500">📍 {t.ubicacion}</p>}
+                          {t.type === TARGET_TYPES.EQUIPO && (t.raw?.marca || t.raw?.modelo) && (
+                            <p className="text-xs text-slate-500 truncate">
+                              {[t.raw?.marca, t.raw?.modelo].filter(Boolean).join(" · ")}
+                            </p>
+                          )}
                         </div>
                       </div>
                     ))}

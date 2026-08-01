@@ -1,16 +1,14 @@
 import { useState, useEffect } from "react";
-import { Settings, Plus, Search, Filter, Wrench } from "lucide-react";
+import { Settings, Search, Filter, Wrench } from "lucide-react";
 import KanbanView from "../features/OrdenTrabajo/components/OrdenTrabajoKanban";
 import ListaView, { OT_DEFAULT_FIELDS, OT_DEFAULT_ORDER } from "../features/OrdenTrabajo/components/OrdenTrabajoLista";
 import CalendarioView from "../features/OrdenTrabajo/components/OrdenTrabajoCalendario";
-import ModalOrdenTrabajo from "../components/inputs/ModalOrdenTrabajo";
 import ModalOrdenTrabajoView from "../features/OrdenTrabajo/modals/ModalOrdenTrabajoView";
 import CrearNotificacionModal from "../features/OrdenTrabajo/modals/ModalNotificacion";
 import ModalConfiguracionCampos from "../components/ModalConfiguracionCampos";
 import {
   getAllOrdenesTrabajo,
   updateEstadoOrdenTrabajo,
-  crearOrdenTrabajo,
   verificarLiberacionOT,
   liberarOrdenTrabajoService,
   cerrarOrdenTrabajoService,
@@ -53,7 +51,7 @@ const mapEstadoToKanban = (estado) => {
 
 /* ================= HEADER COMPONENT ================= */
 
-function OrdenTrabajoEstado({ activeTab, setActiveTab, setModalOpen, setConfigOpen, filters, setFilters }) {
+function OrdenTrabajoEstado({ activeTab, setActiveTab, setConfigOpen, filters, setFilters }) {
   const hasActiveFilters = filters.search || filters.estado || filters.tipo;
   const showConfig = activeTab === "kanban" || activeTab === "lista";
 
@@ -96,13 +94,6 @@ function OrdenTrabajoEstado({ activeTab, setActiveTab, setModalOpen, setConfigOp
               <span className="hidden sm:inline">Configurar</span>
             </button>
           )}
-          <button
-            className="px-3 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold hover:from-blue-700 hover:to-blue-800 transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 text-sm whitespace-nowrap"
-            onClick={() => setModalOpen(true)}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nueva OT</span>
-          </button>
         </div>
       </div>
 
@@ -184,11 +175,8 @@ export default function OrdenTrabajo() {
   const [columnOrder, setColumnOrder] = useState(OT_DEFAULT_ORDER);
 
   /* ── Modals ── */
-  const [modalOpen, setModalOpen] = useState(false);
-  const [wizardStep, setWizardStep] = useState(1);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewData, setViewData] = useState(null);
-  const [formData, setFormData] = useState({});
 
   const [modalNotificacion, setModalNotificacion] = useState({ isOpen: false, ordenTrabajo: null });
   const [listaTecnicos, setListaTecnicos] = useState([]);
@@ -256,18 +244,6 @@ export default function OrdenTrabajo() {
     }, {});
 
   /* ── Handlers ── */
-  const handleSaveAll = async () => {
-    try {
-      await crearOrdenTrabajo(formData);
-      await loadOrdenesTrabajo();
-      setModalOpen(false);
-      setFormData({});
-      setWizardStep(1);
-    } catch (error) {
-      console.error("Error creando orden de trabajo:", error);
-    }
-  };
-
   const handleUpdateEstado = async (ordenId, nuevoEstado) => {
     try {
       setOrdenesData((prev) =>
@@ -378,7 +354,6 @@ export default function OrdenTrabajo() {
         <OrdenTrabajoEstado
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          setModalOpen={setModalOpen}
           setConfigOpen={setConfigOpen}
           filters={filters}
           setFilters={setFilters}
@@ -435,16 +410,6 @@ export default function OrdenTrabajo() {
       </div>
 
       {/* MODALS */}
-      <ModalOrdenTrabajo
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        wizardStep={wizardStep}
-        setWizardStep={setWizardStep}
-        formData={formData}
-        handleInputChange={(e) => setFormData({ ...formData, [e.target.name]: e.target.value })}
-        handleSaveAll={handleSaveAll}
-      />
-
       <ModalOrdenTrabajoView
         isOpen={viewOpen}
         orden={viewData}

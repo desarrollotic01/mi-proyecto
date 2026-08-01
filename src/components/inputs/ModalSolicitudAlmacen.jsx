@@ -13,6 +13,7 @@ import {
 
 import { itemService } from "../../features/PlanMantenimiento/services/itemService";
 import { sapCatalogosService } from "../../features/PlanMantenimiento/services/sapCatalogosService";
+import ModalCamposFaltantes from "./ModalCamposFaltantes";
 
 /* ══════════════════════════════════════════
    HELPERS
@@ -60,13 +61,16 @@ const normalizeLinea = (l = {}, defaultProjectCode = "") => ({
   paqueteTrabajoId: l.paqueteTrabajoId || null,
 });
 
-const normalizeForm = (form) => {
+const normalizeForm = (form, defaultProjectCode = "") => {
   const f = form || emptyForm();
   const lineas = Array.isArray(f.lineas) ? f.lineas : [];
   return {
     ...emptyForm(),
     requiredDate: f.requiredDate ? String(f.requiredDate).slice(0, 10) : "",
-    lineas: lineas.length > 0 ? lineas.map(normalizeLinea) : [emptyLinea()],
+    lineas:
+      lineas.length > 0
+        ? lineas.map((l) => normalizeLinea(l, defaultProjectCode))
+        : [emptyLinea(defaultProjectCode)],
   };
 };
 
@@ -80,6 +84,30 @@ const isSolicitudVacia = (s) => {
         (l.itemCode?.trim() || l.description?.trim()) && Number(l.quantity) > 0
     );
   return !(hasDate || hasLineas);
+};
+
+// Devuelve los mensajes de campos faltantes/inválidos de una solicitud no vacía
+const validarCamposSolicitud = (form, nombre) => {
+  const mensajes = [];
+
+  if (!form.requiredDate) {
+    mensajes.push(`${nombre}: falta la fecha requerida`);
+  }
+
+  (form.lineas || []).forEach((l, idx) => {
+    const lineaVacia = !(l.itemCode?.trim() || l.description?.trim()) || !(Number(l.quantity) > 0);
+    if (lineaVacia) return;
+
+    const n = idx + 1;
+    if (!l.itemCode?.trim()) mensajes.push(`${nombre}: falta el ítem en la línea ${n}`);
+    if (!l.description?.trim()) mensajes.push(`${nombre}: falta la descripción en la línea ${n}`);
+    if (!(Number(l.quantity) > 0)) mensajes.push(`${nombre}: cantidad inválida en la línea ${n}`);
+    if (!l.warehouseCode?.trim()) mensajes.push(`${nombre}: falta el almacén en la línea ${n}`);
+    if (!l.rubroId) mensajes.push(`${nombre}: falta el rubro en la línea ${n}`);
+    if (!l.paqueteTrabajoId) mensajes.push(`${nombre}: falta el paquete de trabajo en la línea ${n}`);
+  });
+
+  return mensajes;
 };
 
 // Payload que espera el backend — solo requiredDate + lineas
@@ -304,7 +332,7 @@ function FormSolicitudAlmacen({
                 </div>
 
                 <div className="col-span-3">
-                  <p className="text-xs text-gray-500 mb-1">Paquete trabajo</p>
+                  <p className="text-xs text-gray-500 mb-1">Paquete trabajo <span className="text-red-400">*</span></p>
                   <select
                     className="w-full px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-300 bg-white"
                     value={l.paqueteTrabajoId != null ? String(l.paqueteTrabajoId) : ""}
@@ -375,6 +403,8 @@ export default function ModalSolicitudAlmacen({
   const [rubros, setRubros] = useState([]);
   const [paquetes, setPaquetes] = useState([]);
   const [loadingCatalogos, setLoadingCatalogos] = useState(false);
+  const [mostrarCamposFaltantes, setMostrarCamposFaltantes] = useState(false);
+  const [camposFaltantesLista, setCamposFaltantesLista] = useState([]);
 
   const normalizedTargets = useMemo(() => {
     const sourceTargets =
@@ -555,6 +585,23 @@ export default function ModalSolicitudAlmacen({
   );
 
   const handleConfirm = () => {
+    const mensajes = [];
+    if (!isSolicitudVacia(general)) {
+      mensajes.push(...validarCamposSolicitud(general, "General"));
+    }
+    for (const target of normalizedTargets) {
+      const f = porTarget[String(target.id)];
+      if (!isSolicitudVacia(f)) {
+        mensajes.push(...validarCamposSolicitud(f, target.nombre || target.id));
+      }
+    }
+
+    if (mensajes.length > 0) {
+      setCamposFaltantesLista(mensajes);
+      setMostrarCamposFaltantes(true);
+      return;
+    }
+
     const solicitudesPorEquipo = {};
 
     normalizedTargets.forEach((target) => {
@@ -594,9 +641,10 @@ export default function ModalSolicitudAlmacen({
     tab !== "general" ? !isSolicitudVacia(porTarget[String(tab)]) : false;
 
   if (!isOpen) return null;
-  
+
 
   return (
+    <>
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
       <div className="bg-white w-full max-w-6xl rounded-2xl flex flex-col max-h-[92vh] shadow-2xl">
 
@@ -753,7 +801,7 @@ export default function ModalSolicitudAlmacen({
               {tab !== "general" && (
                 <button
                   type="button"
-                  onClick={() => updateTargetForm(String(tab), normalizeForm(emptyForm()))}
+                  onClick={() => updateTargetForm(String(tab), normalizeForm(emptyForm(), ordenVenta))}
                   className="text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-lg hover:bg-white/60 transition"
                 >
                   Limpiar este objetivo
@@ -807,5 +855,13 @@ export default function ModalSolicitudAlmacen({
         </div>
       </div>
     </div>
+
+    <ModalCamposFaltantes
+      isOpen={mostrarCamposFaltantes}
+      onClose={() => setMostrarCamposFaltantes(false)}
+      titulo="Faltan completar estos campos"
+      items={camposFaltantesLista}
+    />
+    </>
   );
 }
