@@ -43,8 +43,6 @@ import { abrirPdfOrdenTrabajo } from "../services/ordenTrabajoPdfService";
 import ModalLiberarOT from "./ModalLiberarOT";
 import ModalDetalleSolicitud from "./ModalDetalleSolicitud";
 import ModalEnviarAlmacen from "./ModalEnviarAlmacen";
-import ModalEditarSolicitudCompra from "./ModalEditarSolicitudCompra";
-import ModalEditarSolicitudAlmacen from "./ModalEditarSolicitudAlmacen";
 
 /* ══════════════════════════════════════════
    CONSTANTES
@@ -619,6 +617,36 @@ export default function ModalOrdenTrabajoView({
     })),
   }), [orden]);
 
+  // Precarga el mismo formulario de creación (ModalSolicitudCompra/Almacen) con
+  // los datos de una solicitud DRAFT existente, para usarlo también al "Editar".
+  const mapSolicitudAFormGeneral = (sol) => ({
+    requiredDate: sol?.requiredDate || "",
+    lineas: (sol?.lineas || []).map((l) => ({
+      id: l.id,
+      itemId: l.itemId || "",
+      itemCode: l.itemCode || "",
+      description: l.description || "",
+      quantity: l.quantity,
+      warehouseCode: l.warehouseCode || "",
+      costCenter: l.costingCode || l.costCenter || "",
+      projectCode: l.projectCode || "",
+      rubroId: l.rubroId || null,
+      rubroSapCode: l.rubroSapCode || null,
+      paqueteTrabajoId: l.paqueteTrabajoId || null,
+      paqueteTrabajo: l.paqueteTrabajo || null,
+    })),
+  });
+
+  const contextoOtParaEdicion = useMemo(() => ({ ...contextoOt, targets: [] }), [contextoOt]);
+  const initialValueCompraEdit = useMemo(
+    () => (editandoCompra ? { solicitudGeneral: mapSolicitudAFormGeneral(editandoCompra) } : null),
+    [editandoCompra]
+  );
+  const initialValueAlmacenEdit = useMemo(
+    () => (editandoAlmacen ? { solicitudGeneral: mapSolicitudAFormGeneral(editandoAlmacen) } : null),
+    [editandoAlmacen]
+  );
+
   const getEquipoDetalle  = (eq) => (eq?.equipoId ? equiposDetalleMap[eq.equipoId] || null : null);
   const getNombreObj      = (eq) => getEquipoDetalle(eq)?.nombre || eq.equipo?.nombre || eq.ubicacionTecnica?.nombre || "Objetivo";
   const getCodigoObj      = (eq) => getEquipoDetalle(eq)?.codigo || eq.equipo?.codigo || eq.ubicacionTecnica?.codigo || "—";
@@ -714,16 +742,61 @@ export default function ModalOrdenTrabajoView({
     }
   };
 
-  const handleGuardarCompra = async (solId, payload) => {
-    await updateSolicitudCompra(solId, payload);
-    setEditandoCompra(null);
-    await recargarSolicitudes();
+  // El modal de creación (ModalSolicitudCompra/Almacen) siempre devuelve
+  // { solicitudGeneral, solicitudesPorEquipo } aunque en modo edición solo
+  // usemos la pestaña "General" (targets=[] fuerza a que sea la única).
+  const handleConfirmEditarCompra = async (data) => {
+    try {
+      const sol = data?.solicitudGeneral;
+      if (!sol || !tieneLineasValidas(sol)) {
+        alert("Agrega al menos un ítem válido.");
+        return;
+      }
+      const payload = {
+        ...sol,
+        esGeneral: !!editandoCompra.esGeneral,
+        equipo_id: editandoCompra.equipo_id || null,
+        ubicacion_tecnica_id: editandoCompra.ubicacion_tecnica_id || null,
+        tratamiento_id: editandoCompra.tratamiento_id || contextoOt.tratamiento_id || null,
+        ordenTrabajoId: editandoCompra.ordenTrabajoId || contextoOt.ordenTrabajoId || null,
+        department: editandoCompra.department || "",
+        requester: editandoCompra.requester || editandoCompra.email || "",
+        docCurrency: editandoCompra.docCurrency || "PEN",
+        docRate: editandoCompra.docRate || 1,
+        branchId: editandoCompra.branchId || 1,
+      };
+      await updateSolicitudCompra(editandoCompra.id, payload);
+      setEditandoCompra(null);
+      await recargarSolicitudes();
+    } catch (error) {
+      const msg = error?.response?.data?.errors?.join(", ") || error?.response?.data?.message || error?.message || "Error al guardar la solicitud de compra";
+      alert(msg);
+    }
   };
 
-  const handleGuardarAlmacen = async (solId, payload) => {
-    await updateSolicitudAlmacen(solId, payload);
-    setEditandoAlmacen(null);
-    await recargarSolicitudes();
+  const handleConfirmEditarAlmacen = async (data) => {
+    try {
+      const sol = data?.solicitudGeneral;
+      if (!sol || !tieneLineasValidas(sol)) {
+        alert("Agrega al menos un ítem válido.");
+        return;
+      }
+      const payload = {
+        ...sol,
+        esGeneral: !!editandoAlmacen.esGeneral,
+        equipo_id: editandoAlmacen.equipo_id || null,
+        ubicacion_tecnica_id: editandoAlmacen.ubicacion_tecnica_id || null,
+        tratamiento_id: editandoAlmacen.tratamiento_id || contextoOt.tratamiento_id || null,
+        ordenTrabajoId: editandoAlmacen.ordenTrabajoId || contextoOt.ordenTrabajoId || null,
+        bloque_id: editandoAlmacen.bloque_id || null,
+      };
+      await updateSolicitudAlmacen(editandoAlmacen.id, payload);
+      setEditandoAlmacen(null);
+      await recargarSolicitudes();
+    } catch (error) {
+      const msg = error?.response?.data?.errors?.join(", ") || error?.response?.data?.message || error?.message || "Error al guardar la solicitud de almacén";
+      alert(msg);
+    }
   };
 
   const handleEditarOT = async (payload) => {
@@ -1384,20 +1457,24 @@ export default function ModalOrdenTrabajoView({
       </div>
 
       {/* Modales secundarios */}
+      {/* Mismo modal para crear y editar: en modo edición no se muestran pestañas
+          por equipo (targets=[]), solo "General" precargada con la solicitud. */}
       <ModalSolicitudCompra
-        isOpen={openSolicitudCompra}
-        onClose={() => { setOpenSolicitudCompra(false); setTargetSeleccionado(null); }}
-        onConfirm={handleConfirmSolicitudCompra}
-        targets={targetSeleccionado ? [targetSeleccionado] : contextoOt.targets}
-        contextoOt={contextoOt}
+        isOpen={openSolicitudCompra || !!editandoCompra}
+        onClose={() => { setOpenSolicitudCompra(false); setTargetSeleccionado(null); setEditandoCompra(null); }}
+        onConfirm={editandoCompra ? handleConfirmEditarCompra : handleConfirmSolicitudCompra}
+        targets={editandoCompra ? [] : (targetSeleccionado ? [targetSeleccionado] : contextoOt.targets)}
+        contextoOt={editandoCompra ? contextoOtParaEdicion : contextoOt}
+        initialValue={editandoCompra ? initialValueCompraEdit : null}
         soloContextoOt={true}
       />
       <ModalSolicitudAlmacen
-        isOpen={openSolicitudAlmacen}
-        onClose={() => { setOpenSolicitudAlmacen(false); setTargetSeleccionado(null); }}
-        onConfirm={handleConfirmSolicitudAlmacen}
-        targets={targetSeleccionado ? [targetSeleccionado] : contextoOt.targets}
-        contextoOt={contextoOt}
+        isOpen={openSolicitudAlmacen || !!editandoAlmacen}
+        onClose={() => { setOpenSolicitudAlmacen(false); setTargetSeleccionado(null); setEditandoAlmacen(null); }}
+        onConfirm={editandoAlmacen ? handleConfirmEditarAlmacen : handleConfirmSolicitudAlmacen}
+        targets={editandoAlmacen ? [] : (targetSeleccionado ? [targetSeleccionado] : contextoOt.targets)}
+        contextoOt={editandoAlmacen ? contextoOtParaEdicion : contextoOt}
+        initialValue={editandoAlmacen ? initialValueAlmacenEdit : null}
         soloContextoOt={true}
       />
       <ModalOTGrupal
@@ -1424,26 +1501,6 @@ export default function ModalOrdenTrabajoView({
         onClose={() => setSolicitudDetalle(null)}
         solicitud={solicitudDetalle}
         tipo={tipoDetalle}
-      />
-
-      {/* ── Editar solicitud de compra ── */}
-      <ModalEditarSolicitudCompra
-        isOpen={!!editandoCompra}
-        onClose={() => setEditandoCompra(null)}
-        solicitudes={editandoCompra ? [editandoCompra] : []}
-        defaultSolicitudId={editandoCompra?.id || ""}
-        equiposInfo={contextoOt.targets}
-        onSave={handleGuardarCompra}
-      />
-
-      {/* ── Editar solicitud de almacén ── */}
-      <ModalEditarSolicitudAlmacen
-        isOpen={!!editandoAlmacen}
-        onClose={() => setEditandoAlmacen(null)}
-        solicitud={editandoAlmacen}
-        onSave={handleGuardarAlmacen}
-        ordenTrabajoId={orden?.id}
-        tratamientoId={orden?.tratamientoId}
       />
 
       {/* ── Modal enviar bloques de almacén por correo ── */}
