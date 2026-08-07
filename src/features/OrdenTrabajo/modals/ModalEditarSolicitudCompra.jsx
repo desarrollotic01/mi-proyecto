@@ -1,5 +1,7 @@
 import { X, Save, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { itemService } from "../../PlanMantenimiento/services/itemService";
+import { sapCatalogosService } from "../../PlanMantenimiento/services/sapCatalogosService";
 
 /**
  * ModalEditarSolicitudCompra (UNIVERSAL)
@@ -28,6 +30,33 @@ export default function ModalEditarSolicitudCompra({
 }) {
   const [selectedId, setSelectedId] = useState(defaultSolicitudId || "");
   const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState([]);
+  const [rubros, setRubros] = useState([]);
+  const [paquetes, setPaquetes] = useState([]);
+  const [loadingCatalogos, setLoadingCatalogos] = useState(false);
+  const [warehousesByLinea, setWarehousesByLinea] = useState({});
+  const [errores, setErrores] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    (async () => {
+      try {
+        setLoadingCatalogos(true);
+        const [i, r, p] = await Promise.all([
+          itemService.getAll(),
+          sapCatalogosService.getRubros(),
+          sapCatalogosService.getPaquetes(),
+        ]);
+        setItems(i || []);
+        setRubros(r || []);
+        setPaquetes(p || []);
+      } catch (e) {
+        console.error("Error cargando catálogos:", e);
+      } finally {
+        setLoadingCatalogos(false);
+      }
+    })();
+  }, [isOpen]);
 
   const solicitudesArr = useMemo(() => (Array.isArray(solicitudes) ? solicitudes : []), [solicitudes]);
 
@@ -82,6 +111,7 @@ export default function ModalEditarSolicitudCompra({
     if (!isOpen) return;
     if (!selectedSolicitud) return;
 
+    setErrores([]);
     setFormData({
       requiredDate: selectedSolicitud.requiredDate || "",
       department: selectedSolicitud.department || "Mantenimiento",
@@ -92,15 +122,14 @@ export default function ModalEditarSolicitudCompra({
       branchId: selectedSolicitud.branchId || 1,
       lineas:
         selectedSolicitud.lineas?.map((linea) => ({
+          itemId: linea.itemId || "",
           itemCode: linea.itemCode || "",
           description: linea.description || linea.item || "",
           quantity: Number(linea.quantity ?? linea.cantidad) || 1,
           warehouseCode: linea.warehouseCode || "01",
-
-          // opcional: si tu backend soporta rubro/paqueteTrabajo/costCenter/etc
-          rubro: linea.rubro || "",
-          paqueteTrabajo: linea.paqueteTrabajo || "",
-          costCenter: linea.costCenter || "",
+          rubroId: linea.rubroId || null,
+          paqueteTrabajoId: linea.paqueteTrabajoId || null,
+          costCenter: linea.costingCode || linea.costCenter || "",
           projectCode: linea.projectCode || "",
         })) || [],
     });
@@ -119,18 +148,43 @@ export default function ModalEditarSolicitudCompra({
     });
   };
 
+  const handleSelectItem = async (index, selectedItemId) => {
+    const item = items.find((i) => String(i.id) === String(selectedItemId));
+    if (!item) return;
+
+    setFormData((prev) => {
+      const newLineas = [...(prev.lineas || [])];
+      newLineas[index] = {
+        ...newLineas[index],
+        itemId: item.id,
+        itemCode: item.sapCode || "",
+        description: item.nombre || "",
+        warehouseCode: "",
+      };
+      return { ...prev, lineas: newLineas };
+    });
+
+    try {
+      const res = await itemService.getWarehouses(item.sapCode);
+      setWarehousesByLinea((prev) => ({ ...prev, [index]: res.data || [] }));
+    } catch (e) {
+      console.error("Error cargando warehouses:", e);
+    }
+  };
+
   const agregarLinea = () => {
     setFormData((prev) => ({
       ...prev,
       lineas: [
         ...(prev.lineas || []),
         {
+          itemId: "",
           itemCode: "",
           description: "",
           quantity: 1,
           warehouseCode: "01",
-          rubro: "",
-          paqueteTrabajo: "",
+          rubroId: null,
+          paqueteTrabajoId: null,
           costCenter: "",
           projectCode: "",
         },
@@ -163,24 +217,37 @@ export default function ModalEditarSolicitudCompra({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrores([]);
+
     if (!selectedSolicitud?.id) {
-      alert("No hay solicitud seleccionada.");
+      setErrores(["No hay solicitud seleccionada."]);
       return;
     }
 
     if (!formData.requiredDate || !formData.department || !formData.requester) {
-      alert("Completa requiredDate, department y requester.");
+      setErrores(["Completa la fecha requerida, departamento y solicitante."]);
       return;
     }
 
     if (!formData.lineas || formData.lineas.length === 0) {
-      alert("Agrega al menos 1 ítem.");
+      setErrores(["Agrega al menos 1 ítem."]);
+      return;
+    }
+
+    const erroresLineas = [];
+    formData.lineas.forEach((l, idx) => {
+      const n = idx + 1;
+      if (!l.itemCode?.trim()) erroresLineas.push(`Línea ${n}: falta el ítem`);
+      if (!(Number(l.quantity) > 0)) erroresLineas.push(`Línea ${n}: cantidad inválida`);
+      if (!l.warehouseCode?.trim()) erroresLineas.push(`Línea ${n}: falta el almacén`);
+    });
+    if (erroresLineas.length > 0) {
+      setErrores(erroresLineas);
       return;
     }
 
     setLoading(true);
     try {
-      // ✅ payload limpio
       const payload = {
         requiredDate: formData.requiredDate,
         department: formData.department,
@@ -190,15 +257,14 @@ export default function ModalEditarSolicitudCompra({
         docRate: Number(formData.docRate) || 1,
         branchId: formData.branchId || 1,
         lineas: (formData.lineas || []).map((l) => ({
+          itemId: l.itemId || null,
           itemCode: l.itemCode,
           description: l.description,
           quantity: Number(l.quantity) || 1,
           warehouseCode: l.warehouseCode || "01",
-
-          // opcionales
-          rubro: l.rubro || "",
-          paqueteTrabajo: l.paqueteTrabajo || "",
-          costCenter: l.costCenter || "",
+          rubroId: l.rubroId || null,
+          paqueteTrabajoId: l.paqueteTrabajoId || null,
+          costingCode: l.costCenter || "",
           projectCode: l.projectCode || "",
         })),
       };
@@ -207,7 +273,8 @@ export default function ModalEditarSolicitudCompra({
       onClose();
     } catch (error) {
       console.error("Error al guardar:", error);
-      alert("Error al guardar la solicitud de compra");
+      const msg = error?.response?.data?.errors?.join(", ") || error?.response?.data?.message || "Error al guardar la solicitud de compra";
+      setErrores([msg]);
     } finally {
       setLoading(false);
     }
@@ -276,6 +343,12 @@ export default function ModalEditarSolicitudCompra({
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
           <div className="space-y-6">
+            {errores.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 space-y-1">
+                {errores.map((e, i) => <p key={i}>• {e}</p>)}
+              </div>
+            )}
+
             {/* Info general */}
             <div className="bg-slate-50 rounded-lg p-4 space-y-4">
               <h4 className="font-bold text-slate-900 mb-3">Información General</h4>
@@ -385,15 +458,30 @@ export default function ModalEditarSolicitudCompra({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 mb-1">
-                          Código de Artículo *
+                          Ítem *
+                        </label>
+                        <select
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          value={linea.itemId || ""}
+                          onChange={(e) => handleSelectItem(index, e.target.value)}
+                          disabled={loadingCatalogos}
+                        >
+                          <option value="">{loadingCatalogos ? "Cargando..." : "Seleccione"}</option>
+                          {items.map((item) => (
+                            <option key={item.id} value={item.id}>{item.sapCode} - {item.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Código
                         </label>
                         <input
                           type="text"
+                          readOnly
                           value={linea.itemCode}
-                          onChange={(e) => handleLineaChange(index, "itemCode", e.target.value)}
-                          required
-                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                          placeholder="MAT-001"
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-gray-100"
                         />
                       </div>
 
@@ -429,16 +517,81 @@ export default function ModalEditarSolicitudCompra({
 
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 mb-1">
-                          Código Almacén *
+                          Almacén *
+                        </label>
+                        <select
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          value={linea.warehouseCode || ""}
+                          onChange={(e) => handleLineaChange(index, "warehouseCode", e.target.value)}
+                        >
+                          <option value="">Seleccione</option>
+                          {(warehousesByLinea[index] || []).map((w) => (
+                            <option key={w.warehouseCode} value={w.warehouseCode}>
+                              {w.warehouseCode} (Stock: {w.inStock})
+                            </option>
+                          ))}
+                          {linea.warehouseCode && !(warehousesByLinea[index] || []).some((w) => w.warehouseCode === linea.warehouseCode) && (
+                            <option value={linea.warehouseCode}>{linea.warehouseCode}</option>
+                          )}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Centro de costo
                         </label>
                         <input
                           type="text"
-                          value={linea.warehouseCode}
-                          onChange={(e) => handleLineaChange(index, "warehouseCode", e.target.value)}
-                          required
+                          value={linea.costCenter}
+                          onChange={(e) => handleLineaChange(index, "costCenter", e.target.value)}
                           className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                          placeholder="01"
+                          placeholder="CC-001"
                         />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Proyecto
+                        </label>
+                        <input
+                          type="text"
+                          value={linea.projectCode}
+                          onChange={(e) => handleLineaChange(index, "projectCode", e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          placeholder="Opcional"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Rubro
+                        </label>
+                        <select
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          value={linea.rubroId != null ? String(linea.rubroId) : ""}
+                          onChange={(e) => handleLineaChange(index, "rubroId", e.target.value || null)}
+                        >
+                          <option value="">Seleccione</option>
+                          {rubros.map((r) => (
+                            <option key={r.id} value={r.id}>{r.codigo} - {r.descripcion}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Paquete trabajo
+                        </label>
+                        <select
+                          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          value={linea.paqueteTrabajoId != null ? String(linea.paqueteTrabajoId) : ""}
+                          onChange={(e) => handleLineaChange(index, "paqueteTrabajoId", e.target.value || null)}
+                        >
+                          <option value="">Seleccione</option>
+                          {paquetes.map((p) => (
+                            <option key={p.id} value={p.id}>{p.codigo} - {p.descripcion}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   </div>

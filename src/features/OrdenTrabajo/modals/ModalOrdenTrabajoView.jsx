@@ -1432,6 +1432,7 @@ export default function ModalOrdenTrabajoView({
         onClose={() => setEditandoCompra(null)}
         solicitudes={editandoCompra ? [editandoCompra] : []}
         defaultSolicitudId={editandoCompra?.id || ""}
+        equiposInfo={contextoOt.targets}
         onSave={handleGuardarCompra}
       />
 
@@ -1441,6 +1442,8 @@ export default function ModalOrdenTrabajoView({
         onClose={() => setEditandoAlmacen(null)}
         solicitud={editandoAlmacen}
         onSave={handleGuardarAlmacen}
+        ordenTrabajoId={orden?.id}
+        tratamientoId={orden?.tratamientoId}
       />
 
       {/* ── Modal enviar bloques de almacén por correo ── */}
